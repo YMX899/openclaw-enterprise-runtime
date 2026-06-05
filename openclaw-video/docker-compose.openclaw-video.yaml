@@ -73,6 +73,9 @@ services:
       DOUYIN_CHONG_BIN: /opt/douyin_chong/douyin_chong
       WORKER_CONCURRENCY: "1"
       JOB_TIMEOUT_SECONDS: "900"
+      MAX_DOWNLOAD_BYTES: "536870912"
+      MAX_VIDEO_DURATION_SECONDS: "60"
+      MAX_VIDEO_FRAMES: "1200"
     volumes:
       - ./vendor/douyin_chong:/opt/douyin_chong:ro
       - worker-tmp:/tmp/openclaw-video

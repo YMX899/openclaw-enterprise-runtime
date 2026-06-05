@@ -9,7 +9,14 @@ from typing import Callable
 from .douyin_wrapper import DouyinAnalysisResult, DouyinWrapperError, run_douyin_chong
 from .job_store import InMemoryJobStore, JobLeaseError, VideoJob
 from .result_schema import RESULT_SCHEMA_VERSION, ResultSchemaError, validate_result_payload
-from .url_guard import Resolver, UrlRejected, default_resolver, validate_video_url
+from .url_guard import (
+    RedirectFetcher,
+    Resolver,
+    UrlRejected,
+    default_redirect_fetcher,
+    default_resolver,
+    validate_video_url_with_redirects,
+)
 
 
 Analyzer = Callable[[str, Path], DouyinAnalysisResult]
@@ -20,6 +27,9 @@ class WorkerConfig:
     timeout_seconds: int = 900
     worker_id: str = "video-analysis-worker-1"
     heartbeat_interval_seconds: int = 30
+    max_download_bytes: int = 512 * 1024 * 1024
+    max_duration_seconds: int = 60
+    max_frames: int = 1200
 
 
 class VideoAnalysisWorker:
@@ -29,18 +39,23 @@ class VideoAnalysisWorker:
         *,
         analyzer: Analyzer | None = None,
         url_resolver: Resolver = default_resolver,
+        redirect_fetcher: RedirectFetcher = default_redirect_fetcher,
         config: WorkerConfig | None = None,
     ) -> None:
         self.store = store
         self.config = config or WorkerConfig()
         self.analyzer = analyzer or self._default_analyzer
         self.url_resolver = url_resolver
+        self.redirect_fetcher = redirect_fetcher
 
     def _default_analyzer(self, video_url: str, output_dir: Path) -> DouyinAnalysisResult:
         return run_douyin_chong(
             video_url=video_url,
             output_dir=output_dir,
             timeout_seconds=self.config.timeout_seconds,
+            max_download_bytes=self.config.max_download_bytes,
+            max_duration_seconds=self.config.max_duration_seconds,
+            max_frames=self.config.max_frames,
         )
 
     def _start_heartbeat(self, job: VideoJob) -> Callable[[], None]:
@@ -82,7 +97,11 @@ class VideoAnalysisWorker:
             return None
         stop_heartbeat = self._start_heartbeat(job)
         try:
-            validated = validate_video_url(job.video_url_canonical, resolver=self.url_resolver)
+            validated = validate_video_url_with_redirects(
+                job.video_url_canonical,
+                resolver=self.url_resolver,
+                redirect_fetcher=self.redirect_fetcher,
+            )
             with TemporaryDirectory(prefix="openclaw-video-") as tmp:
                 analysis = self.analyzer(validated.canonical, Path(tmp))
             payload = validate_result_payload(analysis.payload)

@@ -45,5 +45,10 @@
 - Private IP URL is rejected.
 - Cloud metadata IP is rejected.
 - Redirect target is revalidated before download.
+- Redirect chains that loop or exceed the configured hop limit are rejected.
+- Redirects to non-allowlisted hosts or private/metadata IP space are rejected.
+- Worker analyzes the final canonical URL after redirect validation.
+- Worker invokes the video tool through fixed arguments for max download bytes,
+  max video duration and max frame count.
 - Result matches `schemas/video-analysis-result.schema.json`.
 - Temporary files are cleaned.

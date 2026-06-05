@@ -12,6 +12,10 @@ def public_resolver(_host: str, _port: int | None) -> list[str]:
     return ["110.242.68.66"]
 
 
+def no_redirect(_url: str) -> str | None:
+    return None
+
+
 def ok_analyzer(video_url: str, _output_dir: Path) -> DouyinAnalysisResult:
     return DouyinAnalysisResult(
         payload={
@@ -43,7 +47,12 @@ class WorkerServiceTests(unittest.TestCase):
     def test_run_once_succeeds(self):
         store = InMemoryJobStore()
         job = store.create_job("owner", "session", "https://v.douyin.com/abc")
-        worker = VideoAnalysisWorker(store, analyzer=ok_analyzer, url_resolver=public_resolver)
+        worker = VideoAnalysisWorker(
+            store,
+            analyzer=ok_analyzer,
+            url_resolver=public_resolver,
+            redirect_fetcher=no_redirect,
+        )
         completed = worker.run_once()
         self.assertEqual(completed.job_id, job.job_id)
         self.assertEqual(completed.status, JobStatus.SUCCEEDED)
@@ -52,7 +61,7 @@ class WorkerServiceTests(unittest.TestCase):
     def test_run_once_rejects_bad_url(self):
         store = InMemoryJobStore()
         job = store.create_job("owner", "session", "https://example.com/video")
-        worker = VideoAnalysisWorker(store, analyzer=ok_analyzer)
+        worker = VideoAnalysisWorker(store, analyzer=ok_analyzer, redirect_fetcher=no_redirect)
         failed = worker.run_once()
         self.assertEqual(failed.job_id, job.job_id)
         self.assertEqual(failed.status, JobStatus.FAILED)
@@ -61,7 +70,12 @@ class WorkerServiceTests(unittest.TestCase):
     def test_run_once_fails_invalid_result(self):
         store = InMemoryJobStore()
         job = store.create_job("owner", "session", "https://v.douyin.com/abc")
-        worker = VideoAnalysisWorker(store, analyzer=invalid_analyzer, url_resolver=public_resolver)
+        worker = VideoAnalysisWorker(
+            store,
+            analyzer=invalid_analyzer,
+            url_resolver=public_resolver,
+            redirect_fetcher=no_redirect,
+        )
         failed = worker.run_once()
         self.assertEqual(failed.job_id, job.job_id)
         self.assertEqual(failed.status, JobStatus.FAILED)
@@ -70,7 +84,12 @@ class WorkerServiceTests(unittest.TestCase):
     def test_run_once_marks_timeout(self):
         store = InMemoryJobStore()
         job = store.create_job("owner", "session", "https://v.douyin.com/abc")
-        worker = VideoAnalysisWorker(store, analyzer=timeout_analyzer, url_resolver=public_resolver)
+        worker = VideoAnalysisWorker(
+            store,
+            analyzer=timeout_analyzer,
+            url_resolver=public_resolver,
+            redirect_fetcher=no_redirect,
+        )
         failed = worker.run_once()
         self.assertEqual(failed.job_id, job.job_id)
         self.assertEqual(failed.status, JobStatus.TIMED_OUT)
@@ -88,11 +107,41 @@ class WorkerServiceTests(unittest.TestCase):
             takeover()
             return ok_analyzer(video_url, output_dir)
 
-        worker = VideoAnalysisWorker(store, analyzer=stale_worker_analyzer, url_resolver=public_resolver)
+        worker = VideoAnalysisWorker(
+            store,
+            analyzer=stale_worker_analyzer,
+            url_resolver=public_resolver,
+            redirect_fetcher=no_redirect,
+        )
         current = worker.run_once()
         self.assertEqual(current.job_id, job.job_id)
         self.assertEqual(current.status, JobStatus.RUNNING)
         self.assertEqual(current.worker_id, "worker-b")
+
+    def test_run_once_analyzes_redirect_target(self):
+        store = InMemoryJobStore()
+        job = store.create_job("owner", "session", "https://v.douyin.com/abc")
+        seen = {}
+
+        def analyzer(video_url: str, output_dir: Path) -> DouyinAnalysisResult:
+            seen["video_url"] = video_url
+            return ok_analyzer(video_url, output_dir)
+
+        def redirect_fetcher(url: str) -> str | None:
+            if url == "https://v.douyin.com/abc":
+                return "https://www.douyin.com/video/1"
+            return None
+
+        worker = VideoAnalysisWorker(
+            store,
+            analyzer=analyzer,
+            url_resolver=public_resolver,
+            redirect_fetcher=redirect_fetcher,
+        )
+        completed = worker.run_once()
+        self.assertEqual(completed.job_id, job.job_id)
+        self.assertEqual(completed.status, JobStatus.SUCCEEDED)
+        self.assertEqual(seen["video_url"], "https://www.douyin.com/video/1")
 
 
 if __name__ == "__main__":

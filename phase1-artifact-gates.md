@@ -91,9 +91,10 @@ Current local and server checks did not find production-ready:
 
 Local draft artifacts now exist for Bridge identity, URL guarding, job state,
 in-memory job claiming, Postgres durable queue adapter, worker lease/heartbeat
-flow, worker status transitions, Gateway token isolation, database migration
-draft, rollback SQL, rollback runbook and baseline test script. These are
-offline implementation progress, not production deployment evidence.
+flow, worker status transitions, redirect target revalidation, fixed-argument
+video resource-limit wrapper contract, Gateway token isolation, database
+migration draft, rollback SQL, rollback runbook and baseline test script. These
+are offline implementation progress, not production deployment evidence.
 
 Because of these missing artifacts:
 
@@ -178,6 +179,7 @@ The worker must:
 - call `douyin_chong` only through a fixed-argument wrapper.
 - reject non-allowlisted domains.
 - validate redirects and final resolved IPs.
+- reject redirect loops and excessive redirect chains.
 - reject localhost, private networks, link-local ranges, cloud metadata IPs, and internal IPv6.
 - enforce download size, video duration, frame count, timeout, temp directory, CPU, memory, and PID limits.
 - run as non-root.

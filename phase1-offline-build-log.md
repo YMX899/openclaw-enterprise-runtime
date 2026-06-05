@@ -112,6 +112,28 @@ compileall:
   OK
 ```
 
+Updated local test result after redirect revalidation and wrapper resource
+limit contract:
+
+```text
+git diff --check:
+  OK
+
+System Python with PYTHONPATH=openclaw-video\src:
+  Ran 60 tests, OK, skipped=10
+  skipped: FastAPI TestClient and psycopg Jsonb tests missing global deps.
+
+.phase1-sandbox/bridge-api-venv:
+  Ran 60 tests, OK
+  includes URL redirect-chain revalidation, worker final-canonical URL handoff,
+  fixed-argument douyin_chong resource-limit wrapper contract, FastAPI API tests
+  and Postgres adapter replay tests.
+
+compileall:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m compileall -q openclaw-video\src openclaw-video\tests
+  OK
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -130,6 +152,12 @@ Covered:
   session/message/job access.
 - Bridge job events SSE endpoint streams current-user job snapshots, heartbeat
   events and terminal `done` events; polling remains the required recovery path.
+- URL guard revalidates each redirect hop before the worker analyzes the final
+  canonical URL, rejects redirect loops, rejects excessive redirects, and rejects
+  redirects whose final target leaves the allowlist or resolves to private or
+  metadata IP space.
+- fixed-argument `douyin_chong` wrapper passes max download bytes, max video
+  duration and max frame-count controls without shell invocation.
 - Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
   idempotency keys, worker leases, heartbeats, expired lease recovery and
   stale-worker result rejection.
@@ -166,6 +194,8 @@ Verified statically:
 ## Remaining Phase 1 Blockers
 
 - Actual `douyin_chong` artifact is still missing.
+- `douyin_chong` must still prove that it accepts and enforces the wrapper's
+  max download bytes, max video duration and max frame-count arguments.
 - OpenClaw Gateway API contract for Bridge is not locked.
 - OpenClaw 2026.3.13 security exception or patch strategy is not decided.
 - OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated

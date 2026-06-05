@@ -57,6 +57,9 @@ class PostgresContractTests(unittest.TestCase):
             "WORKER_CONCURRENCY",
             'concurrency != 1',
             "recover_expired_leases",
+            "MAX_DOWNLOAD_BYTES",
+            "MAX_VIDEO_DURATION_SECONDS",
+            "MAX_VIDEO_FRAMES",
             "VideoAnalysisWorker",
         ]:
             with self.subTest(required=required):

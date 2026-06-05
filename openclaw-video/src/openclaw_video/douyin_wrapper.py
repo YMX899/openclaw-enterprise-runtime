@@ -18,12 +18,21 @@ class DouyinAnalysisResult:
     stderr: str
 
 
+def _positive_int(value: int, name: str) -> int:
+    if value <= 0:
+        raise DouyinWrapperError(f"{name} must be positive")
+    return value
+
+
 def run_douyin_chong(
     *,
     video_url: str,
     output_dir: Path,
     binary: str | None = None,
     timeout_seconds: int = 900,
+    max_download_bytes: int = 512 * 1024 * 1024,
+    max_duration_seconds: int = 60,
+    max_frames: int = 1200,
 ) -> DouyinAnalysisResult:
     """Run douyin_chong through a fixed-argument, no-shell wrapper.
 
@@ -34,6 +43,9 @@ def run_douyin_chong(
     executable = binary or os.environ.get("DOUYIN_CHONG_BIN")
     if not executable:
         raise DouyinWrapperError("DOUYIN_CHONG_BIN is not configured")
+    max_download_bytes = _positive_int(max_download_bytes, "max_download_bytes")
+    max_duration_seconds = _positive_int(max_duration_seconds, "max_duration_seconds")
+    max_frames = _positive_int(max_frames, "max_frames")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_json = output_dir / "result.json"
     cmd = [
@@ -42,6 +54,12 @@ def run_douyin_chong(
         video_url,
         "--output-json",
         str(output_json),
+        "--max-bytes",
+        str(max_download_bytes),
+        "--max-duration-seconds",
+        str(max_duration_seconds),
+        "--max-frames",
+        str(max_frames),
         "--no-shell",
     ]
     completed = subprocess.run(
@@ -60,4 +78,3 @@ def run_douyin_chong(
     if not isinstance(payload, dict):
         raise DouyinWrapperError("douyin_chong result must be a JSON object")
     return DouyinAnalysisResult(payload=payload, stdout=completed.stdout, stderr=completed.stderr)
-

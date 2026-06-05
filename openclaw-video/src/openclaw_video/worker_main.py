@@ -20,6 +20,9 @@ def main() -> None:
     timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", "900"))
     worker_id = os.environ.get("WORKER_ID", "video-analysis-worker-1")
     heartbeat_interval_seconds = int(os.environ.get("JOB_HEARTBEAT_SECONDS", "30"))
+    max_download_bytes = int(os.environ.get("MAX_DOWNLOAD_BYTES", str(512 * 1024 * 1024)))
+    max_duration_seconds = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "60"))
+    max_frames = int(os.environ.get("MAX_VIDEO_FRAMES", "1200"))
     store = PostgresJobStore(database_url)
     worker = VideoAnalysisWorker(
         store,
@@ -27,6 +30,9 @@ def main() -> None:
             timeout_seconds=timeout_seconds,
             worker_id=worker_id,
             heartbeat_interval_seconds=heartbeat_interval_seconds,
+            max_download_bytes=max_download_bytes,
+            max_duration_seconds=max_duration_seconds,
+            max_frames=max_frames,
         ),
     )
     while True:
