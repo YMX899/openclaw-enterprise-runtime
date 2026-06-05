@@ -86,12 +86,13 @@ Current local and server checks did not find production-ready:
 - `douyin_chong` or equivalent video-analysis source/image/binary.
 - real worker wrapper bound to the actual video-analysis artifact.
 - final JSON result schema for the real video-analysis output.
-- applied and tested Bridge database migrations.
+- applied and tested Bridge database migrations on a real Postgres container.
 - acceptance tests for real session ACL, job lifecycle, and authenticated Dify baseline.
 
 Local draft artifacts now exist for Bridge identity, URL guarding, job state,
-in-memory job claiming, worker status transitions, Gateway token isolation,
-database migration draft, rollback runbook and baseline test script. These are
+in-memory job claiming, Postgres durable queue adapter, worker lease/heartbeat
+flow, worker status transitions, Gateway token isolation, database migration
+draft, rollback SQL, rollback runbook and baseline test script. These are
 offline implementation progress, not production deployment evidence.
 
 Because of these missing artifacts:

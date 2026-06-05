@@ -57,6 +57,25 @@ OK
 ```
 ```
 
+Updated local test result after Bridge Postgres durable queue draft:
+
+```text
+System Python with PYTHONPATH=openclaw-video\src:
+  Ran 44 tests, OK, skipped=6
+  skipped: FastAPI TestClient tests because FastAPI is not installed globally.
+
+.phase1-sandbox/bridge-api-venv:
+  Ran 44 tests, OK
+  includes FastAPI TestClient API tests and Postgres durable-queue contract tests.
+
+compileall:
+  .phase1-sandbox/bridge-api-venv\Scripts\python.exe -m compileall -q openclaw-video\src openclaw-video\tests
+  OK
+
+git diff --check:
+  OK
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -73,6 +92,13 @@ Covered:
 - Bridge API draft does not expose raw Dify tenant/account IDs.
 - Bridge API draft returns 202 for video jobs and 404 for cross-user
   session/message/job access.
+- Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
+  idempotency keys, worker leases, heartbeats, expired lease recovery and
+  stale-worker result rejection.
+- `video-analysis-worker` entrypoint now requires `DATABASE_URL`, uses
+  `PostgresJobStore`, recovers expired leases and enforces V1
+  `WORKER_CONCURRENCY=1`.
+- rollback SQL for Bridge-owned tables only.
 - artifact manifest placeholders for OpenClaw 2026.3.13 and douyin_chong.
 - verification script skeletons for OpenClaw contract, douyin_chong contract,
   compose render and Dify public baseline.

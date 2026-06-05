@@ -12,7 +12,13 @@ except ImportError as exc:  # pragma: no cover - import checked in container ima
 
 from .redaction import safe_error_message
 from .dify_client import DifyClient
-from .identity import DifyPrincipal, IdentityError, derive_openclaw_routing_user, derive_principal
+from .identity import (
+    DifyPrincipal,
+    IdentityError,
+    derive_openclaw_routing_user,
+    derive_principal,
+    hmac_sha256_hex,
+)
 from .job_store import InMemoryJobStore, JobNotFound, JobOwnershipError, VideoJob
 from .session_store import (
     BridgeMessage,
@@ -64,17 +70,35 @@ def _serialize_job(job: VideoJob) -> dict[str, Any]:
     }
 
 
+def _default_session_store() -> Any:
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        from .postgres_store import PostgresSessionStore
+
+        return PostgresSessionStore(database_url)
+    return InMemorySessionStore()
+
+
+def _default_job_store() -> Any:
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        from .postgres_store import PostgresJobStore
+
+        return PostgresJobStore(database_url)
+    return InMemoryJobStore()
+
+
 def create_app(
     *,
     dify: Any | None = None,
-    session_store: InMemorySessionStore | None = None,
-    job_store: InMemoryJobStore | None = None,
+    session_store: Any | None = None,
+    job_store: Any | None = None,
     identity_secret: str | None = None,
 ) -> FastAPI:
     app = FastAPI(title="OpenClaw Dify Bridge", version="0.1.0")
     dify = dify or DifyClient(os.environ.get("DIFY_API_BASE", "http://api:5001"))
-    session_store = session_store or InMemorySessionStore()
-    job_store = job_store or InMemoryJobStore()
+    session_store = session_store or _default_session_store()
+    job_store = job_store or _default_job_store()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
 
     @app.exception_handler(Exception)
@@ -92,7 +116,14 @@ def create_app(
     async def current_principal(request: Request) -> DifyPrincipal:
         try:
             profile, workspaces = await dify.profile(request.headers), await dify.workspaces(request.headers)
-            return derive_principal(identity_secret, profile, workspaces)
+            principal = derive_principal(identity_secret, profile, workspaces)
+            if hasattr(session_store, "ensure_user"):
+                session_store.ensure_user(
+                    principal.principal_id,
+                    hmac_sha256_hex(identity_secret, f"tenant:{principal.tenant_id}"),
+                    hmac_sha256_hex(identity_secret, f"account:{principal.account_id}"),
+                )
+            return principal
         except PermissionError as exc:
             raise HTTPException(status_code=401, detail="login required") from exc
         except IdentityError as exc:
@@ -147,7 +178,13 @@ def create_app(
             session_store.get_session(session_id, principal.principal_id)
         except (SessionNotFound, SessionOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="session not found") from exc
-        job = job_store.create_job(principal.principal_id, session_id, video_url)
+        idempotency_key = payload.get("idempotency_key")
+        job = job_store.create_job(
+            principal.principal_id,
+            session_id,
+            video_url,
+            idempotency_key=str(idempotency_key) if idempotency_key else None,
+        )
         session_store.add_message(
             session_id,
             principal.principal_id,

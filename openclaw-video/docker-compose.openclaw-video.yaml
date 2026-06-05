@@ -7,7 +7,7 @@ services:
       dockerfile: docker/bridge/Dockerfile
     environment:
       DIFY_API_BASE: http://api:5001
-      DATABASE_URL: postgres://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
+      DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
       BRIDGE_IDENTITY_SECRET: ${BRIDGE_IDENTITY_SECRET:?}
       OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?}
@@ -69,7 +69,7 @@ services:
       context: .
       dockerfile: docker/worker/Dockerfile
     environment:
-      DATABASE_URL: postgres://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
+      DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
       DOUYIN_CHONG_BIN: /opt/douyin_chong/douyin_chong
       WORKER_CONCURRENCY: "1"
       JOB_TIMEOUT_SECONDS: "900"
@@ -103,4 +103,3 @@ networks:
   dify-default:
     external: true
     name: docker_default
-

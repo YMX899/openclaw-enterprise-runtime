@@ -28,6 +28,8 @@ supplied and verified:
 - exact OpenClaw Gateway API contract for version `2026.3.13`.
 - explicit security decision for npm audit findings affecting
   `openclaw@2026.3.13`.
+- real Postgres container integration test for the durable queue migration and
+  adapter.
 - real Dify authenticated browser baseline.
 - final ChatGPT web review captured in git.
 
@@ -36,7 +38,8 @@ supplied and verified:
 The unit tests cover the pure safety logic and do not require server access:
 
 ```powershell
-python -m unittest discover openclaw-video/tests
+$env:PYTHONPATH='openclaw-video\src'
+python -m unittest discover openclaw-video\tests
 ```
 
 ## Production Principle
@@ -44,4 +47,3 @@ python -m unittest discover openclaw-video/tests
 No OpenClaw service may be deployed until this repository is clean, artifacts are
 committed, generated image digests are recorded, and rollback has been tested in
 a non-production or no-op mode.
-

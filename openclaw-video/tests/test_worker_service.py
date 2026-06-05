@@ -76,6 +76,24 @@ class WorkerServiceTests(unittest.TestCase):
         self.assertEqual(failed.status, JobStatus.TIMED_OUT)
         self.assertEqual(failed.error_code, "tool_timeout")
 
+    def test_run_once_does_not_complete_after_lease_changes(self):
+        store = InMemoryJobStore()
+        job = store.create_job("owner", "session", "https://v.douyin.com/abc")
+
+        def takeover() -> None:
+            current = store.get_job(job.job_id)
+            current.worker_id = "worker-b"
+
+        def stale_worker_analyzer(video_url: str, output_dir: Path) -> DouyinAnalysisResult:
+            takeover()
+            return ok_analyzer(video_url, output_dir)
+
+        worker = VideoAnalysisWorker(store, analyzer=stale_worker_analyzer, url_resolver=public_resolver)
+        current = worker.run_once()
+        self.assertEqual(current.job_id, job.job_id)
+        self.assertEqual(current.status, JobStatus.RUNNING)
+        self.assertEqual(current.worker_id, "worker-b")
+
 
 if __name__ == "__main__":
     unittest.main()

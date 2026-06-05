@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS video_jobs (
   owner_principal_id text NOT NULL REFERENCES bridge_users(principal_id),
   bridge_session_id uuid NOT NULL REFERENCES bridge_sessions(id) ON DELETE CASCADE,
   video_url_canonical text NOT NULL,
+  idempotency_key text,
   status text NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'timed_out', 'cancelled')),
   created_at timestamptz NOT NULL DEFAULT now(),
   started_at timestamptz,
@@ -40,12 +41,23 @@ CREATE TABLE IF NOT EXISTS video_jobs (
   attempt_count integer NOT NULL DEFAULT 0,
   error_code text,
   result_schema_version text,
-  result_location text
+  result_location text,
+  worker_id text,
+  heartbeat_at timestamptz,
+  lease_expires_at timestamptz
 );
 
 CREATE INDEX IF NOT EXISTS video_jobs_claim_idx
 ON video_jobs(status, created_at)
 WHERE status = 'queued';
+
+CREATE INDEX IF NOT EXISTS video_jobs_lease_expiry_idx
+ON video_jobs(status, lease_expires_at)
+WHERE status = 'running';
+
+CREATE UNIQUE INDEX IF NOT EXISTS video_jobs_idempotency_idx
+ON video_jobs(owner_principal_id, bridge_session_id, idempotency_key)
+WHERE idempotency_key IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS video_results (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -72,4 +84,3 @@ CREATE TABLE IF NOT EXISTS tenant_gateway_mapping (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-
