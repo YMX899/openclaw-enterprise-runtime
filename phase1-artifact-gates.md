@@ -24,8 +24,10 @@ test directory: D:\DESK\Dify\.phase1-sandbox\openclaw-3.13
 install command: npm install openclaw@2026.3.13 --ignore-scripts
 version output: OpenClaw 2026.3.13 (61d171a)
 CLI commands observed: gateway, doctor, config, setup, status, health, sessions, memory, agents, backup
-gateway supports: --bind, --auth, --token, --port, run/status/health/probe
+gateway supports: --bind, --auth, --token, --port, call/status/probe/run
+gateway call supports: health/status/system-presence/cron.* methods through the Gateway RPC helper
 doctor supports: --non-interactive, --generate-gateway-token, --repair
+doctor does not expose: --lint or --json in this fixed-version help output
 config supports: file/get/set/unset/validate
 ```
 
@@ -67,12 +69,15 @@ Gateway regression gate for fixed `2026.3.13 (61d171a)`:
 
 - `openclaw gateway probe` must pass with the token and scopes that Bridge will
   use.
+- `openclaw gateway call health` and `openclaw gateway call status` must pass
+  against the exact isolated Gateway URL that Bridge will use.
 - `openclaw status` must not report missing `operator.read`.
 - stale Gateway processes must not occupy the intended port.
 - Gateway entrypoint and service command must match the fixed package layout.
 - wrong or rotated tokens must fail closed with no browser exposure.
-- Bridge contract tests must prove the exact Gateway API path used by the
-  sidecar.
+- Bridge contract tests must prove the exact Gateway RPC/adapter path used by
+  the sidecar. The placeholder HTTP path `/channels/dify-web/chat` is not
+  approved until it is proven against the fixed artifact.
 - public reports of `2026.3.13` token mismatch, missing `operator.read`,
   port-conflict and probe/ACP failures must be explicitly excluded in an
   isolated environment before production.

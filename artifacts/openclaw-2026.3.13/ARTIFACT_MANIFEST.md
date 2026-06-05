@@ -46,19 +46,50 @@ local sandbox output: OpenClaw 2026.3.13 (61d171a)
 
 This is not sufficient for production.
 
+## Observed CLI Surface For 2026.3.13
+
+Local read-only CLI help checks confirmed the following fixed-version surface:
+
+```text
+openclaw --version
+openclaw --help
+openclaw gateway --help
+openclaw gateway call --help
+openclaw gateway status --help
+openclaw gateway probe --help
+openclaw gateway run --help
+openclaw doctor --help
+openclaw health --help
+openclaw status --help
+openclaw agent --help
+```
+
+Important corrections:
+
+- `openclaw doctor --lint --json` is not exposed by this fixed-version help
+  output and must not be used as a production gate.
+- `openclaw gateway` is a WebSocket Gateway surface with RPC-style
+  `gateway call <method>` helpers, not an HTTP REST contract by default.
+- The local Bridge placeholder path `POST /channels/dify-web/chat` remains
+  unproven and must not be treated as an OpenClaw standard API.
+- `gateway run --force`, `gateway start`, `gateway restart`, `gateway stop`,
+  `gateway install` and `doctor --repair/--fix` are operational commands and
+  must not run during read-only checks.
+
 ## Fixed-Version Gateway Regression Gates
 
 Before production, the fixed artifact must pass these checks in an isolated
 Ubuntu 24.04 environment:
 
 - `openclaw --version`
-- `openclaw doctor --lint --json`
-- `openclaw doctor --deep`
-- `openclaw gateway status --deep`
-- `openclaw gateway probe`
-- `openclaw status --deep`
-- `openclaw devices list`
-- Bridge contract tests against the exact Gateway API path.
+- read-only CLI surface checks in `scripts/verify_openclaw_contract.sh`.
+- `openclaw doctor --non-interactive` in an isolated environment.
+- `openclaw gateway status --json --require-rpc --url <ws-url>`.
+- `openclaw gateway probe --json --url <ws-url>`.
+- `openclaw gateway call health --json --url <ws-url>`.
+- `openclaw gateway call status --json --url <ws-url>`.
+- wrong-token and rotated-token checks when token auth is enabled.
+- Bridge contract tests against the exact Gateway RPC/adapter path.
 - Wrong-token request fails closed.
 - Rotated-token request fails closed.
 - Gateway token never appears in browser-facing responses.
@@ -72,4 +103,3 @@ The following public reports are mandatory risk checks for `2026.3.13`:
 
 These reports do not prove this deployment will fail, but they prevent treating
 "installable" as "production-ready".
-

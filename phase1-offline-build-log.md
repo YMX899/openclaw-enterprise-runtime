@@ -134,6 +134,42 @@ compileall:
   OK
 ```
 
+Updated OpenClaw 2026.3.13 CLI contract evidence:
+
+```text
+Local read-only CLI help checks confirmed:
+  openclaw --version -> OpenClaw 2026.3.13 (61d171a)
+  gateway supports call/status/probe/run
+  gateway call supports health/status/system-presence/cron.* helper methods
+  doctor supports --non-interactive and --generate-gateway-token
+  doctor does not expose --lint or --json in the fixed-version help output
+
+scripts/verify_openclaw_contract.sh was corrected to:
+  - validate the exact expected version.
+  - validate read-only CLI surface by default.
+  - avoid gateway install/start/restart/stop/run/force/reset in read-only mode.
+  - run Gateway RPC checks only when OPENCLAW_GATEWAY_URL is explicitly set.
+  - avoid printing OPENCLAW_GATEWAY_TOKEN.
+
+scripts/verify_openclaw_contract.ps1 was added for the current Windows
+workstation and passed against:
+  D:\DESK\Dify\.phase1-sandbox\openclaw-3.13\node_modules\.bin\openclaw.cmd
+
+WSL bash syntax check passed for the shell scripts. The bash OpenClaw contract
+script was not executed end-to-end in WSL because WSL has no `node` binary; it is
+intended for a Linux isolated host where `openclaw` is installed in PATH.
+```
+
+ChatGPT web follow-up status:
+
+```text
+The previous OpenClaw architecture review tab was recovered, but ChatGPT showed
+"your session has expired" after the follow-up prompt was entered. No cookies,
+tokens or local storage were read. The Chrome tab was released for user
+re-login. Work continued only on low-risk Phase 1 local offline gates already
+approved by the earlier Go/No-Go review.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -158,6 +194,9 @@ Covered:
   metadata IP space.
 - fixed-argument `douyin_chong` wrapper passes max download bytes, max video
   duration and max frame-count controls without shell invocation.
+- OpenClaw 2026.3.13 Gateway contract documentation now treats
+  `/channels/dify-web/chat` as an unapproved placeholder and records the
+  observed WebSocket/RPC Gateway CLI surface.
 - Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
   idempotency keys, worker leases, heartbeats, expired lease recovery and
   stale-worker result rejection.
