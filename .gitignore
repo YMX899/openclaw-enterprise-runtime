@@ -22,6 +22,7 @@ browser-client-copy.mjs
 draft-api-*.json
 draft-api-*.txt
 page-assets-list*.json
+huahuo-front-assets/
 
 # Build outputs for future implementation
 node_modules/
