@@ -10,10 +10,10 @@ testing, and final deployment verification.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Use git version management | Partial complete | Git repo initialized; latest committed state before this audit update is `9d223b5`; working tree has only planned documentation updates. Server-side versioned deployment still pending. |
+| Use git version management | Partial complete | Git repo initialized; latest committed state before this audit update is `6e0cfc9`; working tree has only planned Phase 0/1 evidence and artifact-gate updates. Server-side versioned deployment still pending. |
 | Re-review plan with ChatGPT web before execution | Complete for current gate | Completed architecture review captured in `chatgpt-architecture-review.md`; final execution Go/No-Go captured in `chatgpt-final-go-nogo-review.md`. Verdict: production deployment No-Go; local Phase 1 Conditional Go. |
 | Use OpenClaw 3.13 | Partial complete | Local sandbox verified `openclaw@2026.3.13`, version `OpenClaw 2026.3.13 (61d171a)`. Not deployed; security and Gateway regression gates unresolved. |
-| Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md`; no server modification performed. |
+| Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md` and `phase0-readonly-recheck-20260606.md`; no server modification performed; Dify core container IDs/restart counts and compose hash recorded. |
 | Real public Dify unauthenticated baseline | Complete | `public-baseline-check-20260606.md`; `/signin=200`, `/apps=200`, profile unauthenticated `401`. |
 | Real public Dify authenticated app baseline | Incomplete | Needs logged-in browser test of existing app page and message flow without recording tokens. |
 | OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, session/job API draft, job flow utilities and tests. Not production complete. |
@@ -21,7 +21,7 @@ testing, and final deployment verification.
 | Async video job implementation | Partial complete | Schema/migration/status model, in-memory job store, result validation, worker success/failure/timeout flow and tests exist. Production Postgres queue and real worker loop still pending. |
 | SSRF and URL validation | Partial complete | Pure URL guard implemented and unit tested; redirect revalidation and download limits still pending. |
 | Bridge Postgres migrations | Partial | Initial SQL migration exists; not applied/tested on Postgres; adapter and up/down tests pending. |
-| OpenClaw Gateway deployment | Incomplete | Dockerfile draft exists; no image digest, no doctor/probe result, no API contract, no security exception, and fixed-version Gateway regression gates are unresolved. |
+| OpenClaw Gateway deployment | Incomplete | Dockerfile draft and artifact manifest placeholders exist; no image digest, no doctor/probe result, no API contract, no security exception, and fixed-version Gateway regression gates are unresolved. |
 | Docker compose sidecar | Partial | Compose draft exists and static YAML check passed; Docker CLI unavailable locally; not rendered/built/deployed. |
 | OpenResty route integration | Not started | Correctly gated; no route change made. |
 | Public `/openclaw-lab/` and `/openclaw-api/` tests | Not started | Requires Phase 2/3 deployment after gates. |
@@ -49,4 +49,3 @@ Mark objective complete: NO-GO
 5. Sidecar Docker build and compose config have not been verified in a Docker environment.
 6. OpenClaw Gateway API contract for Bridge is not locked.
 7. Bridge durable Postgres queue and production adapters are not implemented.
-

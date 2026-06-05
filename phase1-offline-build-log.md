@@ -17,6 +17,12 @@ change, no OpenResty reload.
 - `openclaw-video/docker/*/Dockerfile`
 - `openclaw-video/rollback-runbook.md`
 - `openclaw-video/acceptance-test-cases.md`
+- `artifacts/openclaw-2026.3.13/*`
+- `artifacts/douyin_chong/*`
+- `scripts/verify_openclaw_contract.sh`
+- `scripts/verify_douyin_chong_contract.sh`
+- `scripts/verify_compose_render.sh`
+- `scripts/capture_dify_baseline.sh`
 
 ## Local Tests
 
@@ -42,6 +48,13 @@ System Python: Ran 32 tests, OK, skipped=6
 
 .phase1-sandbox/bridge-api-venv: Ran 32 tests, OK
   includes: FastAPI TestClient API tests for /me, sessions, jobs and ACL.
+
+Shell script syntax check:
+
+```text
+bash -n scripts/*.sh
+OK
+```
 ```
 
 Covered:
@@ -60,6 +73,9 @@ Covered:
 - Bridge API draft does not expose raw Dify tenant/account IDs.
 - Bridge API draft returns 202 for video jobs and 404 for cross-user
   session/message/job access.
+- artifact manifest placeholders for OpenClaw 2026.3.13 and douyin_chong.
+- verification script skeletons for OpenClaw contract, douyin_chong contract,
+  compose render and Dify public baseline.
 
 ## Compose Static Check
 
