@@ -6,6 +6,7 @@ except ImportError:  # pragma: no cover - exercised when optional deps are absen
     TestClient = None
 
 from openclaw_video.job_store import InMemoryJobStore
+from openclaw_video.openclaw_gateway import GatewayChatResult
 from openclaw_video.session_store import InMemorySessionStore
 
 
@@ -19,6 +20,15 @@ class FakeDifyClient:
     async def workspaces(self, headers):
         tenant_id = headers.get("x-test-tenant", "tenant-a")
         return {"data": [{"id": tenant_id, "current": True}]}
+
+
+class FakeGateway:
+    def __init__(self):
+        self.requests = []
+
+    async def chat(self, request):
+        self.requests.append(request)
+        return GatewayChatResult(content=f"reply to {request.content}", raw={"content": f"reply to {request.content}"})
 
 
 @unittest.skipIf(TestClient is None, "fastapi test client is not installed")
@@ -144,6 +154,122 @@ class BridgeAppTests(unittest.TestCase):
             headers=self.auth("account-a", "tenant-b"),
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_chat_without_gateway_adapter_returns_501_without_writing_messages(self):
+        session = self.create_session("account-a")
+        response = self.client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "hello"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(response.status_code, 501)
+        messages = self.client.get(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(messages.status_code, 200, messages.text)
+        self.assertEqual(messages.json()["messages"], [])
+
+    def test_chat_gateway_adapter_gets_routing_user_not_dify_ids(self):
+        from openclaw_video.bridge_app import create_app
+
+        gateway = FakeGateway()
+        client = TestClient(
+            create_app(
+                dify=FakeDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                gateway=gateway,
+                identity_secret="test-secret",
+            )
+        )
+        session_response = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Chat"},
+            headers=self.auth("account-a", "tenant-a"),
+        )
+        session = session_response.json()["session"]
+        response = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "hello"},
+            headers=self.auth("account-a", "tenant-a"),
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["message"]["role"], "assistant")
+        self.assertEqual(body["message"]["content"], "reply to hello")
+        self.assertEqual(len(gateway.requests), 1)
+        request = gateway.requests[0]
+        self.assertEqual(request.session_id, session["id"])
+        self.assertEqual(request.content, "hello")
+        self.assertEqual(request.history, ())
+        self.assertNotIn("tenant-a", request.routing_user)
+        self.assertNotIn("account-a", request.routing_user)
+        self.assertNotIn("tenant-a", request.to_payload().values())
+        self.assertNotIn("account-a", request.to_payload().values())
+
+    def test_chat_gateway_history_excludes_current_message(self):
+        from openclaw_video.bridge_app import create_app
+
+        gateway = FakeGateway()
+        session_store = InMemorySessionStore()
+        client = TestClient(
+            create_app(
+                dify=FakeDifyClient(),
+                session_store=session_store,
+                job_store=InMemoryJobStore(),
+                gateway=gateway,
+                identity_secret="test-secret",
+            )
+        )
+        session = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Chat"},
+            headers=self.auth("account-a"),
+        ).json()["session"]
+        first = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "first"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        second = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "second"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual(gateway.requests[1].history[0]["role"], "user")
+        self.assertEqual(gateway.requests[1].history[0]["content"], "first")
+        self.assertEqual(gateway.requests[1].history[1]["role"], "assistant")
+        self.assertEqual(gateway.requests[1].history[1]["content"], "reply to first")
+        self.assertNotIn("second", [item["content"] for item in gateway.requests[1].history])
+
+    def test_cross_user_cannot_chat_with_other_users_session(self):
+        from openclaw_video.bridge_app import create_app
+
+        gateway = FakeGateway()
+        client = TestClient(
+            create_app(
+                dify=FakeDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                gateway=gateway,
+                identity_secret="test-secret",
+            )
+        )
+        session = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Chat"},
+            headers=self.auth("account-a"),
+        ).json()["session"]
+        response = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "hello"},
+            headers=self.auth("account-b"),
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(gateway.requests, [])
 
 
 if __name__ == "__main__":

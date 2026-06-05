@@ -168,6 +168,38 @@ The previous OpenClaw architecture review tab was recovered, but ChatGPT showed
 tokens or local storage were read. The Chrome tab was released for user
 re-login. Work continued only on low-risk Phase 1 local offline gates already
 approved by the earlier Go/No-Go review.
+
+The status was checked again on 2026-06-06. ChatGPT still showed the expired
+session/login prompt, so no new web-GPT review output was collected.
+```
+
+Updated local test result after default-disabled Gateway chat adapter contract:
+
+```text
+git diff --check:
+  OK
+
+System Python with PYTHONPATH=openclaw-video\src:
+  Ran 64 tests, OK, skipped=14
+  skipped: FastAPI TestClient and psycopg Jsonb tests missing global deps.
+
+.phase1-sandbox/bridge-api-venv:
+  Ran 64 tests, OK
+  includes FastAPI TestClient coverage for:
+    - /openclaw-api/chat returns 501 and writes no messages when Gateway
+      adapter is not configured.
+    - injected Gateway adapter receives routing_user/session/message/history
+      without raw Dify tenant/account IDs.
+    - cross-user chat with another user's session returns 404 and does not call
+      the Gateway adapter.
+
+OpenClaw CLI contract:
+  scripts/verify_openclaw_contract.ps1
+  OK against openclaw.cmd version OpenClaw 2026.3.13 (61d171a)
+
+compileall:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m compileall -q openclaw-video\src openclaw-video\tests
+  OK
 ```
 
 Covered:
@@ -197,6 +229,10 @@ Covered:
 - OpenClaw 2026.3.13 Gateway contract documentation now treats
   `/channels/dify-web/chat` as an unapproved placeholder and records the
   observed WebSocket/RPC Gateway CLI surface.
+- Bridge non-video chat now has a default-disabled Gateway adapter contract:
+  production still returns `501` unless an adapter is explicitly supplied, while
+  offline tests prove the Bridge passes only scoped routing/session/message
+  data and enforces session ownership before calling the adapter.
 - Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
   idempotency keys, worker leases, heartbeats, expired lease recovery and
   stale-worker result rejection.
@@ -235,7 +271,8 @@ Verified statically:
 - Actual `douyin_chong` artifact is still missing.
 - `douyin_chong` must still prove that it accepts and enforces the wrapper's
   max download bytes, max video duration and max frame-count arguments.
-- OpenClaw Gateway API contract for Bridge is not locked.
+- OpenClaw Gateway API contract for Bridge is only mock-tested locally; the real
+  fixed-version Gateway RPC/adapter path is not locked.
 - OpenClaw 2026.3.13 security exception or patch strategy is not decided.
 - OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated
   fixed-version environment before production.

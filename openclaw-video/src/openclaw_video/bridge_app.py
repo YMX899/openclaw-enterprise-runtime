@@ -23,10 +23,12 @@ from .identity import (
 )
 from .job_state import TERMINAL_STATUSES
 from .job_store import InMemoryJobStore, JobNotFound, JobOwnershipError, VideoJob
+from .openclaw_gateway import DisabledGatewayClient, GatewayChatRequest, GatewayError, GatewayNotConfigured
 from .session_store import (
     BridgeMessage,
     BridgeSession,
     InMemorySessionStore,
+    MessageValidationError,
     SessionNotFound,
     SessionOwnershipError,
 )
@@ -101,12 +103,14 @@ def create_app(
     dify: Any | None = None,
     session_store: Any | None = None,
     job_store: Any | None = None,
+    gateway: Any | None = None,
     identity_secret: str | None = None,
 ) -> FastAPI:
     app = FastAPI(title="OpenClaw Dify Bridge", version="0.1.0")
     dify = dify or DifyClient(os.environ.get("DIFY_API_BASE", "http://api:5001"))
     session_store = session_store or _default_session_store()
     job_store = job_store or _default_job_store()
+    gateway = gateway or DisabledGatewayClient()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
 
     @app.exception_handler(Exception)
@@ -254,7 +258,47 @@ def create_app(
             raise HTTPException(status_code=400, detail="request body must be an object")
         if payload.get("video_url"):
             return await create_job(request)
-        raise HTTPException(status_code=501, detail="offline draft has no Gateway chat adapter")
+        principal = await current_principal(request)
+        session_id = str(payload.get("session_id") or "")
+        content = str(payload.get("content") or "").strip()
+        if not session_id or not content:
+            raise HTTPException(status_code=400, detail="session_id and content are required")
+        if isinstance(gateway, DisabledGatewayClient):
+            raise HTTPException(status_code=501, detail="offline draft has no Gateway chat adapter")
+        try:
+            session = session_store.get_session(session_id, principal.principal_id)
+            history = session_store.list_messages(session_id, principal.principal_id)
+            user_message = session_store.add_message(session_id, principal.principal_id, "user", content)
+        except (SessionNotFound, SessionOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="session not found") from exc
+        except MessageValidationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        chat_request = GatewayChatRequest(
+            routing_user=session.openclaw_routing_user,
+            session_id=session.id,
+            message_id=user_message.id,
+            content=user_message.content,
+            history=tuple({"role": item.role, "content": item.content} for item in history),
+        )
+        try:
+            result = await gateway.chat(chat_request)
+        except GatewayNotConfigured as exc:
+            raise HTTPException(status_code=501, detail="offline draft has no Gateway chat adapter") from exc
+        except GatewayError as exc:
+            raise HTTPException(status_code=502, detail=safe_error_message(exc)) from exc
+        assistant_message = session_store.add_message(
+            session_id,
+            principal.principal_id,
+            "assistant",
+            result.content,
+        )
+        return JSONResponse(
+            status_code=200,
+            content={
+                "message": _serialize_message(assistant_message),
+                "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
+            },
+        )
 
     return app
 
