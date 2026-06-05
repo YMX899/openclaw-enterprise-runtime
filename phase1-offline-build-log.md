@@ -30,7 +30,7 @@ python -m unittest discover openclaw-video\tests
 Result:
 
 ```text
-Ran 12 tests
+Ran 22 tests
 OK
 ```
 
@@ -43,6 +43,9 @@ Covered:
 - rejection of localhost, private IP, metadata IP, userinfo URLs.
 - sensitive header redaction.
 - safe error message redaction.
+- in-memory job store ownership isolation and queued-to-running claim semantics.
+- worker success, URL rejection, invalid result and timeout status transitions.
+- OpenClaw Gateway token header is kept inside the private Gateway client.
 
 ## Compose Static Check
 
@@ -79,4 +82,3 @@ Phase 1 offline source skeleton: GO and committed
 Phase 1 complete: NO-GO
 Phase 2 server deployment: NO-GO
 ```
-
