@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/video-analysis-result.schema.json",
+  "type": "object",
+  "required": ["schema_version", "source", "summary", "signals", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "openclaw-video-result.v1"},
+    "source": {
+      "type": "object",
+      "required": ["video_url_canonical", "platform"],
+      "additionalProperties": false,
+      "properties": {
+        "video_url_canonical": {"type": "string"},
+        "platform": {"const": "douyin"},
+        "duration_seconds": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "summary": {"type": "string"},
+    "signals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hook": {"type": ["string", "null"]},
+        "topic": {"type": ["string", "null"]},
+        "audience": {"type": ["string", "null"]},
+        "structure": {"type": ["string", "null"]},
+        "visual_notes": {"type": ["string", "null"]},
+        "risk_notes": {"type": ["string", "null"]}
+      }
+    },
+    "raw_tool_result": {"type": ["object", "null"]},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}
+

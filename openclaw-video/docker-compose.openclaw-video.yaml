@@ -1,0 +1,106 @@
+name: openclaw-video
+
+services:
+  openclaw-bridge:
+    build:
+      context: .
+      dockerfile: docker/bridge/Dockerfile
+    environment:
+      DIFY_API_BASE: http://api:5001
+      DATABASE_URL: postgres://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
+      BRIDGE_IDENTITY_SECRET: ${BRIDGE_IDENTITY_SECRET:?}
+      OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?}
+    ports:
+      - "127.0.0.1:18181:3000"
+    networks:
+      - openclaw-internal
+      - dify-default
+    depends_on:
+      bridge-postgres:
+        condition: service_healthy
+      openclaw-gateway:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+
+  bridge-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bridge
+      POSTGRES_USER: bridge
+      POSTGRES_PASSWORD: ${BRIDGE_POSTGRES_PASSWORD:?}
+    volumes:
+      - bridge-postgres-data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - openclaw-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bridge -d bridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports: []
+
+  openclaw-gateway:
+    build:
+      context: .
+      dockerfile: docker/openclaw-gateway/Dockerfile
+      args:
+        OPENCLAW_VERSION: "2026.3.13"
+    environment:
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?}
+    volumes:
+      - openclaw-gateway-state:/var/lib/openclaw
+      - ./openclaw/config:/etc/openclaw:ro
+    networks:
+      - openclaw-internal
+    expose:
+      - "18789"
+    ports: []
+    security_opt:
+      - no-new-privileges:true
+
+  video-analysis-worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    environment:
+      DATABASE_URL: postgres://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
+      DOUYIN_CHONG_BIN: /opt/douyin_chong/douyin_chong
+      WORKER_CONCURRENCY: "1"
+      JOB_TIMEOUT_SECONDS: "900"
+    volumes:
+      - ./vendor/douyin_chong:/opt/douyin_chong:ro
+      - worker-tmp:/tmp/openclaw-video
+    networks:
+      - openclaw-internal
+    depends_on:
+      bridge-postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+
+volumes:
+  bridge-postgres-data:
+  openclaw-gateway-state:
+  worker-tmp:
+
+networks:
+  openclaw-internal:
+    internal: true
+  dify-default:
+    external: true
+    name: docker_default
+

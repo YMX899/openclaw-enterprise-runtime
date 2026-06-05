@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/video-job.schema.json",
+  "type": "object",
+  "required": ["job_id", "session_id", "status", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "job_id": {"type": "string", "format": "uuid"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "status": {
+      "enum": ["queued", "running", "succeeded", "failed", "timed_out", "cancelled"]
+    },
+    "video_url_canonical": {"type": "string"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "started_at": {"type": ["string", "null"], "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
+    "attempt_count": {"type": "integer", "minimum": 0},
+    "error_code": {"type": ["string", "null"]},
+    "result_schema_version": {"type": ["string", "null"]},
+    "result_location": {"type": ["string", "null"]}
+  }
+}
+

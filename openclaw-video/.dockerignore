@@ -1,0 +1,12 @@
+.git
+.phase1-sandbox
+node_modules
+__pycache__
+*.pyc
+.pytest_cache
+.env
+.env.*
+secrets
+vendor/douyin_chong/*
+!vendor/douyin_chong/.gitkeep
+

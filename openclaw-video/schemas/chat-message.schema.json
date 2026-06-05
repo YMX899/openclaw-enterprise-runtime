@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/chat-message.schema.json",
+  "type": "object",
+  "required": ["id", "session_id", "role", "content", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "format": "uuid"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "role": {"enum": ["user", "assistant", "system", "tool"]},
+    "content": {"type": "string"},
+    "video_url": {"type": ["string", "null"]},
+    "job_id": {"type": ["string", "null"], "format": "uuid"},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}
+
