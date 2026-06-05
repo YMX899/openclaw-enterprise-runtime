@@ -17,6 +17,34 @@ shasum: 559b4cc4a605616ada0d11a9ca29b7395af91e0e
 binary: openclaw -> openclaw.mjs
 ```
 
+Observed local offline sandbox verification:
+
+```text
+test directory: D:\DESK\Dify\.phase1-sandbox\openclaw-3.13
+install command: npm install openclaw@2026.3.13 --ignore-scripts
+version output: OpenClaw 2026.3.13 (61d171a)
+CLI commands observed: gateway, doctor, config, setup, status, health, sessions, memory, agents, backup
+gateway supports: --bind, --auth, --token, --port, run/status/health/probe
+doctor supports: --non-interactive, --generate-gateway-token, --repair
+config supports: file/get/set/unset/validate
+```
+
+Security gate from local `npm audit`:
+
+```text
+total vulnerabilities: 7
+moderate: 2
+high: 4
+critical: 1
+affected direct package: openclaw@2026.3.13
+```
+
+Important implication:
+
+- OpenClaw `2026.3.13` is installable, but npm audit reports security advisories affecting this version and its dependencies.
+- Production use of this fixed version requires an explicit security exception, a patched vendor build, or a user-approved version upgrade strategy.
+- Without that security decision, the project remains No-Go for production even if Bridge and video worker are implemented.
+
 This registry observation is not enough for production deployment. Phase 1 must still lock:
 
 - exact install method: npm package, source checkout, or container image.
@@ -138,4 +166,3 @@ Before moving from Phase 1 to Phase 2:
 - generated images/packages must have SHA256 or digest recorded.
 - server deployment directory must be versioned independently or deployed from a versioned artifact.
 - rollback commands must be tested in a non-production or no-op mode.
-
