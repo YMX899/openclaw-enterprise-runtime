@@ -173,7 +173,9 @@ Verified statically:
 - Docker build and compose render are not verified in an isolated Docker host.
 - ChatGPT final Go/No-Go review is captured in
   `chatgpt-final-go-nogo-review.md`.
-- Authenticated public Dify browser baseline is still incomplete.
+- Authenticated public Dify browser baseline is still incomplete; real Chrome
+  retry on 2026-06-06 reached `/signin` from `/apps`, indicating no active Dify
+  login session in the current browser profile.
 
 ## Go / No-Go
 

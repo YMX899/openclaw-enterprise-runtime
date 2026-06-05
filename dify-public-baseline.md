@@ -161,6 +161,32 @@ Interpretation:
 
 Authenticated baseline was not completed because no Dify login credentials were provided and no request was made to submit credentials.
 
+## Authenticated Baseline Retry 2026-06-06
+
+Route tested with the user's real Chrome browser:
+
+```text
+https://ai001.huahuoai.com/apps
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible page: Dify login page
+visible inputs: email and password
+```
+
+Interpretation:
+
+- The current Chrome profile did not have an authenticated Dify session for
+  `https://ai001.huahuoai.com`.
+- No credentials, cookies, tokens, CSRF values or full request headers were
+  read or recorded.
+- Existing-app open/message-flow testing is still incomplete and remains a
+  required gate before any future public OpenClaw route exposure.
+
 Required before any future OpenClaw route is exposed:
 
 ```text
@@ -185,4 +211,3 @@ Authenticated Dify app baseline: BLOCKED, credentials/session not provided
 ```
 
 Future OpenClaw public route work must not proceed past Phase 2 until authenticated real-browser Dify baseline is complete.
-

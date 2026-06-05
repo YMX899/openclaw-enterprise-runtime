@@ -15,7 +15,7 @@ testing, and final deployment verification.
 | Use OpenClaw 3.13 | Partial complete | Local sandbox verified `openclaw@2026.3.13`, version `OpenClaw 2026.3.13 (61d171a)`. Not deployed; security and Gateway regression gates unresolved. |
 | Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md` and `phase0-readonly-recheck-20260606.md`; no server modification performed; Dify core container IDs/restart counts and compose hash recorded. |
 | Real public Dify unauthenticated baseline | Complete | `public-baseline-check-20260606.md`; `/signin=200`, `/apps=200`, profile unauthenticated `401`. |
-| Real public Dify authenticated app baseline | Incomplete | Needs logged-in browser test of existing app page and message flow without recording tokens. |
+| Real public Dify authenticated app baseline | Incomplete | Retried in real Chrome on 2026-06-06; `/apps` redirected to `/signin`, so the current browser profile has no authenticated Dify session. Existing app page/message flow still needs a logged-in browser test without recording tokens. |
 | OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, session/job API draft, job events SSE draft, job flow utilities and tests. Not production complete. |
 | douyin_chong video tool artifact | Missing | Not found locally in project or on server; wrapper placeholder only. |
 | Async video job implementation | Partial complete | Schema/migration/status model, in-memory job store, Postgres durable-queue adapter draft, worker entrypoint, result validation, worker success/failure/timeout flow and tests exist. Postgres adapter replay tests pass. Real `douyin_chong` execution and deployed Postgres integration test still pending. |
