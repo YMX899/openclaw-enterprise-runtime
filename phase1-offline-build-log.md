@@ -224,6 +224,41 @@ Static compose contract:
   ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
 ```
 
+Updated local test result after Bridge API JSON Schema contract:
+
+```text
+Added committed JSON Schema contracts for:
+  /openclaw-api/me response.
+  session create request and create/list responses.
+  session and message objects.
+  message-list response.
+  chat request/response.
+  job create request and job read/create responses.
+  job SSE event payloads.
+  error responses.
+
+System Python with PYTHONPATH=openclaw-video\src:
+  Ran 70 tests, OK, skipped=17
+  skipped: FastAPI TestClient and psycopg Jsonb tests missing global deps.
+
+.phase1-sandbox/bridge-api-venv:
+  Ran 70 tests, OK
+  includes JSON Schema validation of live FastAPI TestClient responses for
+  /me, sessions, messages, jobs, /chat and job SSE events.
+
+compileall:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m compileall -q openclaw-video\src openclaw-video\tests
+  OK
+
+git diff --check:
+  OK
+
+OpenClaw 2026.3.13 contract:
+  scripts/verify_openclaw_contract.ps1 now accepts -OpenClawBin while still
+  supporting OPENCLAW_BIN.
+  Passed against .phase1-sandbox\openclaw-3.13\node_modules\.bin\openclaw.cmd.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -255,6 +290,9 @@ Covered:
   production still returns `501` unless an adapter is explicitly supplied, while
   offline tests prove the Bridge passes only scoped routing/session/message
   data and enforces session ownership before calling the adapter.
+- Bridge API JSON Schema contract tests validate committed request/response
+  schemas against live FastAPI TestClient outputs for identity projection,
+  sessions, messages, jobs, chat, SSE job events and error responses.
 - Short-video knowledge base now has a versioned read-only artifact with
   `VERSION`, `MANIFEST.md`, `SHA256SUMS`, Windows/Linux verification scripts and
   compose static coverage for `/knowledge/short-video:ro`.

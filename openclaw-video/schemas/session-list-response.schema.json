@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/session-list-response.schema.json",
+  "type": "object",
+  "required": ["sessions"],
+  "additionalProperties": false,
+  "properties": {
+    "sessions": {
+      "type": "array",
+      "items": {"$ref": "https://huahuoai.local/schemas/openclaw-video/bridge-session.schema.json"}
+    }
+  }
+}

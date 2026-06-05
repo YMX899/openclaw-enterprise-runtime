@@ -99,8 +99,9 @@ in-memory job claiming, Postgres durable queue adapter, worker lease/heartbeat
 flow, worker status transitions, redirect target revalidation, fixed-argument
 video resource-limit wrapper contract, Gateway token isolation, database
 migration draft, rollback SQL, versioned read-only short-video knowledge-base
-artifact, rollback runbook and baseline test script. These are offline
-implementation progress, not production deployment evidence.
+artifact, Bridge API JSON Schema request/response contracts, rollback runbook
+and baseline test script. These are offline implementation progress, not
+production deployment evidence.
 
 Because of these missing artifacts:
 
@@ -137,8 +138,14 @@ All deliverables must be stored in git before any server deployment:
 - versioned read-only knowledge-base artifact with `VERSION`, `SHA256SUMS`,
   manifest and verification scripts.
 - JSON Schemas for:
-  - chat request/response.
+  - `GET /openclaw-api/me` response.
+  - session create request and session create/list responses.
   - session and message objects.
+  - message-list response.
+  - chat request/response.
+  - job create request and job read/create responses.
+  - job SSE event payloads.
+  - error responses.
   - video job states.
   - video analysis result.
 - SSRF and URL validation tests.

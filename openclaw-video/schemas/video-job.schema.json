@@ -2,7 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://huahuoai.local/schemas/openclaw-video/video-job.schema.json",
   "type": "object",
-  "required": ["job_id", "session_id", "status", "created_at"],
+  "required": [
+    "job_id",
+    "session_id",
+    "status",
+    "video_url_canonical",
+    "created_at",
+    "started_at",
+    "finished_at",
+    "attempt_count",
+    "error_code",
+    "result_schema_version",
+    "result_location"
+  ],
   "additionalProperties": false,
   "properties": {
     "job_id": {"type": "string", "format": "uuid"},
@@ -20,4 +32,3 @@
     "result_location": {"type": ["string", "null"]}
   }
 }
-

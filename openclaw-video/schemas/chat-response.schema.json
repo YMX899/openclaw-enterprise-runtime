@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/chat-response.schema.json",
+  "type": "object",
+  "required": ["message", "session"],
+  "additionalProperties": false,
+  "properties": {
+    "message": {"$ref": "https://huahuoai.local/schemas/openclaw-video/chat-message.schema.json"},
+    "session": {"$ref": "https://huahuoai.local/schemas/openclaw-video/bridge-session.schema.json"}
+  }
+}

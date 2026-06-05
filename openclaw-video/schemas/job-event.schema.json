@@ -11,5 +11,81 @@
     "data": {
       "type": "object"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"event": {"const": "job"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["job"],
+            "additionalProperties": false,
+            "properties": {
+              "job": {"$ref": "https://huahuoai.local/schemas/openclaw-video/video-job.schema.json"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"event": {"const": "heartbeat"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["job_id", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "job_id": {"type": "string", "format": "uuid"},
+              "status": {
+                "enum": ["queued", "running", "succeeded", "failed", "timed_out", "cancelled"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"event": {"const": "done"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["job_id", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "job_id": {"type": "string", "format": "uuid"},
+              "status": {
+                "enum": ["succeeded", "failed", "timed_out", "cancelled"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"event": {"const": "error"}}
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["error"],
+            "additionalProperties": false,
+            "properties": {
+              "error": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  ]
 }

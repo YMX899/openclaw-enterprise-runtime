@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/job-response.schema.json",
+  "type": "object",
+  "required": ["job"],
+  "additionalProperties": false,
+  "properties": {
+    "job": {"$ref": "https://huahuoai.local/schemas/openclaw-video/video-job.schema.json"}
+  }
+}

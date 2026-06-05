@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/job-create-request.schema.json",
+  "type": "object",
+  "required": ["session_id", "video_url"],
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {"type": "string", "format": "uuid"},
+    "video_url": {"type": "string", "format": "uri", "minLength": 1},
+    "content": {"type": "string", "minLength": 1, "maxLength": 8000},
+    "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 128}
+  }
+}

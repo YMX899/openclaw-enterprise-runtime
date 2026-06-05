@@ -3,6 +3,8 @@
 ## Phase 2 Local Sidecar
 
 - `openclaw-bridge` health returns 200 on `127.0.0.1:18181/health`.
+- Bridge API responses validate against committed JSON Schemas in
+  `openclaw-video/schemas`.
 - `openclaw-bridge` reaches `api:5001` from `docker_default`.
 - `openclaw-bridge` reaches `bridge-postgres` on private network.
 - `openclaw-bridge` reaches OpenClaw Gateway on private network.

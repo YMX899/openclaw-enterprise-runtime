@@ -1,16 +1,18 @@
-$ErrorActionPreference = "Stop"
+param(
+    [string]$OpenClawBin = $(if ($env:OPENCLAW_BIN) { $env:OPENCLAW_BIN } else { "openclaw" }),
+    [string]$ExpectedOpenClawVersion = $(if ($env:EXPECTED_OPENCLAW_VERSION) {
+        $env:EXPECTED_OPENCLAW_VERSION
+    } else {
+        "OpenClaw 2026.3.13 (61d171a)"
+    }),
+    [string]$GatewayTimeoutMs = $(if ($env:OPENCLAW_GATEWAY_TIMEOUT_MS) {
+        $env:OPENCLAW_GATEWAY_TIMEOUT_MS
+    } else {
+        "5000"
+    })
+)
 
-$OpenClawBin = if ($env:OPENCLAW_BIN) { $env:OPENCLAW_BIN } else { "openclaw" }
-$ExpectedOpenClawVersion = if ($env:EXPECTED_OPENCLAW_VERSION) {
-    $env:EXPECTED_OPENCLAW_VERSION
-} else {
-    "OpenClaw 2026.3.13 (61d171a)"
-}
-$GatewayTimeoutMs = if ($env:OPENCLAW_GATEWAY_TIMEOUT_MS) {
-    $env:OPENCLAW_GATEWAY_TIMEOUT_MS
-} else {
-    "5000"
-}
+$ErrorActionPreference = "Stop"
 
 function Resolve-OpenClawBinary {
     param([string]$Binary)

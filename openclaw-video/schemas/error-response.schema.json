@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/error-response.schema.json",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["detail"],
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "object"},
+            {"type": "array"}
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["error"],
+      "additionalProperties": false,
+      "properties": {
+        "error": {"type": "string"}
+      }
+    }
+  ]
+}

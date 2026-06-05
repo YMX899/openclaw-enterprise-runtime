@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/me-response.schema.json",
+  "type": "object",
+  "required": ["principal_id", "authenticated"],
+  "additionalProperties": false,
+  "properties": {
+    "principal_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "authenticated": {"const": true}
+  }
+}

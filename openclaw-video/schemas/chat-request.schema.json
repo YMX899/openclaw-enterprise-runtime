@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/chat-request.schema.json",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["session_id", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {"type": "string", "format": "uuid"},
+        "content": {"type": "string", "minLength": 1, "maxLength": 8000}
+      }
+    },
+    {
+      "$ref": "https://huahuoai.local/schemas/openclaw-video/job-create-request.schema.json"
+    }
+  ]
+}
