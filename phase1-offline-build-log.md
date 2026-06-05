@@ -94,6 +94,24 @@ System Python with PYTHONPATH=openclaw-video\src:
   recovery.
 ```
 
+Updated local test result after job SSE endpoint draft:
+
+```text
+System Python with PYTHONPATH=openclaw-video\src:
+  Ran 52 tests, OK, skipped=10
+  skipped: FastAPI TestClient and psycopg Jsonb tests missing global deps.
+
+.phase1-sandbox/bridge-api-venv:
+  Ran 52 tests, OK
+  includes FastAPI TestClient coverage for
+  /openclaw-api/jobs/{job_id}/events current snapshot, terminal done event and
+  cross-user 404 isolation.
+
+compileall:
+  .phase1-sandbox/bridge-api-venv\Scripts\python.exe -m compileall -q openclaw-video\src openclaw-video\tests
+  OK
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -110,6 +128,8 @@ Covered:
 - Bridge API draft does not expose raw Dify tenant/account IDs.
 - Bridge API draft returns 202 for video jobs and 404 for cross-user
   session/message/job access.
+- Bridge job events SSE endpoint streams current-user job snapshots, heartbeat
+  events and terminal `done` events; polling remains the required recovery path.
 - Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
   idempotency keys, worker leases, heartbeats, expired lease recovery and
   stale-worker result rejection.

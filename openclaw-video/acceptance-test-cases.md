@@ -11,6 +11,8 @@
 - Worker claims one queued job and no more than one at a time.
 - Worker timeout moves job to `timed_out`.
 - Worker failure returns a user-safe error without internal stack traces.
+- `/openclaw-api/jobs/{job_id}/events` streams only the current user's job
+  snapshot and terminal `done` event.
 - Dify containers are not recreated.
 
 ## Phase 3 Public Route
@@ -21,6 +23,8 @@
 - `/openclaw-lab/` loads from same public origin.
 - Unauthenticated `/openclaw-api/me` returns 401.
 - Authenticated `/openclaw-api/me` returns only non-sensitive identity projection.
+- SSE disconnection does not lose job state; polling `GET /openclaw-api/jobs/{job_id}`
+  recovers the latest status.
 - Browser network requests do not contain OpenClaw Gateway token.
 - Public network cannot access OpenClaw Gateway.
 - Public network cannot access Bridge Postgres.
@@ -43,4 +47,3 @@
 - Redirect target is revalidated before download.
 - Result matches `schemas/video-analysis-result.schema.json`.
 - Temporary files are cleaned.
-

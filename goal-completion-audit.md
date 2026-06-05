@@ -16,7 +16,7 @@ testing, and final deployment verification.
 | Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md` and `phase0-readonly-recheck-20260606.md`; no server modification performed; Dify core container IDs/restart counts and compose hash recorded. |
 | Real public Dify unauthenticated baseline | Complete | `public-baseline-check-20260606.md`; `/signin=200`, `/apps=200`, profile unauthenticated `401`. |
 | Real public Dify authenticated app baseline | Incomplete | Needs logged-in browser test of existing app page and message flow without recording tokens. |
-| OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, session/job API draft, job flow utilities and tests. Not production complete. |
+| OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, session/job API draft, job events SSE draft, job flow utilities and tests. Not production complete. |
 | douyin_chong video tool artifact | Missing | Not found locally in project or on server; wrapper placeholder only. |
 | Async video job implementation | Partial complete | Schema/migration/status model, in-memory job store, Postgres durable-queue adapter draft, worker entrypoint, result validation, worker success/failure/timeout flow and tests exist. Postgres adapter replay tests pass. Real `douyin_chong` execution and deployed Postgres integration test still pending. |
 | SSRF and URL validation | Partial complete | Pure URL guard implemented and unit tested; redirect revalidation and download limits still pending. |

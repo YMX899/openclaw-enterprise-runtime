@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/job-event.schema.json",
+  "type": "object",
+  "required": ["event", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "event": {
+      "enum": ["job", "heartbeat", "done", "error"]
+    },
+    "data": {
+      "type": "object"
+    }
+  }
+}

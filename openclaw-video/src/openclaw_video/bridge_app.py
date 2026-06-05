@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import uuid
 from typing import Any
 
 try:
     from fastapi import FastAPI, HTTPException, Request
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, StreamingResponse
 except ImportError as exc:  # pragma: no cover - import checked in container image
     raise RuntimeError("fastapi is required for openclaw-bridge") from exc
 
@@ -19,6 +21,7 @@ from .identity import (
     derive_principal,
     hmac_sha256_hex,
 )
+from .job_state import TERMINAL_STATUSES
 from .job_store import InMemoryJobStore, JobNotFound, JobOwnershipError, VideoJob
 from .session_store import (
     BridgeMessage,
@@ -68,6 +71,11 @@ def _serialize_job(job: VideoJob) -> dict[str, Any]:
         "result_schema_version": job.result_schema_version,
         "result_location": job.result_location,
     }
+
+
+def _sse_event(event: str, data: dict[str, Any]) -> str:
+    payload = json.dumps(data, separators=(",", ":"), ensure_ascii=True)
+    return f"event: {event}\ndata: {payload}\n\n"
 
 
 def _default_session_store() -> Any:
@@ -203,6 +211,41 @@ def create_app(
         except (JobNotFound, JobOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="job not found") from exc
         return {"job": _serialize_job(job)}
+
+    @app.get("/openclaw-api/jobs/{job_id}/events")
+    async def job_events(job_id: str, request: Request) -> StreamingResponse:
+        principal = await current_principal(request)
+        try:
+            job_store.get_job(job_id, principal.principal_id)
+        except (JobNotFound, JobOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="job not found") from exc
+
+        async def stream():
+            last_status: str | None = None
+            while True:
+                if await request.is_disconnected():
+                    return
+                try:
+                    job = job_store.get_job(job_id, principal.principal_id)
+                except (JobNotFound, JobOwnershipError):
+                    yield _sse_event("error", {"error": "job not found"})
+                    return
+                serialized = _serialize_job(job)
+                status = serialized["status"]
+                if status != last_status:
+                    yield _sse_event("job", {"job": serialized})
+                    last_status = status
+                if job.status in TERMINAL_STATUSES:
+                    yield _sse_event("done", {"job_id": job.job_id, "status": job.status.value})
+                    return
+                yield _sse_event("heartbeat", {"job_id": job.job_id, "status": job.status.value})
+                await asyncio.sleep(1)
+
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/openclaw-api/chat")
     async def chat(request: Request) -> JSONResponse:

@@ -89,6 +89,38 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(read_response.status_code, 200, read_response.text)
         self.assertEqual(read_response.json()["job"]["job_id"], job["job_id"])
 
+    def test_job_events_stream_returns_current_job_snapshot(self):
+        session = self.create_session("account-a")
+        response = self.client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        )
+        job_id = response.json()["job"]["job_id"]
+        self.jobs.complete_job(job_id, {"ok": True}, "schema")
+        with self.client.stream(
+            "GET",
+            f"/openclaw-api/jobs/{job_id}/events",
+            headers=self.auth("account-a"),
+        ) as stream:
+            self.assertEqual(stream.status_code, 200)
+            self.assertEqual(stream.headers["content-type"].split(";")[0], "text/event-stream")
+            body = "".join(stream.iter_text())
+        self.assertIn("event: job", body)
+        self.assertIn('"status":"succeeded"', body)
+        self.assertIn("event: done", body)
+
+    def test_cross_user_cannot_read_job_events(self):
+        session = self.create_session("account-a")
+        response = self.client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        )
+        job_id = response.json()["job"]["job_id"]
+        stream = self.client.get(f"/openclaw-api/jobs/{job_id}/events", headers=self.auth("account-b"))
+        self.assertEqual(stream.status_code, 404)
+
     def test_cross_user_cannot_read_session_messages_or_job(self):
         session = self.create_session("account-a")
         job_response = self.client.post(
