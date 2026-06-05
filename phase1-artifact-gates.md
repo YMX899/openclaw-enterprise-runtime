@@ -63,6 +63,20 @@ Gateway safety gate:
 - Gateway token must never enter browser JavaScript or network requests.
 - Control UI/default Gateway port such as `18789` must not be bound to `0.0.0.0`.
 
+Gateway regression gate for fixed `2026.3.13 (61d171a)`:
+
+- `openclaw gateway probe` must pass with the token and scopes that Bridge will
+  use.
+- `openclaw status` must not report missing `operator.read`.
+- stale Gateway processes must not occupy the intended port.
+- Gateway entrypoint and service command must match the fixed package layout.
+- wrong or rotated tokens must fail closed with no browser exposure.
+- Bridge contract tests must prove the exact Gateway API path used by the
+  sidecar.
+- public reports of `2026.3.13` token mismatch, missing `operator.read`,
+  port-conflict and probe/ACP failures must be explicitly excluded in an
+  isolated environment before production.
+
 ## Missing Or Incomplete Artifacts
 
 Current local and server checks did not find production-ready:
@@ -83,12 +97,16 @@ offline implementation progress, not production deployment evidence.
 Because of these missing artifacts:
 
 ```text
-Phase 1 offline artifact preparation: BLOCKED
+Phase 1 offline artifact preparation: CONDITIONAL GO for local implementation
 Phase 2 sidecar deployment: NO-GO
 Phase 3 public route: NO-GO
 Phase 4 controlled trial: NO-GO
 Phase 5 Dify entry integration: NO-GO
 ```
+
+The project may continue implementing local Phase 1 artifacts, but Phase 1
+cannot be considered complete until production adapters, Docker build, contract
+tests, vulnerability triage and real artifact manifests are verified.
 
 ## Required Offline Deliverables
 

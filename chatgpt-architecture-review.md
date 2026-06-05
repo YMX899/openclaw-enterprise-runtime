@@ -13,8 +13,8 @@ recorded.
 The completed first architecture review was captured from the ChatGPT page.
 
 The follow-up prompt asking for an "执行前最终 Go/No-Go 复审" was visible on the
-page, but the page still showed "正在思考" after waiting. Therefore the final
-execution Go/No-Go review is not captured and remains a deployment gate.
+page, but the page still showed "正在思考" after waiting. A later fresh ChatGPT
+conversation completed that final review; see `chatgpt-final-go-nogo-review.md`.
 
 ## Main Review Conclusions
 

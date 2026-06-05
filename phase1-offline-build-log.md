@@ -85,8 +85,11 @@ Verified statically:
 - Actual `douyin_chong` artifact is still missing.
 - OpenClaw Gateway API contract for Bridge is not locked.
 - OpenClaw 2026.3.13 security exception or patch strategy is not decided.
+- OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated
+  fixed-version environment before production.
 - Docker build and compose render are not verified in an isolated Docker host.
-- ChatGPT web review conclusion is still not captured.
+- ChatGPT final Go/No-Go review is captured in
+  `chatgpt-final-go-nogo-review.md`.
 - Authenticated public Dify browser baseline is still incomplete.
 
 ## Go / No-Go
