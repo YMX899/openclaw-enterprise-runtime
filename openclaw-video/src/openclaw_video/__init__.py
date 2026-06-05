@@ -5,6 +5,7 @@ __all__ = [
     "job_store",
     "openclaw_gateway",
     "result_schema",
+    "session_store",
     "url_guard",
     "worker_service",
 ]

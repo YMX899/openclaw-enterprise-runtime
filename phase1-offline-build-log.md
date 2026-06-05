@@ -34,6 +34,16 @@ Ran 22 tests
 OK
 ```
 
+Updated local test result after Bridge API/session/job draft:
+
+```text
+System Python: Ran 32 tests, OK, skipped=6
+  skipped: FastAPI TestClient tests because FastAPI is not installed globally.
+
+.phase1-sandbox/bridge-api-venv: Ran 32 tests, OK
+  includes: FastAPI TestClient API tests for /me, sessions, jobs and ACL.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -46,6 +56,10 @@ Covered:
 - in-memory job store ownership isolation and queued-to-running claim semantics.
 - worker success, URL rejection, invalid result and timeout status transitions.
 - OpenClaw Gateway token header is kept inside the private Gateway client.
+- in-memory session/message store ownership isolation.
+- Bridge API draft does not expose raw Dify tenant/account IDs.
+- Bridge API draft returns 202 for video jobs and 404 for cross-user
+  session/message/job access.
 
 ## Compose Static Check
 

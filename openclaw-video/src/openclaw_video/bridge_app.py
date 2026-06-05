@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any
 
 try:
@@ -11,13 +12,70 @@ except ImportError as exc:  # pragma: no cover - import checked in container ima
 
 from .redaction import safe_error_message
 from .dify_client import DifyClient
-from .identity import IdentityError, derive_principal
+from .identity import DifyPrincipal, IdentityError, derive_openclaw_routing_user, derive_principal
+from .job_store import InMemoryJobStore, JobNotFound, JobOwnershipError, VideoJob
+from .session_store import (
+    BridgeMessage,
+    BridgeSession,
+    InMemorySessionStore,
+    SessionNotFound,
+    SessionOwnershipError,
+)
 
 
-def create_app() -> FastAPI:
+def _serialize_dt(value: Any) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _serialize_session(session: BridgeSession) -> dict[str, Any]:
+    return {
+        "id": session.id,
+        "title": session.title,
+        "created_at": _serialize_dt(session.created_at),
+        "updated_at": _serialize_dt(session.updated_at),
+    }
+
+
+def _serialize_message(message: BridgeMessage) -> dict[str, Any]:
+    return {
+        "id": message.id,
+        "session_id": message.session_id,
+        "role": message.role,
+        "content": message.content,
+        "video_url": message.video_url,
+        "job_id": message.job_id,
+        "created_at": _serialize_dt(message.created_at),
+    }
+
+
+def _serialize_job(job: VideoJob) -> dict[str, Any]:
+    return {
+        "job_id": job.job_id,
+        "session_id": job.bridge_session_id,
+        "status": job.status.value,
+        "video_url_canonical": job.video_url_canonical,
+        "created_at": _serialize_dt(job.created_at),
+        "started_at": _serialize_dt(job.started_at),
+        "finished_at": _serialize_dt(job.finished_at),
+        "attempt_count": job.attempt_count,
+        "error_code": job.error_code,
+        "result_schema_version": job.result_schema_version,
+        "result_location": job.result_location,
+    }
+
+
+def create_app(
+    *,
+    dify: Any | None = None,
+    session_store: InMemorySessionStore | None = None,
+    job_store: InMemoryJobStore | None = None,
+    identity_secret: str | None = None,
+) -> FastAPI:
     app = FastAPI(title="OpenClaw Dify Bridge", version="0.1.0")
-    dify = DifyClient(os.environ.get("DIFY_API_BASE", "http://api:5001"))
-    identity_secret = os.environ.get("BRIDGE_IDENTITY_SECRET", "")
+    dify = dify or DifyClient(os.environ.get("DIFY_API_BASE", "http://api:5001"))
+    session_store = session_store or InMemorySessionStore()
+    job_store = job_store or InMemoryJobStore()
+    identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
 
     @app.exception_handler(Exception)
     async def _exception_handler(_: Request, exc: Exception) -> JSONResponse:
@@ -31,24 +89,92 @@ def create_app() -> FastAPI:
             "dify_api_base": os.environ.get("DIFY_API_BASE", "http://api:5001"),
         }
 
-    @app.get("/openclaw-api/me")
-    async def me(request: Request) -> dict[str, Any]:
+    async def current_principal(request: Request) -> DifyPrincipal:
         try:
             profile, workspaces = await dify.profile(request.headers), await dify.workspaces(request.headers)
-            principal = derive_principal(identity_secret, profile, workspaces)
+            return derive_principal(identity_secret, profile, workspaces)
         except PermissionError as exc:
             raise HTTPException(status_code=401, detail="login required") from exc
         except IdentityError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+    @app.get("/openclaw-api/me")
+    async def me(request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
         return {"principal_id": principal.principal_id, "authenticated": True}
 
     @app.get("/openclaw-api/sessions")
-    async def sessions() -> dict[str, Any]:
-        raise HTTPException(status_code=501, detail="database adapter not wired in offline draft")
+    async def sessions(request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        return {"sessions": [_serialize_session(item) for item in session_store.list_sessions(principal.principal_id)]}
+
+    @app.post("/openclaw-api/sessions", status_code=201)
+    async def create_session(request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be an object")
+        session_id = str(uuid.uuid4())
+        routing_user = derive_openclaw_routing_user(identity_secret, principal.principal_id, session_id)
+        session = session_store.create_session(
+            principal.principal_id,
+            str(payload.get("title") or "OpenClaw session"),
+            routing_user,
+            session_id=session_id,
+        )
+        return {"session": _serialize_session(session)}
+
+    @app.get("/openclaw-api/sessions/{session_id}/messages")
+    async def messages(session_id: str, request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        try:
+            messages = session_store.list_messages(session_id, principal.principal_id)
+        except (SessionNotFound, SessionOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="session not found") from exc
+        return {"messages": [_serialize_message(item) for item in messages]}
 
     @app.post("/openclaw-api/jobs")
-    async def create_job() -> dict[str, Any]:
-        raise HTTPException(status_code=501, detail="job queue adapter not wired in offline draft")
+    async def create_job(request: Request) -> JSONResponse:
+        principal = await current_principal(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be an object")
+        session_id = str(payload.get("session_id") or "")
+        video_url = str(payload.get("video_url") or "").strip()
+        if not session_id or not video_url:
+            raise HTTPException(status_code=400, detail="session_id and video_url are required")
+        try:
+            session_store.get_session(session_id, principal.principal_id)
+        except (SessionNotFound, SessionOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="session not found") from exc
+        job = job_store.create_job(principal.principal_id, session_id, video_url)
+        session_store.add_message(
+            session_id,
+            principal.principal_id,
+            "user",
+            str(payload.get("content") or "Analyze video"),
+            video_url=video_url,
+            job_id=job.job_id,
+        )
+        return JSONResponse(status_code=202, content={"job": _serialize_job(job)})
+
+    @app.get("/openclaw-api/jobs/{job_id}")
+    async def get_job(job_id: str, request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        try:
+            job = job_store.get_job(job_id, principal.principal_id)
+        except (JobNotFound, JobOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="job not found") from exc
+        return {"job": _serialize_job(job)}
+
+    @app.post("/openclaw-api/chat")
+    async def chat(request: Request) -> JSONResponse:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be an object")
+        if payload.get("video_url"):
+            return await create_job(request)
+        raise HTTPException(status_code=501, detail="offline draft has no Gateway chat adapter")
 
     return app
 
