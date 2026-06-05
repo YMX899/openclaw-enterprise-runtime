@@ -63,17 +63,22 @@ Gateway safety gate:
 - Gateway token must never enter browser JavaScript or network requests.
 - Control UI/default Gateway port such as `18789` must not be bound to `0.0.0.0`.
 
-## Missing Artifacts
+## Missing Or Incomplete Artifacts
 
-Current local and server checks did not find:
+Current local and server checks did not find production-ready:
 
-- `openclaw-bridge` source or image.
+- `openclaw-bridge` image or complete production source.
 - OpenClaw Gateway deployment assets for version `2026.3.13`.
 - `douyin_chong` or equivalent video-analysis source/image/binary.
-- worker wrapper source.
-- JSON result schema for video analysis.
-- migration files for Bridge database.
-- acceptance tests for session ACL, job lifecycle, and Dify baseline.
+- real worker wrapper bound to the actual video-analysis artifact.
+- final JSON result schema for the real video-analysis output.
+- applied and tested Bridge database migrations.
+- acceptance tests for real session ACL, job lifecycle, and authenticated Dify baseline.
+
+Local draft artifacts now exist for Bridge identity, URL guarding, job state,
+in-memory job claiming, worker status transitions, Gateway token isolation,
+database migration draft, rollback runbook and baseline test script. These are
+offline implementation progress, not production deployment evidence.
 
 Because of these missing artifacts:
 
