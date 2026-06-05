@@ -18,9 +18,9 @@ testing, and final deployment verification.
 | Real public Dify authenticated app baseline | Incomplete | Needs logged-in browser test of existing app page and message flow without recording tokens. |
 | OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, session/job API draft, job flow utilities and tests. Not production complete. |
 | douyin_chong video tool artifact | Missing | Not found locally in project or on server; wrapper placeholder only. |
-| Async video job implementation | Partial complete | Schema/migration/status model, in-memory job store, Postgres durable-queue adapter draft, worker entrypoint, result validation, worker success/failure/timeout flow and tests exist. Real `douyin_chong` execution and deployed Postgres integration test still pending. |
+| Async video job implementation | Partial complete | Schema/migration/status model, in-memory job store, Postgres durable-queue adapter draft, worker entrypoint, result validation, worker success/failure/timeout flow and tests exist. Postgres adapter replay tests pass. Real `douyin_chong` execution and deployed Postgres integration test still pending. |
 | SSRF and URL validation | Partial complete | Pure URL guard implemented and unit tested; redirect revalidation and download limits still pending. |
-| Bridge Postgres migrations | Partial complete | Initial SQL migration includes queue lease/idempotency fields; rollback SQL exists; SQL contract tests pass. Not applied/tested on a real Postgres container yet. |
+| Bridge Postgres migrations | Partial complete | Initial SQL migration includes queue lease/idempotency fields; rollback SQL exists; SQL contract and adapter replay tests pass. Local Docker CLI is unavailable, so migration has not been applied/tested on a real Postgres container yet. |
 | OpenClaw Gateway deployment | Incomplete | Dockerfile draft and artifact manifest placeholders exist; no image digest, no doctor/probe result, no API contract, no security exception, and fixed-version Gateway regression gates are unresolved. |
 | Docker compose sidecar | Partial | Compose draft exists and static YAML check passed; Docker CLI unavailable locally; not rendered/built/deployed. |
 | OpenResty route integration | Not started | Correctly gated; no route change made. |
@@ -46,6 +46,6 @@ Mark objective complete: NO-GO
 2. OpenClaw 2026.3.13 security audit exception/patch/upgrade decision is unresolved.
 3. OpenClaw 2026.3.13 Gateway regression risks are not excluded in an isolated fixed-version environment.
 4. Authenticated Dify browser baseline is incomplete.
-5. Sidecar Docker build and compose config have not been verified in a Docker environment.
+5. Sidecar Docker build, compose config and Postgres migration have not been verified in a Docker environment because the local workstation currently has no `docker` command.
 6. OpenClaw Gateway API contract for Bridge is not locked.
 7. Bridge durable Postgres queue and production adapters are drafted and unit/contract-tested, but not integration-tested on a real Postgres container.

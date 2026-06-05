@@ -61,11 +61,11 @@ Updated local test result after Bridge Postgres durable queue draft:
 
 ```text
 System Python with PYTHONPATH=openclaw-video\src:
-  Ran 44 tests, OK, skipped=6
+  Ran 45 tests, OK, skipped=6
   skipped: FastAPI TestClient tests because FastAPI is not installed globally.
 
 .phase1-sandbox/bridge-api-venv:
-  Ran 44 tests, OK
+  Ran 45 tests, OK
   includes FastAPI TestClient API tests and Postgres durable-queue contract tests.
 
 compileall:
@@ -74,6 +74,24 @@ compileall:
 
 git diff --check:
   OK
+```
+
+Updated local test result after Postgres store replay tests:
+
+```text
+Local Docker CLI probe:
+  docker: command not found
+  docker compose: command not found
+
+System Python with PYTHONPATH=openclaw-video\src:
+  Ran 50 tests, OK, skipped=8
+  skipped: FastAPI TestClient and psycopg Jsonb tests missing global deps.
+
+.phase1-sandbox/bridge-api-venv:
+  Ran 50 tests, OK
+  includes Postgres adapter replay tests for idempotency, SKIP LOCKED claim
+  parameters, worker-lease completion, stale-worker rejection and expired lease
+  recovery.
 ```
 
 Covered:
@@ -95,6 +113,9 @@ Covered:
 - Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
   idempotency keys, worker leases, heartbeats, expired lease recovery and
   stale-worker result rejection.
+- Postgres adapter replay tests exercise real adapter methods without a Docker
+  database; this is stronger than source-string checks but still does not
+  replace real Postgres container integration.
 - `video-analysis-worker` entrypoint now requires `DATABASE_URL`, uses
   `PostgresJobStore`, recovers expired leases and enforces V1
   `WORKER_CONCURRENCY=1`.

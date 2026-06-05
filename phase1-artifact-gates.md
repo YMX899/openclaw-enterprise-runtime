@@ -109,6 +109,11 @@ The project may continue implementing local Phase 1 artifacts, but Phase 1
 cannot be considered complete until production adapters, Docker build, contract
 tests, vulnerability triage and real artifact manifests are verified.
 
+Current local Docker status: the workstation has no `docker` command available,
+so Docker build, compose render and real Postgres migration integration remain
+unverified. Adapter replay tests are useful local evidence, not a replacement
+for container integration.
+
 ## Required Offline Deliverables
 
 All deliverables must be stored in git before any server deployment:
