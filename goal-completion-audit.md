@@ -10,13 +10,13 @@ testing, and final deployment verification.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Use git version management | Partial complete | Git repo initialized; latest commits through `ca5f760`; clean working tree after each committed step. Server-side versioned deployment still pending. |
+| Use git version management | Partial complete | Git repo initialized; latest commits through `ba4e32d`; clean working tree after each committed step. Server-side versioned deployment still pending. |
 | Re-review plan with ChatGPT web before execution | Partial complete | Completed architecture review captured in `chatgpt-architecture-review.md`. The follow-up final execution Go/No-Go prompt is still stuck at "正在思考" and remains a deployment gate. |
 | Use OpenClaw 3.13 | Partial complete | Local sandbox verified `openclaw@2026.3.13`, version `OpenClaw 2026.3.13 (61d171a)`. Not deployed; security gate unresolved. |
 | Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md`; no server modification performed. |
 | Real public Dify unauthenticated baseline | Complete | `public-baseline-check-20260606.md`; `/signin=200`, `/apps=200`, profile unauthenticated `401`. |
 | Real public Dify authenticated app baseline | Incomplete | Needs logged-in browser test of existing app page and message flow without recording tokens. |
-| OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, job flow utilities and tests. Not production complete. |
+| OpenClaw Bridge artifact | Partial | Local skeleton exists with identity adapter, Dify client, session/job API draft, job flow utilities and tests. Not production complete. |
 | douyin_chong video tool artifact | Missing | Not found locally in project or on server; wrapper placeholder only. |
 | Async video job implementation | Partial complete | Schema/migration/status model, in-memory job store, result validation, worker success/failure/timeout flow and tests exist. Production Postgres queue and real worker loop still pending. |
 | SSRF and URL validation | Partial complete | Pure URL guard implemented and unit tested; redirect revalidation and download limits still pending. |
