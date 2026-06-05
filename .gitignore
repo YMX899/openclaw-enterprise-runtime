@@ -10,6 +10,7 @@ codex-browser-cookies.db
 
 # Temporary scratch files
 tmp/
+.phase1-sandbox/
 *.tmp
 *.bak
 *.log
