@@ -10,7 +10,7 @@ testing, and final deployment verification.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Use git version management | Partial complete | Git repo initialized; latest committed state before this audit update is `74ad280`; current Phase 1 Bridge/Gateway adapter contract work is being prepared for a new commit after tests. Server-side versioned deployment still pending. |
+| Use git version management | Partial complete | Git repo initialized; latest committed state before this audit update is `0a8cf11`; current Phase 1 knowledge-base artifact work is being prepared for a new commit after tests. Server-side versioned deployment still pending. |
 | Re-review plan with ChatGPT web before execution | Complete for current gate | Completed architecture review captured in `chatgpt-architecture-review.md`; final execution Go/No-Go captured in `chatgpt-final-go-nogo-review.md`. Verdict: production deployment No-Go; local Phase 1 Conditional Go. A follow-up review attempt on 2026-06-06 found ChatGPT session expired; no cookies/tokens were read. |
 | Use OpenClaw 3.13 | Partial complete | Local sandbox verified `openclaw@2026.3.13`, version `OpenClaw 2026.3.13 (61d171a)`. Not deployed; security and Gateway regression gates unresolved. |
 | Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md` and `phase0-readonly-recheck-20260606.md`; no server modification performed; Dify core container IDs/restart counts and compose hash recorded. |
@@ -23,6 +23,7 @@ testing, and final deployment verification.
 | Bridge Postgres migrations | Partial complete | Initial SQL migration includes queue lease/idempotency fields; rollback SQL exists; SQL contract and adapter replay tests pass. Local Docker CLI is unavailable, so migration has not been applied/tested on a real Postgres container yet. |
 | OpenClaw Gateway deployment | Incomplete | Dockerfile draft and artifact manifest placeholders exist; local CLI contract scripts validate OpenClaw 2026.3.13 help/version and keep `/channels/dify-web/chat` as an unapproved placeholder. No image digest, running Gateway RPC result, security exception, or isolated fixed-version regression gate exists. |
 | Docker compose sidecar | Partial | Compose draft exists and static YAML check passed; Docker CLI unavailable locally; not rendered/built/deployed. |
+| Short-video knowledge base artifact | Partial complete | Versioned artifact `artifacts/knowledge-base-short-video/2026.06.06` exists with `VERSION`, `MANIFEST.md`, `SHA256SUMS`, Windows/Linux verification scripts and static compose read-only mount. Not yet deployed or tested in container runtime. |
 | OpenResty route integration | Not started | Correctly gated; no route change made. |
 | Public `/openclaw-lab/` and `/openclaw-api/` tests | Not started | Requires Phase 2/3 deployment after gates. |
 | Dify unaffected under video-analysis load | Not started | Requires real worker and sidecar deployment. |

@@ -8,6 +8,8 @@
 - `openclaw-bridge` reaches OpenClaw Gateway on private network.
 - OpenClaw Gateway is not bound to a public host port.
 - Bridge Postgres is not bound to a public host port.
+- Knowledge base is mounted at `/knowledge/short-video:ro`.
+- Knowledge base `VERSION` and `SHA256SUMS` verify before sidecar startup.
 - Worker claims one queued job and no more than one at a time.
 - Worker timeout moves job to `timed_out`.
 - Worker failure returns a user-safe error without internal stack traces.
@@ -52,3 +54,11 @@
   max video duration and max frame count.
 - Result matches `schemas/video-analysis-result.schema.json`.
 - Temporary files are cleaned.
+
+## Knowledge Base
+
+- `artifacts/knowledge-base-short-video/2026.06.06/SHA256SUMS` verifies.
+- Runtime services cannot write into `/knowledge/short-video`.
+- Knowledge base version is visible to operators before controlled trial.
+- User memory, sessions, jobs and video results are not written to the
+  knowledge-base artifact.

@@ -11,8 +11,12 @@ services:
       BRIDGE_IDENTITY_SECRET: ${BRIDGE_IDENTITY_SECRET:?}
       OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?}
+      KNOWLEDGE_BASE_DIR: /knowledge/short-video
+      KNOWLEDGE_BASE_VERSION_FILE: /knowledge/short-video/VERSION
     ports:
       - "127.0.0.1:18181:3000"
+    volumes:
+      - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
     networks:
       - openclaw-internal
       - dify-default
@@ -56,6 +60,7 @@ services:
     volumes:
       - openclaw-gateway-state:/var/lib/openclaw
       - ./openclaw/config:/etc/openclaw:ro
+      - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
     networks:
       - openclaw-internal
     expose:

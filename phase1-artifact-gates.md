@@ -98,8 +98,9 @@ Local draft artifacts now exist for Bridge identity, URL guarding, job state,
 in-memory job claiming, Postgres durable queue adapter, worker lease/heartbeat
 flow, worker status transitions, redirect target revalidation, fixed-argument
 video resource-limit wrapper contract, Gateway token isolation, database
-migration draft, rollback SQL, rollback runbook and baseline test script. These
-are offline implementation progress, not production deployment evidence.
+migration draft, rollback SQL, versioned read-only short-video knowledge-base
+artifact, rollback runbook and baseline test script. These are offline
+implementation progress, not production deployment evidence.
 
 Because of these missing artifacts:
 
@@ -133,6 +134,8 @@ All deliverables must be stored in git before any server deployment:
 - `docker-compose.openclaw-video.yaml`.
 - `rollback-runbook.md`.
 - `acceptance-test-cases.md`.
+- versioned read-only knowledge-base artifact with `VERSION`, `SHA256SUMS`,
+  manifest and verification scripts.
 - JSON Schemas for:
   - chat request/response.
   - session and message objects.
@@ -141,6 +144,20 @@ All deliverables must be stored in git before any server deployment:
 - SSRF and URL validation tests.
 - ACL isolation tests.
 - Dify public baseline test script.
+
+## Minimum Knowledge-Base Contract
+
+The knowledge base must:
+
+- be stored as a versioned artifact under `artifacts/knowledge-base-short-video/<version>`.
+- include `VERSION`, `MANIFEST.md` and `SHA256SUMS`.
+- pass `scripts/verify_knowledge_base_artifact.ps1` on Windows and
+  `scripts/verify_knowledge_base_artifact.sh` on Linux or an isolated Docker
+  host.
+- be mounted read-only at `/knowledge/short-video:ro`.
+- not be used as per-user memory, session storage, job storage or result
+  storage.
+- create a new version directory and git commit for every content update.
 
 ## Minimum Bridge Contract
 

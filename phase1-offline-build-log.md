@@ -19,7 +19,10 @@ change, no OpenResty reload.
 - `openclaw-video/acceptance-test-cases.md`
 - `artifacts/openclaw-2026.3.13/*`
 - `artifacts/douyin_chong/*`
+- `artifacts/knowledge-base-short-video/2026.06.06/*`
 - `scripts/verify_openclaw_contract.sh`
+- `scripts/verify_knowledge_base_artifact.sh`
+- `scripts/verify_knowledge_base_artifact.ps1`
 - `scripts/verify_douyin_chong_contract.sh`
 - `scripts/verify_compose_render.sh`
 - `scripts/capture_dify_baseline.sh`
@@ -202,6 +205,25 @@ compileall:
   OK
 ```
 
+Updated local test result after versioned read-only knowledge-base artifact:
+
+```text
+Knowledge-base artifact:
+  artifacts/knowledge-base-short-video/2026.06.06
+
+PowerShell verification:
+  .\scripts\verify_knowledge_base_artifact.ps1
+  OK, 4 files verified.
+
+Bash verification:
+  bash scripts/verify_knowledge_base_artifact.sh
+  OK, 4 files verified.
+
+Static compose contract:
+  openclaw-bridge and openclaw-gateway mount
+  ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -233,6 +255,9 @@ Covered:
   production still returns `501` unless an adapter is explicitly supplied, while
   offline tests prove the Bridge passes only scoped routing/session/message
   data and enforces session ownership before calling the adapter.
+- Short-video knowledge base now has a versioned read-only artifact with
+  `VERSION`, `MANIFEST.md`, `SHA256SUMS`, Windows/Linux verification scripts and
+  compose static coverage for `/knowledge/short-video:ro`.
 - Bridge Postgres adapter draft with `FOR UPDATE SKIP LOCKED` job claiming,
   idempotency keys, worker leases, heartbeats, expired lease recovery and
   stale-worker result rejection.
@@ -265,6 +290,8 @@ Verified statically:
 - `openclaw-gateway` has no public host port.
 - `bridge-postgres` has no public host port.
 - only `openclaw-bridge` joins external `docker_default`.
+- knowledge base is statically mounted read-only at
+  `/knowledge/short-video:ro`.
 
 ## Remaining Phase 1 Blockers
 
