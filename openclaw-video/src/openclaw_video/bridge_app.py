@@ -228,6 +228,7 @@ LAB_PAGE_HTML = """<!doctype html>
         <button id="refreshMe" class="secondary">Refresh Login</button>
         <button id="identityDiagnostics" class="secondary">Identity Check</button>
         <button id="runSelfTest" class="secondary">Self Test</button>
+        <button id="runSecurityTest" class="secondary">Security Test</button>
       </div>
     </section>
     <section class="grid">
@@ -379,6 +380,77 @@ LAB_PAGE_HTML = """<!doctype html>
         count: messages.body.messages ? messages.body.messages.length : 0
       });
     }
+    async function runSecurityTest() {
+      const steps = [];
+      const add = (name, result) => {
+        steps.push({ name, ...result });
+        show({ security_test: steps });
+      };
+      const diagnostics = await api('/openclaw-api/identity/diagnostics');
+      add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
+      if (!diagnostics.body.authenticated) return;
+
+      const me = await api('/openclaw-api/me');
+      add('me', { status: me.status, authenticated: me.body.authenticated === true });
+      if (me.status !== 200) return;
+
+      const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      const randomMessages = await api('/openclaw-api/sessions/' + encodeURIComponent(randomId) + '/messages');
+      add('random_session_404', { status: randomMessages.status, ok: randomMessages.status === 404 });
+      const randomJob = await api('/openclaw-api/jobs/' + encodeURIComponent(randomId));
+      add('random_job_404', { status: randomJob.status, ok: randomJob.status === 404 });
+      const randomResult = await api('/openclaw-api/jobs/' + encodeURIComponent(randomId) + '/result');
+      add('random_result_404', { status: randomResult.status, ok: randomResult.status === 404 });
+
+      const sessionResult = await api('/openclaw-api/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'OpenClaw security test ' + new Date().toISOString() })
+      });
+      add('create_session', { status: sessionResult.status, body: sessionResult.body });
+      const sessionId = sessionResult.body.session && sessionResult.body.session.id;
+      if (!sessionId) return;
+      document.getElementById('sessionId').value = sessionId;
+
+      const negativeCases = [
+        ['non_allowlisted_domain', 'https://example.com/not-douyin'],
+        ['localhost_blocked', 'http://127.0.0.1:8081/apps'],
+        ['cloud_metadata_blocked', 'http://169.254.169.254/latest/meta-data/']
+      ];
+      for (const [caseName, videoUrl] of negativeCases) {
+        const created = await api('/openclaw-api/jobs', {
+          method: 'POST',
+          body: JSON.stringify({
+            session_id: sessionId,
+            video_url: videoUrl,
+            content: 'Security negative case: ' + caseName,
+            idempotency_key: 'security-' + caseName + '-' + sessionId
+          })
+        });
+        add(caseName + '_submitted', { status: created.status, body: created.body });
+        const jobId = created.body.job && created.body.job.job_id || '';
+        if (!jobId) continue;
+        currentJobId = jobId;
+        let lastJob = null;
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          await delay(1000);
+          const poll = await api('/openclaw-api/jobs/' + encodeURIComponent(jobId));
+          lastJob = poll.body.job || null;
+          if (lastJob && terminalStatuses.has(lastJob.status)) break;
+        }
+        add(caseName + '_terminal', {
+          job_id: jobId,
+          status: lastJob ? lastJob.status : 'missing',
+          error_code: lastJob ? lastJob.error_code : null,
+          ok: !!lastJob && lastJob.status === 'failed' && lastJob.error_code === 'url_rejected'
+        });
+      }
+
+      const messages = await api('/openclaw-api/sessions/' + encodeURIComponent(sessionId) + '/messages');
+      add('messages', {
+        status: messages.status,
+        count: messages.body.messages ? messages.body.messages.length : 0
+      });
+    }
     async function submitJob() {
       const result = await api('/openclaw-api/jobs', {
         method: 'POST',
@@ -481,6 +553,7 @@ LAB_PAGE_HTML = """<!doctype html>
     document.getElementById('refreshMe').addEventListener('click', refreshMe);
     document.getElementById('identityDiagnostics').addEventListener('click', identityDiagnostics);
     document.getElementById('runSelfTest').addEventListener('click', runSelfTest);
+    document.getElementById('runSecurityTest').addEventListener('click', runSecurityTest);
     document.getElementById('createSession').addEventListener('click', createSession);
     document.getElementById('submitJob').addEventListener('click', submitJob);
     document.getElementById('uploadJob').addEventListener('click', uploadJob);
