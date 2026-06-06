@@ -21,6 +21,8 @@ class PublicPortScriptTests(unittest.TestCase):
         self.assertIn('proxy_pass ${BACKEND};', text)
         self.assertIn('openresty -t', text)
         self.assertIn('openresty -s reload', text)
+        self.assertIn('lab_ready=0', text)
+        self.assertIn('for _ in 1 2 3 4 5', text)
         self.assertIn('local_https_me=401', text)
 
     def test_install_script_does_not_publish_gateway_postgres_or_touch_dify(self):

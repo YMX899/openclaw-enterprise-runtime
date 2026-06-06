@@ -158,8 +158,27 @@ redact_config_summary
 docker exec "$OPENRESTY_CONTAINER" openresty -t
 docker exec "$OPENRESTY_CONTAINER" openresty -s reload
 
-curl -kfsS --resolve "${SERVER_NAME}:${PORT}:127.0.0.1" "https://${SERVER_NAME}:${PORT}/openclaw-lab/" >/dev/null
-me_status="$(curl -ksS --resolve "${SERVER_NAME}:${PORT}:127.0.0.1" -o /tmp/openclaw-public-port-me -w '%{http_code}' "https://${SERVER_NAME}:${PORT}/openclaw-api/me" || true)"
+lab_ready=0
+for _ in 1 2 3 4 5; do
+  if curl -kfsS --resolve "${SERVER_NAME}:${PORT}:127.0.0.1" "https://${SERVER_NAME}:${PORT}/openclaw-lab/" >/dev/null; then
+    lab_ready=1
+    break
+  fi
+  sleep 1
+done
+if [ "$lab_ready" != "1" ]; then
+  echo "OpenClaw public port did not become reachable on $PORT" >&2
+  exit 1
+fi
+
+me_status=""
+for _ in 1 2 3 4 5; do
+  me_status="$(curl -ksS --resolve "${SERVER_NAME}:${PORT}:127.0.0.1" -o /tmp/openclaw-public-port-me -w '%{http_code}' "https://${SERVER_NAME}:${PORT}/openclaw-api/me" || true)"
+  if [ "$me_status" = "401" ]; then
+    break
+  fi
+  sleep 1
+done
 if [ "$me_status" != "401" ]; then
   echo "expected unauthenticated /openclaw-api/me to return 401, got $me_status" >&2
   exit 1
