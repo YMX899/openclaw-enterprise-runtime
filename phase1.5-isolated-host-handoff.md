@@ -160,3 +160,36 @@ full .env files
 TLS private keys
 OpenClaw gateway tokens
 ```
+
+## Real Sample Evidence Promotion
+
+After a real sample run succeeds, first inspect only the sanitized summary under
+`tmp/`. Do not commit raw result JSON, raw URLs, secret env files, stdout/stderr
+contents, cookies, headers, browser state or full model output.
+
+Validate without writing:
+
+```bash
+PYTHON=/path/to/python
+$PYTHON scripts/promote_douyin_real_sample_evidence.py \
+  --source tmp/douyin-real-samples/<run-id>/sanitized-run.json \
+  --dry-run
+```
+
+Promote only the sanitized evidence:
+
+```bash
+$PYTHON scripts/promote_douyin_real_sample_evidence.py \
+  --source tmp/douyin-real-samples/<run-id>/sanitized-run.json
+```
+
+The promotion script writes:
+
+```text
+artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json
+```
+
+It fails closed if the sample did not succeed, if the explicit runtime env file
+was missing, if stdout/stderr contents were recorded, if a raw URL is present,
+or if the schema/hash evidence is missing. The generated file is still only one
+gate input; it does not approve production by itself.

@@ -147,6 +147,7 @@ Current status:
 ```text
 OpenResty route-map discovery: PASS
 OpenClaw route present: NO
+no openclaw route present
 Safe to add route now: NO, OpenClaw/Bridge artifacts are missing
 ```
 

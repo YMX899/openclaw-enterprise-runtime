@@ -182,6 +182,40 @@ new 5xx: NONE
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("raw URL", result.evidence)
 
+    def test_real_sample_evidence_rejects_http_raw_url_leak(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json",
+                """
+{
+  "schema_version": "douyin-real-sample-evidence.v1",
+  "status": "succeeded",
+  "input_url_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "raw_url": "http://www.douyin.com/video/123",
+  "env_file_present": true,
+  "secret_file_contents_recorded": false,
+  "process": {
+    "returncode": 0,
+    "elapsed_seconds": 12.3,
+    "stdout_recorded": false,
+    "stderr_recorded": false
+  },
+  "result": {
+    "schema_version": "openclaw-video-result.v1",
+    "platform": "douyin",
+    "result_json_bytes": 1234,
+    "result_json_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}
+""",
+            )
+
+            result = audit_module.check_douyin_real_sample(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("raw URL", result.evidence)
+
 
 if __name__ == "__main__":
     unittest.main()

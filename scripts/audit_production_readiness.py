@@ -83,7 +83,7 @@ def check_douyin_real_sample(repo: Path) -> GateResult:
         return GateResult("douyin_real_sample", "NO_GO", "real sample did not use an explicit runtime env file")
     if not _is_sha256(evidence.get("input_url_sha256")):
         return GateResult("douyin_real_sample", "NO_GO", "real sample evidence is missing input URL hash")
-    if "https://" in _json_text(evidence):
+    if re.search(r"https?://", _json_text(evidence), re.IGNORECASE):
         return GateResult("douyin_real_sample", "NO_GO", "real sample evidence contains a raw URL")
 
     process = evidence.get("process") or {}

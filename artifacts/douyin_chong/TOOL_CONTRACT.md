@@ -108,3 +108,20 @@ Linux child max_rss_kb when available
 It must not print or commit the runtime secret file, raw headers, cookies,
 Authorization values, CSRF values, or full model output. The generated output
 directory is under `tmp/` by default and is ignored by git.
+
+After the sanitized evidence has been reviewed, promote it into the committed
+production-readiness evidence path only through the promotion script:
+
+```bash
+python scripts/promote_douyin_real_sample_evidence.py \
+  --source tmp/douyin-real-samples/<run-id>/sanitized-run.json
+```
+
+The promotion script fails closed if the sample did not succeed, if the runtime
+secret file was missing, if stdout/stderr contents were recorded, if a raw URL is
+present, or if the result hash/schema evidence is missing. It also strips local
+temporary output paths before writing:
+
+```text
+artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json
+```
