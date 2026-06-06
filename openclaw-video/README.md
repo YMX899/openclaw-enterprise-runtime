@@ -1,7 +1,8 @@
 # OpenClaw Video Sidecar
 
 Status: Phase 1 offline artifact draft. Do not deploy to production until all
-gates in `../phase1-artifact-gates.md` pass.
+gates in `../phase1-artifact-gates.md` and
+`../phase1.5-isolated-docker-gates.md` pass.
 
 This directory defines the sidecar architecture for an independent
 `/openclaw-lab/` page and `/openclaw-api/` API in front of OpenClaw `2026.3.13`.
@@ -33,6 +34,7 @@ supplied and verified:
   adapter.
 - real Dify authenticated browser baseline.
 - final ChatGPT web review captured in git.
+- Phase 1.5 isolated Linux Docker validation.
 
 ## Local Unit Tests
 
@@ -74,3 +76,7 @@ node scripts/verify_openclaw_gateway_ws_contract.mjs
 No OpenClaw service may be deployed until this repository is clean, artifacts are
 committed, generated image digests are recorded, and rollback has been tested in
 a non-production or no-op mode.
+
+The production Dify server must not be the first environment used to test
+Docker build, compose render, sidecar startup, Gateway WS v3 runtime behavior,
+or worker resource limits.

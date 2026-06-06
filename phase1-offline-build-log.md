@@ -322,6 +322,34 @@ Verification:
   status/chat.history.
 ```
 
+Updated ChatGPT web review after session recovery:
+
+```text
+Model/mode:
+  GPT-5.5 Thinking mode selected in the ChatGPT web UI.
+
+Reviewed state:
+  commit ae72206
+  tag phase1-openclaw-gateway-ws-v3
+
+Verdict:
+  Production server Phase 2 sidecar deployment: NO-GO.
+  Allowed next step: Phase 1.5 isolated Docker/Linux validation.
+
+Main reasons:
+  - real douyin_chong/video-analysis artifact is still missing.
+  - Docker build/compose/up/port exposure is not verified on an isolated Linux
+    Docker host.
+  - authenticated real public Dify baseline is incomplete.
+  - OpenClaw 2026.3.13 security decision is unresolved.
+  - Gateway WS v3 design is acceptable, but must be proven inside deployment
+    compose with production model credentials.
+
+Action taken:
+  phase1.5-isolated-docker-gates.md added as the controlling gate before any
+  production server sidecar deployment.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -412,9 +440,9 @@ Verified statically:
 - OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated
   fixed-version environment before production.
 - Docker build and compose render are not verified in an isolated Docker host.
-- ChatGPT final Go/No-Go review is still pending. On 2026-06-06 an existing
-  conversation was readable, but new-chat/root still redirected to the login
-  page with an expired-session prompt.
+- ChatGPT final Go/No-Go review was completed after the web session recovered.
+  The review kept production server Phase 2 as `NO-GO` and introduced a
+  required `Phase 1.5` isolated Docker/Linux validation gate.
 - Authenticated public Dify browser baseline is still incomplete; real Chrome
   retry on 2026-06-06 reached `/signin` from `/apps`, indicating no active Dify
   login session in the current browser profile.
@@ -424,5 +452,6 @@ Verified statically:
 ```text
 Phase 1 offline source skeleton: GO and committed
 Phase 1 complete: NO-GO
+Phase 1.5 isolated Docker/Linux validation: GO
 Phase 2 server deployment: NO-GO
 ```

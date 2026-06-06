@@ -137,6 +137,7 @@ Because of these missing artifacts:
 
 ```text
 Phase 1 offline artifact preparation: CONDITIONAL GO for local implementation
+Phase 1.5 isolated Docker/Linux validation: GO
 Phase 2 sidecar deployment: NO-GO
 Phase 3 public route: NO-GO
 Phase 4 controlled trial: NO-GO
@@ -151,6 +152,11 @@ Current local Docker status: the workstation has no `docker` command available,
 so Docker build, compose render and real Postgres migration integration remain
 unverified. Adapter replay tests are useful local evidence, not a replacement
 for container integration.
+
+After the 2026-06-06 GPT-5.5 Thinking web review, `phase1.5-isolated-docker-gates.md`
+is the controlling gate before any production server sidecar deployment. The
+production Dify server must not be used as the first Docker build/compose/up
+validation environment.
 
 ## Required Offline Deliverables
 

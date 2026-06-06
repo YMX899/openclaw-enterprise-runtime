@@ -8,6 +8,10 @@ Mode: user-provided ChatGPT web session. Captured only rendered page text. No
 cookies, request headers, tokens, browser storage, or secrets were read or
 recorded.
 
+Update on 2026-06-06: a second ChatGPT web review was completed after the web
+session recovered. It used GPT-5.5 Thinking mode and reviewed the repository
+state after commit `ae72206` / tag `phase1-openclaw-gateway-ws-v3`.
+
 ## Final Verdict
 
 ```text
@@ -17,6 +21,7 @@ OpenResty public route change: NO-GO
 Dify Web / Dify compose modification: NO-GO
 Server Phase 0 read-only evidence collection: GO
 Local Phase 1 offline engineering: CONDITIONAL GO
+Phase 1.5 isolated Docker/Linux validation: GO
 ```
 
 The review explicitly rejects any current claim that the project is "100%
@@ -49,12 +54,12 @@ statement after all gates below pass with current-state evidence.
 ## Current Blockers
 
 - No real `douyin_chong` artifact has been supplied.
-- OpenClaw `2026.3.13` Gateway API contract is not locked or tested.
+- OpenClaw `2026.3.13` Gateway WS v3 contract is locally locked, but not yet
+  proven inside the deployment compose with production model credentials.
 - OpenClaw `2026.3.13` has public Gateway regression reports that must be
   specifically excluded in a fixed-version environment.
 - `npm audit` reports a critical vulnerability affecting the fixed OpenClaw
   package path; production use requires triage or a signed exception.
-- Bridge durable Postgres queue is not implemented.
 - Docker build and compose render are not verified in an isolated Docker host.
 - Authenticated public Dify application baseline is incomplete.
 - OpenResty rollback is documented but not rehearsed.
@@ -107,6 +112,18 @@ make fixed-version Gateway contract tests mandatory before production.
 - Triage OpenClaw npm audit findings.
 - Keep all artifacts in git and tag the phase exit.
 
+### Phase 1.5
+
+- Use `phase1.5-isolated-docker-gates.md` as the controlling gate before any
+  production server sidecar deployment.
+- Supply and test the real `douyin_chong` or equivalent video-analysis
+  artifact.
+- Run Docker build, compose render, container startup, port exposure checks,
+  Gateway WS v3 contract tests and worker resource tests on an isolated
+  Linux Docker host.
+- Close the OpenClaw `2026.3.13` security decision.
+- Keep the production Dify server untouched except for read-only baselines.
+
 ### Phase 2
 
 - Validate fixed OpenClaw `2026.3.13 (61d171a)` in disposable Ubuntu 24.04, not
@@ -153,12 +170,10 @@ make fixed-version Gateway contract tests mandatory before production.
 ## Immediate Next Safe Actions
 
 1. Keep server work to Phase 0 read-only checks and authenticated Dify baseline.
-2. Continue local Phase 1 implementation:
-   - Bridge Postgres adapter.
-   - Durable job queue and worker lease.
-   - migration up/down tests.
-   - Docker build/compose verification.
-   - mock OpenClaw Gateway contract tests.
-3. Create artifact manifest placeholders for OpenClaw and `douyin_chong`, but do
-   not deploy them until real artifacts are supplied and validated.
-
+2. Continue only with Phase 1.5 preparation:
+   - real video-analysis artifact and wrapper verification.
+   - isolated Docker/Linux build and compose validation.
+   - OpenClaw security decision.
+   - authenticated Dify baseline evidence.
+3. Do not deploy sidecar services on the production Dify server until the
+   Phase 1.5 exit commit and tag exist.
