@@ -94,6 +94,30 @@ acceptance_python="$PWD/$acceptance_venv/bin/python"
 "$acceptance_python" -m pip install ./openclaw-video
 "$acceptance_python" -B -c 'import fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime'
 
+step "ephemeral compose secrets"
+if [[ -z "${BRIDGE_POSTGRES_PASSWORD:-}" ]]; then
+  BRIDGE_POSTGRES_PASSWORD="$("$acceptance_python" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(32))
+PY
+)"
+  export BRIDGE_POSTGRES_PASSWORD
+  printf 'generated: BRIDGE_POSTGRES_PASSWORD\n'
+else
+  printf 'provided: BRIDGE_POSTGRES_PASSWORD\n'
+fi
+if [[ -z "${BRIDGE_IDENTITY_SECRET:-}" ]]; then
+  BRIDGE_IDENTITY_SECRET="$("$acceptance_python" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+)"
+  export BRIDGE_IDENTITY_SECRET
+  printf 'generated: BRIDGE_IDENTITY_SECRET\n'
+else
+  printf 'provided: BRIDGE_IDENTITY_SECRET\n'
+fi
+
 step "full Phase 1.5 gate"
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
 REQUIRE_DOUYIN_ARTIFACT=1 \

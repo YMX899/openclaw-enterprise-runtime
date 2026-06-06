@@ -52,6 +52,20 @@ class Phase15AcceptanceRunnerTests(unittest.TestCase):
         self.assertIn('"$acceptance_python" -m pip install ./openclaw-video', self.text)
         self.assertIn('PYTHON="$acceptance_python"', self.text)
 
+    def test_generates_ephemeral_compose_secrets_without_printing_values(self):
+        secret_index = self.text.index("ephemeral compose secrets")
+        full_gate_index = self.text.index("scripts/verify_phase1_5_gates.sh")
+
+        self.assertLess(secret_index, full_gate_index)
+        self.assertIn('BRIDGE_POSTGRES_PASSWORD="$("$acceptance_python" - <<', self.text)
+        self.assertIn('BRIDGE_IDENTITY_SECRET="$("$acceptance_python" - <<', self.text)
+        self.assertIn("secrets.token_urlsafe(32)", self.text)
+        self.assertIn("secrets.token_urlsafe(48)", self.text)
+        self.assertIn("generated: BRIDGE_POSTGRES_PASSWORD", self.text)
+        self.assertIn("generated: BRIDGE_IDENTITY_SECRET", self.text)
+        self.assertNotIn("printf '%s' \"$BRIDGE_POSTGRES_PASSWORD\"", self.text)
+        self.assertNotIn("printf '%s' \"$BRIDGE_IDENTITY_SECRET\"", self.text)
+
     def test_full_gate_requires_hard_gates_and_compose_up(self):
         self.assertIn("REQUIRE_OPENCLAW_SECURITY_APPROVAL=1", self.text)
         self.assertIn("REQUIRE_DOUYIN_ARTIFACT=1", self.text)
