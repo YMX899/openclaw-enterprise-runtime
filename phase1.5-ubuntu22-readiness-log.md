@@ -396,3 +396,81 @@ No sudo password, Docker group change, Docker socket permission change, daemon
 restart, package install, image build, compose up, production SSH operation, Dify
 container operation, OpenResty reload, `.env` read, Cookie read, token read, or
 root-server deployment was performed.
+
+## Sudo Docker Readiness Probe
+
+Refresh time:
+
+```text
+2026-06-06T14:22:33+08:00
+```
+
+Uploaded build:
+
+```text
+commit: e545691bf8bc741511bee0f04cba743411b6997c
+tag: ubuntu22-acceptance-runner-probe-20260606
+archive: tmp/openclaw-dify-phase1.5-e545691.tar.gz
+remote_archive: /tmp/openclaw-dify-phase1.5-e545691.tar.gz
+remote_extract: /tmp/openclaw-dify-phase1.5-e545691
+```
+
+The sudo password was used only to run a single non-production Ubuntu 22.04
+root-wrapped probe. It was not written to a file and is not recorded in this
+repository. The root production server was not used.
+
+Sudo-wrapped Docker readiness:
+
+```text
+effective_user: root
+docker version: Docker server=29.4.0
+docker compose version: Docker Compose version v5.1.3
+host readiness overall: PASS
+host_os: PASS, Linux x86_64
+python3: PASS, Python 3.10.12
+node: PASS, v24.14.1
+docker_engine: PASS, Docker server=29.4.0
+docker_compose: PASS, Docker Compose version v5.1.3
+disk_free: PASS, 50.5GiB free
+memory_total: PASS, 15.6GiB total
+```
+
+Acceptance runner probe with Docker available:
+
+```text
+command: sudo bash wrapper -> REQUIRE_SECRETS=0 TARGET_LABEL=ubuntu22.04 DOCKER_CMD=docker PYTHON=python3 scripts/run_phase1_5_acceptance.sh
+runner_exit: 1
+git_commit: e545691bf8bc741511bee0f04cba743411b6997c
+git_tags: ubuntu22-acceptance-runner-probe-20260606
+host readiness inside runner: PASS
+failure reason: REQUIRE_SECRETS=0 cannot continue to full Phase 1.5 acceptance
+phase1.5-exit-proof.md present after failed command: NO
+failure_closed: PASS
+```
+
+Full Phase 1.5 is now blocked by missing non-production deliverables rather
+than Docker access. Only file presence and byte sizes were checked; secret
+contents were not read.
+
+```text
+missing openclaw-video/secrets/openclaw_gateway_token
+missing openclaw-video/secrets/openclaw_bridge_device_key.pem
+missing openclaw-video/secrets/douyin_chong.env
+present artifacts/douyin_chong/ARTIFACT_MANIFEST.md
+missing artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json
+present artifacts/openclaw-2026.3.13/SECURITY_DECISION.md
+missing artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md
+```
+
+Current interpretation:
+
+```text
+ubuntu22.04 Docker readiness through sudo wrapper: PASS
+Phase 1.5 full isolated Docker proof: NO_GO, blocked by missing secrets/artifacts/security triage
+Production/root deployment: NO_GO
+```
+
+No Docker group change, sudoers change, Docker daemon restart, package install,
+image build, compose up, production SSH operation, Dify container operation,
+OpenResty reload, `.env` read, Cookie read, token read, or root-server
+deployment was performed.
