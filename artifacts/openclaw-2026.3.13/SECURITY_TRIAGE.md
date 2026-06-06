@@ -1,6 +1,6 @@
 # OpenClaw 2026.3.13 Security Triage
 
-status: reviewed
+status: allowed
 openclaw_version: 2026.3.13
 production_decision: approve_exception
 
@@ -11,10 +11,12 @@ security_owner: user-approved operator exception
 engineering_owner: Codex implementation gate with user authorization
 decision_date: 2026-06-06
 decision: approve_exception
+operator_security_status: allowed
 approved_by_security_owner: user-approved-operator-exception
 approved_by_engineering_owner: codex-implementation-gate
 approval_date: 2026-06-06
 approval_scope: phase1.5 isolated validation and controlled private sidecar trial
+approval_note: user explicitly changed SECURITY_TRIAGE.md to allowed status
 ```
 
 ## Summary
@@ -57,7 +59,7 @@ worker_concurrency_one: required
 
 ## Notes
 
-This triage records a user-approved exception for the current implementation
-path. It does not claim that the upstream advisories are fixed. Any later
-public Gateway exposure, Dify Web modification, operator admin scope, or wider
-multi-tenant rollout requires a new review.
+This triage records a user-approved allowed exception for the current
+implementation path. It does not claim that the upstream advisories are fixed.
+Any later public Gateway exposure, Dify Web modification, operator admin scope,
+or wider multi-tenant rollout requires a new review.

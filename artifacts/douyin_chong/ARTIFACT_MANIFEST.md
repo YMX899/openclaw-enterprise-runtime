@@ -84,10 +84,12 @@ JSON schema. The clean candidate source is mounted read-only at
 ## Required Evidence Before Phase 2
 
 The operator has explicitly deferred `REAL_SAMPLE_EVIDENCE.json` for the
-current phase because public Douyin videos can be viewed without account login.
-The deployment gates still keep this deferral explicit through
-`ALLOW_DOUYIN_SAMPLE_DEFERRED=1`; final production can require the sanitized
-real sample evidence again by omitting that flag.
+current Ubuntu 22.04 validation phase. Public Douyin videos can be viewed
+without an account login, so the current phase does not require a Douyin account
+or browser storage state to prove that path. The deployment gates still keep
+this deferral explicit through `ALLOW_DOUYIN_SAMPLE_DEFERRED=1`; final
+production can require the sanitized real sample evidence again by omitting
+that flag.
 
 - real model-backed execution through the vendored minimal source using only
   the explicit runtime secret file.
