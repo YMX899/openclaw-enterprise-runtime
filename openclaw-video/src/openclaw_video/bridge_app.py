@@ -248,6 +248,7 @@ LAB_PAGE_HTML = """<!doctype html>
         <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
         <div class="actions">
           <button id="uploadJob">Upload Job</button>
+          <button id="uploadSmoke" class="secondary">Tiny Upload</button>
         </div>
       </div>
       <div>
@@ -414,6 +415,55 @@ LAB_PAGE_HTML = """<!doctype html>
       if (body.job && body.job.job_id) currentJobId = body.job.job_id;
       show({ status: response.status, body });
     }
+    async function uploadTinySmoke() {
+      let sessionId = document.getElementById('sessionId').value;
+      const steps = [];
+      const add = (name, result) => {
+        steps.push({ name, ...result });
+        show({ upload_smoke: steps });
+      };
+      if (!sessionId) {
+        const sessionResult = await api('/openclaw-api/sessions', {
+          method: 'POST',
+          body: JSON.stringify({ title: 'OpenClaw upload smoke ' + new Date().toISOString() })
+        });
+        add('create_session', { status: sessionResult.status, body: sessionResult.body });
+        sessionId = sessionResult.body.session && sessionResult.body.session.id || '';
+        document.getElementById('sessionId').value = sessionId;
+      }
+      if (!sessionId) return;
+      const fileBytes = new Uint8Array([
+        0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109,
+        0, 0, 0, 0, 105, 115, 111, 109, 109, 112, 52, 49
+      ]);
+      const form = new FormData();
+      form.append('session_id', sessionId);
+      form.append('content', 'Smoke test uploaded video.');
+      form.append('video', new File([fileBytes], 'tiny-smoke.mp4', { type: 'video/mp4' }));
+      const response = await fetch('/openclaw-api/uploads', {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: form
+      });
+      const text = await response.text();
+      let body;
+      try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
+      add('upload_job', { status: response.status, body });
+      currentJobId = body.job && body.job.job_id || '';
+      if (!currentJobId) return;
+      let lastJob = null;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await delay(1000);
+        const poll = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId));
+        lastJob = poll.body.job || null;
+        add('poll_job', { status: poll.status, body: poll.body });
+        if (lastJob && terminalStatuses.has(lastJob.status)) break;
+      }
+      if (lastJob && lastJob.status === 'succeeded') {
+        add('job_result', await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId) + '/result'));
+      }
+    }
     async function pollJob() {
       if (!currentJobId) {
         show('No job_id is available yet.');
@@ -434,6 +484,7 @@ LAB_PAGE_HTML = """<!doctype html>
     document.getElementById('createSession').addEventListener('click', createSession);
     document.getElementById('submitJob').addEventListener('click', submitJob);
     document.getElementById('uploadJob').addEventListener('click', uploadJob);
+    document.getElementById('uploadSmoke').addEventListener('click', uploadTinySmoke);
     document.getElementById('pollJob').addEventListener('click', pollJob);
     refreshMe();
   </script>
