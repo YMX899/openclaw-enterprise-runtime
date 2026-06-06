@@ -16,6 +16,8 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("pip install --no-cache-dir --no-deps /app", text)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET", text)
+        self.assertIn("OPENCLAW_SHARED_SECRETS_DIR:-/app/bin/openclaw-video/shared/secrets", text)
+        self.assertIn("ln -s \"$SHARED_SECRETS_DIR\" secrets", text)
         self.assertIn("up -d --no-deps --force-recreate openclaw-bridge", text)
         self.assertIn("bridge_fast_rebuild=PASS", text)
         self.assertNotIn("video-analysis-worker", text)

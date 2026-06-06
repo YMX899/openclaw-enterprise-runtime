@@ -9,12 +9,30 @@ FAST_IMAGE="${OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast}"
 TMP_DOCKERFILE="${ROOT}/.bridge-fast.Dockerfile"
 TEST_IDENTITY_HEADERS="${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}"
 TEST_IDENTITY_SECRET="${BRIDGE_TEST_IDENTITY_SECRET:-}"
+SHARED_SECRETS_DIR="${OPENCLAW_SHARED_SECRETS_DIR:-/app/bin/openclaw-video/shared/secrets}"
 
 cd "$ROOT"
 
 if ! docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
   echo "base bridge image not found: $BASE_IMAGE" >&2
   exit 1
+fi
+
+if [ ! -d "$SHARED_SECRETS_DIR" ]; then
+  echo "shared secrets directory not found: $SHARED_SECRETS_DIR" >&2
+  exit 1
+fi
+if [ -L secrets ]; then
+  :
+elif [ -d secrets ]; then
+  find secrets -mindepth 1 -maxdepth 1 -type d -empty -exec rmdir {} +
+  rmdir secrets
+else
+  echo "unexpected secrets path under release: $ROOT/secrets" >&2
+  exit 1
+fi
+if [ ! -e secrets ]; then
+  ln -s "$SHARED_SECRETS_DIR" secrets
 fi
 
 cat > "$TMP_DOCKERFILE" <<'EOF'
