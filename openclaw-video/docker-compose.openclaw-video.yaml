@@ -51,6 +51,8 @@ services:
       timeout: 5s
       retries: 5
     ports: []
+    security_opt:
+      - no-new-privileges:true
 
   openclaw-gateway:
     build:
@@ -70,6 +72,7 @@ services:
     ports: []
     security_opt:
       - no-new-privileges:true
+    pids_limit: 128
 
   video-analysis-worker:
     build:
@@ -86,6 +89,9 @@ services:
     volumes:
       - ./vendor/douyin_chong:/opt/douyin_chong:ro
       - worker-tmp:/tmp/openclaw-video
+    read_only: true
+    tmpfs:
+      - /tmp:size=1024m,nosuid,nodev
     networks:
       - openclaw-internal
     depends_on:

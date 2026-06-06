@@ -10,6 +10,9 @@ The local wrapper currently allows only a fixed no-shell invocation:
 <douyin_chong_binary>
   --input-url <canonical_video_url>
   --output-json <temporary_result_json>
+  --max-bytes <max_download_bytes>
+  --max-duration-seconds <max_video_duration_seconds>
+  --max-frames <max_video_frames>
   --no-shell
 ```
 
@@ -53,4 +56,3 @@ temporary_storage_exhausted
 
 Internal stack traces, cookies, tokens, local filesystem paths and raw request
 headers must not be returned to users.
-

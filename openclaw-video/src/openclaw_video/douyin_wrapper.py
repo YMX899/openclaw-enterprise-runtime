@@ -6,6 +6,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from .result_schema import validate_result_payload
+
 
 class DouyinWrapperError(RuntimeError):
     pass
@@ -62,13 +64,18 @@ def run_douyin_chong(
         str(max_frames),
         "--no-shell",
     ]
-    completed = subprocess.run(
-        cmd,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-    )
+    try:
+        completed = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("douyin_chong timed out") from exc
+    except FileNotFoundError as exc:
+        raise DouyinWrapperError("douyin_chong binary was not found") from exc
     if completed.returncode != 0:
         raise DouyinWrapperError(f"douyin_chong failed with exit code {completed.returncode}")
     if output_json.exists():
@@ -77,4 +84,5 @@ def run_douyin_chong(
         payload = json.loads(completed.stdout)
     if not isinstance(payload, dict):
         raise DouyinWrapperError("douyin_chong result must be a JSON object")
+    payload = validate_result_payload(payload)
     return DouyinAnalysisResult(payload=payload, stdout=completed.stdout, stderr=completed.stderr)

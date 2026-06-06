@@ -3,6 +3,9 @@ set -euo pipefail
 
 : "${DOUYIN_CHONG_BIN:?DOUYIN_CHONG_BIN is required}"
 : "${SAMPLE_DOUYIN_URL:?SAMPLE_DOUYIN_URL is required}"
+: "${MAX_DOWNLOAD_BYTES:=536870912}"
+: "${MAX_VIDEO_DURATION_SECONDS:=60}"
+: "${MAX_VIDEO_FRAMES:=1200}"
 
 tmpdir="$(mktemp -d)"
 cleanup() {
@@ -15,6 +18,9 @@ result_json="$tmpdir/result.json"
 "$DOUYIN_CHONG_BIN" \
   --input-url "$SAMPLE_DOUYIN_URL" \
   --output-json "$result_json" \
+  --max-bytes "$MAX_DOWNLOAD_BYTES" \
+  --max-duration-seconds "$MAX_VIDEO_DURATION_SECONDS" \
+  --max-frames "$MAX_VIDEO_FRAMES" \
   --no-shell
 
 python - "$result_json" <<'PY'
@@ -34,4 +40,3 @@ if data["source"].get("platform") != "douyin":
     raise SystemExit("unexpected source.platform")
 print("douyin_chong contract ok")
 PY
-

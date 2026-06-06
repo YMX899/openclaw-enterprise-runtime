@@ -42,8 +42,23 @@ The unit tests cover the pure safety logic and do not require server access:
 
 ```powershell
 $env:PYTHONPATH='openclaw-video\src'
-python -m unittest discover openclaw-video\tests
+.\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
 ```
+
+Phase 1.5 development gate on Windows without Docker:
+
+```powershell
+.\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
+```
+
+Phase 1.5 exit gate on an isolated Linux Docker host:
+
+```bash
+PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
+```
+
+The exit gate must run from a clean git worktree and must not be run for the
+first time on the production Dify server.
 
 ## OpenClaw Gateway Contract
 

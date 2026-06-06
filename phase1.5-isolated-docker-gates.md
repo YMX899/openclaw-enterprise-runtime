@@ -63,6 +63,7 @@ git status --short
 git rev-parse HEAD
 git tag --points-at HEAD
 
+python -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, websockets; from psycopg.types.json import Jsonb'
 python -m unittest discover openclaw-video/tests -v
 python -m compileall openclaw-video/src openclaw-video/tests
 node --check scripts/verify_openclaw_gateway_ws_contract.mjs
@@ -72,6 +73,28 @@ docker compose -f openclaw-video/docker-compose.openclaw-video.yaml build --no-c
 docker compose -f openclaw-video/docker-compose.openclaw-video.yaml up -d
 docker compose -f openclaw-video/docker-compose.openclaw-video.yaml ps
 ```
+
+The same gate is codified in:
+
+```bash
+scripts/verify_phase1_5_gates.sh
+```
+
+If the isolated host uses a virtual environment, pin the interpreter explicitly:
+
+```bash
+PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
+```
+
+On Windows workstations without Docker, a development-only static check can run:
+
+```powershell
+.\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
+```
+
+This static check is useful while editing, but it is not Phase 1.5 exit
+evidence. Phase 1.5 exit requires a clean worktree and a non-production Linux
+Docker host running the full script without `SKIP_DOCKER=1`.
 
 Verify host exposure:
 

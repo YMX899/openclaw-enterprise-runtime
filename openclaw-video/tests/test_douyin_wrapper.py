@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -8,7 +9,11 @@ from openclaw_video.douyin_wrapper import DouyinWrapperError, run_douyin_chong
 
 class Completed:
     returncode = 0
-    stdout = '{"schema_version":"openclaw-video-analysis.v1"}'
+    stdout = (
+        '{"schema_version":"openclaw-video-result.v1",'
+        '"source":{"video_url_canonical":"https://www.douyin.com/video/1","platform":"douyin"},'
+        '"summary":"ok","signals":{},"created_at":"2026-06-06T00:00:00Z"}'
+    )
     stderr = ""
 
 
@@ -39,7 +44,7 @@ class DouyinWrapperTests(unittest.TestCase):
         self.assertIn("--no-shell", command)
         self.assertNotIn("shell", kwargs)
         self.assertEqual(kwargs["timeout"], 123)
-        self.assertEqual(result.payload["schema_version"], "openclaw-video-analysis.v1")
+        self.assertEqual(result.payload["schema_version"], "openclaw-video-result.v1")
 
     def test_rejects_non_positive_resource_limits(self):
         with TemporaryDirectory() as tmp:
@@ -49,6 +54,32 @@ class DouyinWrapperTests(unittest.TestCase):
                     output_dir=Path(tmp),
                     binary="/opt/douyin_chong/douyin_chong",
                     max_download_bytes=0,
+                )
+
+    def test_subprocess_timeout_maps_to_timeout_error(self):
+        with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
+            run.side_effect = subprocess.TimeoutExpired(cmd=["douyin_chong"], timeout=1)
+            with self.assertRaises(TimeoutError):
+                run_douyin_chong(
+                    video_url="https://www.douyin.com/video/1",
+                    output_dir=Path(tmp),
+                    binary="/opt/douyin_chong/douyin_chong",
+                    timeout_seconds=1,
+                )
+
+    def test_invalid_schema_is_rejected_in_wrapper(self):
+        class InvalidCompleted:
+            returncode = 0
+            stdout = '{"schema_version":"wrong"}'
+            stderr = ""
+
+        with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
+            run.return_value = InvalidCompleted()
+            with self.assertRaises(ValueError):
+                run_douyin_chong(
+                    video_url="https://www.douyin.com/video/1",
+                    output_dir=Path(tmp),
+                    binary="/opt/douyin_chong/douyin_chong",
                 )
 
 

@@ -25,6 +25,8 @@ change, no OpenResty reload.
 - `scripts/verify_knowledge_base_artifact.ps1`
 - `scripts/verify_douyin_chong_contract.sh`
 - `scripts/verify_compose_render.sh`
+- `scripts/verify_phase1_5_gates.sh`
+- `scripts/verify_phase1_5_gates.ps1`
 - `scripts/capture_dify_baseline.sh`
 
 ## Local Tests
@@ -350,6 +352,48 @@ Action taken:
   production server sidecar deployment.
 ```
 
+Updated local test result after executable Phase 1.5 gate hardening:
+
+```text
+New gate scripts:
+  scripts/verify_phase1_5_gates.sh
+  scripts/verify_phase1_5_gates.ps1
+
+Gate hardening:
+  - scripts require a clean git rollback anchor unless explicit development
+    override is set.
+  - scripts print HEAD and tags before checks.
+  - scripts require an explicit Python environment with FastAPI, psycopg,
+    jsonschema, websockets and cryptography.
+  - scripts fail the static compose gate if Gateway/Postgres/Docker socket
+    public exposure or token command-line surfaces are present.
+  - scripts report the douyin_chong artifact status and can fail hard when
+    REQUIRE_DOUYIN_ARTIFACT is enabled.
+  - Docker build/up gates remain mandatory for Phase 1.5 exit and were not run
+    on the current Windows workstation.
+
+Local Windows command:
+  .\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
+
+Result:
+  Python dependency gate OK.
+  Ran 82 tests, OK.
+  node --check scripts\verify_openclaw_gateway_ws_contract.mjs OK.
+  static phase gates OK.
+  douyin_chong artifact gate: MISSING.
+  Docker gates skipped by operator request; this is not Phase 1.5 exit proof.
+
+Additional checks:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m compileall openclaw-video\src openclaw-video\tests
+  OK
+
+  bash -n scripts/verify_phase1_5_gates.sh
+  OK
+
+  git diff --check
+  OK
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -375,6 +419,12 @@ Covered:
   metadata IP space.
 - fixed-argument `douyin_chong` wrapper passes max download bytes, max video
   duration and max frame-count controls without shell invocation.
+- fixed-argument `douyin_chong` wrapper now maps subprocess timeouts to
+  `TimeoutError`, maps missing binaries to a safe wrapper error, and validates
+  the tool result against the committed JSON Schema before returning it to the
+  worker.
+- `scripts/verify_douyin_chong_contract.sh` now checks the same fixed
+  resource-limit arguments used by the wrapper.
 - OpenClaw 2026.3.13 Gateway contract documentation now treats
   `/channels/dify-web/chat` as a rejected V1 placeholder and records the
   observed WebSocket/RPC Gateway CLI surface.
@@ -424,6 +474,9 @@ Verified statically:
 - `openclaw-bridge` binds `127.0.0.1:18181:3000`.
 - `openclaw-gateway` has no public host port.
 - `bridge-postgres` has no public host port.
+- `video-analysis-worker` has read-only root filesystem intent, no-new-privileges
+  coverage through compose tests, pids limit coverage and a bounded `/tmp`
+  tmpfs declaration.
 - only `openclaw-bridge` joins external `docker_default`.
 - knowledge base is statically mounted read-only at
   `/knowledge/short-video:ro`.
@@ -440,6 +493,9 @@ Verified statically:
 - OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated
   fixed-version environment before production.
 - Docker build and compose render are not verified in an isolated Docker host.
+- Phase 1.5 executable gate currently passes only in local `-SkipDocker`
+  development mode. Full exit still requires a clean worktree on a
+  non-production Linux Docker host without skipping Docker.
 - ChatGPT final Go/No-Go review was completed after the web session recovered.
   The review kept production server Phase 2 as `NO-GO` and introduced a
   required `Phase 1.5` isolated Docker/Linux validation gate.
