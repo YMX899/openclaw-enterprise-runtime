@@ -103,8 +103,11 @@ scripts/verify_phase1_5_gates.sh
 If the isolated host uses a virtual environment, pin the interpreter explicitly:
 
 ```bash
+REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
 PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
 ```
+
+If `node` is not in `PATH`, also pass `NODE=/path/to/node`.
 
 On Windows workstations without Docker, a development-only static check can run:
 
@@ -118,6 +121,8 @@ Docker host running the full script without `SKIP_DOCKER=1`.
 
 The full Linux/Docker script must also prove:
 
+- OpenClaw `2026.3.13` security decision is human-approved, not rejected or
+  unassigned.
 - vendored `douyin_chong` files match `SOURCE_SHA256SUMS`.
 - no `.env`, storage state, cache, `.pyc`, log or browser-state utility exists
   in the vendored V1 subset.

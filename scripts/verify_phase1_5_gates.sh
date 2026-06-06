@@ -3,9 +3,11 @@ set -euo pipefail
 
 compose_file="${COMPOSE_FILE:-openclaw-video/docker-compose.openclaw-video.yaml}"
 python_cmd="${PYTHON:-python}"
+node_cmd="${NODE:-node}"
 skip_docker="${SKIP_DOCKER:-0}"
 run_compose_up="${RUN_COMPOSE_UP:-0}"
 require_douyin_artifact="${REQUIRE_DOUYIN_ARTIFACT:-0}"
+require_openclaw_security_approval="${REQUIRE_OPENCLAW_SECURITY_APPROVAL:-0}"
 allow_dirty="${ALLOW_DIRTY:-0}"
 
 step() {
@@ -26,18 +28,19 @@ fi
 git rev-parse HEAD
 git tag --points-at HEAD
 printf 'PYTHON=%s\n' "$python_cmd"
+printf 'NODE=%s\n' "$node_cmd"
 
 step "Python dependency gate"
-"$python_cmd" -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb'
+"$python_cmd" -B -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb'
 
 step "Python tests"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="openclaw-video/src"
-"$python_cmd" -m unittest discover openclaw-video/tests -v
-"$python_cmd" -m compileall openclaw-video/src openclaw-video/tests
+"$python_cmd" -B -m unittest discover openclaw-video/tests -v
+"$python_cmd" -B -m compileall openclaw-video/src openclaw-video/tests
 
 step "vendored douyin_chong source gate"
-"$python_cmd" - <<'PY'
+"$python_cmd" -B - <<'PY'
 from hashlib import sha256
 from pathlib import Path
 
@@ -75,10 +78,10 @@ print("vendor source gate: OK")
 PY
 
 step "Node syntax"
-node --check scripts/verify_openclaw_gateway_ws_contract.mjs
+"$node_cmd" --check scripts/verify_openclaw_gateway_ws_contract.mjs
 
 step "static phase gates"
-"$python_cmd" - <<'PY'
+"$python_cmd" -B - <<'PY'
 from pathlib import Path
 
 compose = Path("openclaw-video/docker-compose.openclaw-video.yaml").read_text(encoding="utf-8")
@@ -124,8 +127,27 @@ else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 PY
 
+step "OpenClaw 2026.3.13 security decision"
+"$python_cmd" -B - <<'PY'
+from pathlib import Path
+
+decision = Path("artifacts/openclaw-2026.3.13/SECURITY_DECISION.md").read_text(encoding="utf-8").lower()
+if "decision: reject_fixed_version_for_production_currently" in decision:
+    print("openclaw security gate: REJECTED_FOR_PRODUCTION")
+elif "decision: approve_exception" in decision or "decision: vendor_patch" in decision or "decision: upgrade_strategy" in decision:
+    if "security_owner: not assigned" in decision or "engineering_owner: codex draft" in decision:
+        raise SystemExit("openclaw security decision is present but not human-approved")
+    print("openclaw security gate: APPROVED")
+else:
+    raise SystemExit("openclaw security decision is missing or unrecognized")
+PY
+
 if [[ "$require_douyin_artifact" == "1" ]] && ! grep -q 'Status: verified' artifacts/douyin_chong/ARTIFACT_MANIFEST.md; then
   fail "REQUIRE_DOUYIN_ARTIFACT=1 but douyin_chong artifact is not verified."
+fi
+
+if [[ "$require_openclaw_security_approval" == "1" ]] && ! grep -Eq 'decision: (approve_exception|vendor_patch|upgrade_strategy)' artifacts/openclaw-2026.3.13/SECURITY_DECISION.md; then
+  fail "REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 but OpenClaw 2026.3.13 is not approved for production."
 fi
 
 if [[ "$skip_docker" == "1" ]]; then

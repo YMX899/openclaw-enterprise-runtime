@@ -56,6 +56,9 @@ git status --short
 git tag --points-at HEAD
 ```
 
+The gate uses `PYTHON` and `NODE` from the environment. On a normal Linux host
+`NODE` can be omitted if `node` is in `PATH`.
+
 ## Secret Files For Build/Smoke
 
 The Docker build and no-up smoke gate need secret files to exist because compose
@@ -82,13 +85,16 @@ Do not commit or upload these files. They are ignored by git.
 No compose-up build/smoke gate:
 
 ```bash
+REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 ```
 
 Full isolated sidecar boot gate:
 
 ```bash
-RUN_COMPOSE_UP=1 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
+REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
+RUN_COMPOSE_UP=1 \
+PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 ```
 
 The full script must prove:
@@ -100,6 +106,7 @@ Python dependency gate
 vendored douyin_chong SOURCE_SHA256SUMS gate
 Node syntax gate
 static compose safety gates
+OpenClaw 2026.3.13 security decision approved, not rejected/unapproved
 docker compose config render
 docker compose build --no-cache
 worker image smoke:

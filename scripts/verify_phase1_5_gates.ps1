@@ -4,6 +4,7 @@ param(
     [switch]$SkipDocker,
     [switch]$RunComposeUp,
     [switch]$RequireDouyinArtifact,
+    [switch]$RequireOpenClawSecurityApproval,
     [switch]$AllowDirty
 )
 
@@ -39,15 +40,15 @@ Write-Host "TAGS=$tags"
 Write-Host "PYTHON=$PythonCmd"
 
 Step "Python dependency gate"
-& $PythonCmd -c "import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb"
+& $PythonCmd -B -c "import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb"
 Assert-LastExitCode "Python dependency gate"
 
 Step "Python tests"
 $env:PYTHONDONTWRITEBYTECODE = "1"
 $env:PYTHONPATH = "openclaw-video/src"
-& $PythonCmd -m unittest discover openclaw-video/tests -v
+& $PythonCmd -B -m unittest discover openclaw-video/tests -v
 Assert-LastExitCode "Python unittest"
-& $PythonCmd -m compileall openclaw-video/src openclaw-video/tests
+& $PythonCmd -B -m compileall openclaw-video/src openclaw-video/tests
 Assert-LastExitCode "Python compileall"
 
 Step "vendored douyin_chong source gate"
@@ -87,7 +88,7 @@ for path in vendor.rglob("*"):
         raise SystemExit(f"forbidden vendor runtime artifact present: {path}")
 print("vendor source gate: OK")
 '@
-$vendorGate | & $PythonCmd -
+$vendorGate | & $PythonCmd -B -
 Assert-LastExitCode "vendored douyin_chong source gate"
 
 Step "Node syntax"
@@ -140,13 +141,37 @@ elif "Status: minimal candidate source vendored" in manifest:
 else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 '@
-$staticGate | & $PythonCmd -
+$staticGate | & $PythonCmd -B -
 Assert-LastExitCode "static phase gates"
+
+Step "OpenClaw 2026.3.13 security decision"
+$openClawSecurityGate = @'
+from pathlib import Path
+
+decision = Path("artifacts/openclaw-2026.3.13/SECURITY_DECISION.md").read_text(encoding="utf-8").lower()
+if "decision: reject_fixed_version_for_production_currently" in decision:
+    print("openclaw security gate: REJECTED_FOR_PRODUCTION")
+elif "decision: approve_exception" in decision or "decision: vendor_patch" in decision or "decision: upgrade_strategy" in decision:
+    if "security_owner: not assigned" in decision or "engineering_owner: codex draft" in decision:
+        raise SystemExit("openclaw security decision is present but not human-approved")
+    print("openclaw security gate: APPROVED")
+else:
+    raise SystemExit("openclaw security decision is missing or unrecognized")
+'@
+$openClawSecurityGate | & $PythonCmd -B -
+Assert-LastExitCode "OpenClaw security decision"
 
 if ($RequireDouyinArtifact) {
     $manifest = Get-Content -Path "artifacts/douyin_chong/ARTIFACT_MANIFEST.md" -Raw
     if ($manifest -notmatch "Status:\s*verified") {
         Fail "RequireDouyinArtifact was set, but artifacts/douyin_chong/ARTIFACT_MANIFEST.md is not verified."
+    }
+}
+
+if ($RequireOpenClawSecurityApproval) {
+    $securityDecision = Get-Content -Path "artifacts/openclaw-2026.3.13/SECURITY_DECISION.md" -Raw
+    if ($securityDecision -notmatch "decision:\s*(approve_exception|vendor_patch|upgrade_strategy)") {
+        Fail "RequireOpenClawSecurityApproval was set, but OpenClaw 2026.3.13 is not approved for production."
     }
 }
 
