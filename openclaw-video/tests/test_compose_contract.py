@@ -1,5 +1,6 @@
 from pathlib import Path
 from hashlib import sha256
+import json
 import subprocess
 import unittest
 
@@ -166,14 +167,28 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("ARG APT_DEBIAN_MIRROR=http://deb.debian.org/debian", gateway)
         self.assertIn("ARG APT_SECURITY_MIRROR=http://deb.debian.org/debian-security", gateway)
         self.assertIn("ARG NPM_CONFIG_REGISTRY=", gateway)
+        self.assertIn("ENV OPENCLAW_RUNTIME_DIR=/opt/openclaw-runtime", gateway)
         self.assertIn("apt-get install -y --no-install-recommends ca-certificates git openssh-client", gateway)
+        self.assertIn("COPY docker/openclaw-gateway/package*.json /opt/openclaw-runtime/", gateway)
         self.assertIn('npm config set registry "$NPM_CONFIG_REGISTRY"', gateway)
         self.assertIn('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', gateway)
-        self.assertIn(
-            'npm install -g "openclaw@${OPENCLAW_VERSION}" --omit=optional --ignore-scripts --no-audit --no-fund',
-            gateway,
-        )
+        self.assertIn("npm ci --omit=optional --ignore-scripts --no-audit --no-fund", gateway)
+        self.assertIn("./node_modules/.bin/openclaw --version", gateway)
+        self.assertIn("PATH=/opt/openclaw-runtime/node_modules/.bin:$PATH", gateway)
+        self.assertNotIn("npm install -g", gateway)
         self.assertIn("rm -rf /var/lib/apt/lists/*", gateway)
+
+        package_json = json.loads((ROOT / "docker" / "openclaw-gateway" / "package.json").read_text(encoding="utf-8"))
+        package_lock = json.loads(
+            (ROOT / "docker" / "openclaw-gateway" / "package-lock.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(package_json["dependencies"]["openclaw"], "2026.3.13")
+        self.assertEqual(package_json["overrides"]["@whiskeysockets/baileys"]["libsignal"], "6.0.0")
+        self.assertEqual(package_lock["packages"]["node_modules/openclaw"]["version"], "2026.3.13")
+        libsignal_lock = package_lock["packages"]["node_modules/libsignal"]
+        self.assertEqual(libsignal_lock["version"], "6.0.0")
+        self.assertIn("/libsignal-6.0.0.tgz", libsignal_lock["resolved"])
+        self.assertNotIn("github.com/whiskeysockets/libsignal-node", libsignal_lock["resolved"])
         self.assertIn("PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}", compose)
         self.assertIn("PIP_INDEX_URL: ${PIP_INDEX_URL:-}", compose)
         self.assertIn("NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22.18-slim}", compose)
