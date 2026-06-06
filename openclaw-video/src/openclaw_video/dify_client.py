@@ -22,6 +22,7 @@ FORWARDED_IDENTITY_HEADERS = {
 }
 
 HUAHUO_ACCESS_TOKEN_HEADER = "x-huahuo-access-token"
+HUAHUO_APP_UUID_HEADER = "x-huahuo-app-uuid"
 
 
 def identity_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -81,7 +82,8 @@ def huahuo_identity_headers(headers: Mapping[str, str]) -> dict[str, str]:
 
     explicit = _header_value(headers, HUAHUO_ACCESS_TOKEN_HEADER)
     if explicit:
-        authorization = huahuo_authorization_header(explicit)
+        app_uuid = _header_value(headers, HUAHUO_APP_UUID_HEADER)
+        authorization = huahuo_authorization_header(explicit, app_uuid=app_uuid or None)
         return {"Authorization": authorization} if authorization else {}
     authorization = _header_value(headers, "authorization")
     if authorization.startswith("Bearer "):

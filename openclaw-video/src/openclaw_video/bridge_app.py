@@ -265,9 +265,17 @@ LAB_PAGE_HTML = """<!doctype html>
       try { return window.localStorage && window.localStorage.getItem('Access-Token') || ''; }
       catch { return ''; }
     }
+    function huahuoAppUuid() {
+      try { return window.localStorage && window.localStorage.getItem('APP-UUID') || ''; }
+      catch { return ''; }
+    }
     function authHeaders() {
       const token = huahuoAccessToken();
-      return token ? { 'X-Huahuo-Access-Token': token } : {};
+      const appUuid = huahuoAppUuid();
+      if (!token) return {};
+      const headers = { 'X-Huahuo-Access-Token': token };
+      if (appUuid) headers['X-Huahuo-App-UUID'] = appUuid;
+      return headers;
     }
     async function api(path, options = {}) {
       const response = await fetch(path, {

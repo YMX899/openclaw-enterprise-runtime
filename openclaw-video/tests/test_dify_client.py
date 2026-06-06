@@ -3,6 +3,7 @@ from urllib.parse import parse_qs
 import unittest
 
 from openclaw_video.dify_client import (
+    HUAHUO_APP_UUID_HEADER,
     HUAHUO_ACCESS_TOKEN_HEADER,
     huahuo_authorization_header,
     huahuo_identity_headers,
@@ -44,6 +45,7 @@ class DifyClientTests(unittest.TestCase):
         selected = huahuo_identity_headers(
             {
                 HUAHUO_ACCESS_TOKEN_HEADER: "HUAHUO-access",
+                HUAHUO_APP_UUID_HEADER: "front-app-uuid",
                 "Cookie": "session=1",
                 "OpenClaw-Gateway-Token": "gateway-secret",
             }
@@ -52,6 +54,9 @@ class DifyClientTests(unittest.TestCase):
         self.assertEqual(set(selected), {"Authorization"})
         self.assertTrue(selected["Authorization"].startswith("Bearer "))
         self.assertNotIn("HUAHUO-access", selected["Authorization"])
+        payload = base64.b64decode(selected["Authorization"].removeprefix("Bearer ")).decode("utf-8")
+        parsed = parse_qs(payload)
+        self.assertEqual(parsed["appUuid"], ["front-app-uuid"])
         self.assertNotIn("Cookie", selected)
         self.assertNotIn("OpenClaw-Gateway-Token", selected)
 
