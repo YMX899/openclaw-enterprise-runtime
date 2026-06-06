@@ -141,6 +141,9 @@ required = [
     "./vendor/douyin_chong:/app/vendor/douyin_chong:ro",
     "read_only: true",
     "/tmp:size=1024m,nosuid,nodev",
+    'cpus: "1.00"',
+    "mem_limit: 1024M",
+    "mem_reservation: 256M",
     "pids_limit: 128",
 ]
 for needle in required:

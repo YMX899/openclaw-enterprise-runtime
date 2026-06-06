@@ -74,6 +74,9 @@ class ComposeContractTests(unittest.TestCase):
             "- worker-tmp:/tmp/openclaw-video",
             "read_only: true",
             "/tmp:size=1024m,nosuid,nodev",
+            'cpus: "1.00"',
+            "mem_limit: 1024M",
+            "mem_reservation: 256M",
             "pids_limit: 128",
         ]:
             with self.subTest(required=required):
