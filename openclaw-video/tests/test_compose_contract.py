@@ -189,6 +189,7 @@ class ComposeContractTests(unittest.TestCase):
         self.assertEqual(libsignal_lock["version"], "6.0.0")
         self.assertIn("/libsignal-6.0.0.tgz", libsignal_lock["resolved"])
         self.assertNotIn("github.com/whiskeysockets/libsignal-node", libsignal_lock["resolved"])
+        self.assertNotIn("github.com/whiskeysockets/libsignal-node", json.dumps(package_lock))
         self.assertIn("PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}", compose)
         self.assertIn("PIP_INDEX_URL: ${PIP_INDEX_URL:-}", compose)
         self.assertIn("NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22.18-slim}", compose)
