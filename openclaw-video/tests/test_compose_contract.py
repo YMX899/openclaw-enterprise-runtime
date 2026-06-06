@@ -145,6 +145,8 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("FROM ${PYTHON_BASE_IMAGE}", worker)
         self.assertIn("ARG NODE_BASE_IMAGE=node:22.18-slim", gateway)
         self.assertIn("FROM ${NODE_BASE_IMAGE}", gateway)
+        self.assertIn("apt-get install -y --no-install-recommends ca-certificates git", gateway)
+        self.assertIn("rm -rf /var/lib/apt/lists/*", gateway)
         self.assertIn("PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}", compose)
         self.assertIn("NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22.18-slim}", compose)
         self.assertNotIn("public.ecr.aws", compose)

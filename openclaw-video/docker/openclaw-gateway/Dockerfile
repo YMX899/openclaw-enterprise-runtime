@@ -2,6 +2,10 @@ ARG NODE_BASE_IMAGE=node:22.18-slim
 FROM ${NODE_BASE_IMAGE}
 
 ARG OPENCLAW_VERSION=2026.3.13
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
 RUN npm install -g "openclaw@${OPENCLAW_VERSION}" --ignore-scripts \
     && openclaw --version
 
