@@ -652,3 +652,74 @@ ln -sfn /app/bin/openclaw-video/releases/84e13d007d33 /app/bin/openclaw-video/cu
 OPENCLAW_VIDEO_ROOT=/app/bin/openclaw-video/current/openclaw-video \
 bash /app/bin/openclaw-video/current/scripts/root_rebuild_bridge_fast.sh
 ```
+
+## Chrome Post-Login Runner Helper
+
+Date: 2026-06-07T04:04+08:00.
+
+Implemented helper:
+
+```text
+scripts/huahuo_post_login_acceptance_runner.mjs
+```
+
+Purpose:
+
+```text
+The helper is imported from the Codex Chrome-controlled browser session after browser-client is initialized.
+It is not a standalone browser controller and does not launch Chrome by itself.
+It opens the real OpenClaw Lab page and Huahuo user page, checks visible page state,
+clicks Post-Login Acceptance only when the user page appears logged in, and returns
+a sanitized summary.
+```
+
+Safety properties:
+
+```text
+cookies inspected: false
+browser storage values inspected: false
+request headers recorded: false
+local storage values recorded: false
+secrets recorded: false
+evidence source: visible page text and OpenClaw Lab JSON output only
+```
+
+Local verification:
+
+```text
+PYTHONPATH=openclaw-video\src .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
+Ran 231 tests
+Result: OK
+node --check scripts\huahuo_post_login_acceptance_runner.mjs passed.
+git diff --check passed.
+```
+
+Chrome runner result in the current browser state:
+
+```json
+{
+  "schema": "openclaw-chrome-post-login-acceptance.v1",
+  "status": "PENDING_LOGIN",
+  "lab_url": "https://www.huahuoai.com/openclaw-lab/",
+  "user_url": "https://www.huahuoai.com/home/",
+  "lab_has_post_login_acceptance_button": true,
+  "user_looks_logged_out": true,
+  "lab_output_summary": {
+    "status": 401,
+    "body": {
+      "detail": "login required"
+    }
+  },
+  "secrets_recorded": false,
+  "headers_recorded": false,
+  "local_storage_values_recorded": false
+}
+```
+
+Interpretation:
+
+```text
+The automated Chrome runner is ready for the post-login gate.
+The current browser still lacks a Huahuo user-web login session, so it correctly stops before running jobs.
+After the user logs in at https://www.huahuoai.com/ai/?id=4, the same runner can execute the full OpenClaw browser gate and return PASS/FAIL.
+```
