@@ -28,8 +28,8 @@ export PYTHON_BASE_IMAGE="${PYTHON_BASE_IMAGE:-python:3.12-slim}"
 export NODE_BASE_IMAGE="${NODE_BASE_IMAGE:-node:22.18-slim}"
 export PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 export NPM_CONFIG_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
-export APT_DEBIAN_MIRROR="${APT_DEBIAN_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian}"
-export APT_SECURITY_MIRROR="${APT_SECURITY_MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/debian-security}"
+export APT_DEBIAN_MIRROR="${APT_DEBIAN_MIRROR:-http://mirrors.tuna.tsinghua.edu.cn/debian}"
+export APT_SECURITY_MIRROR="${APT_SECURITY_MIRROR:-http://mirrors.tuna.tsinghua.edu.cn/debian-security}"
 
 set +e
 timeout "${OPENCLAW_BUILD_TIMEOUT_SECONDS:-900}" \
