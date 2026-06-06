@@ -68,6 +68,23 @@ class BridgeAppTests(unittest.TestCase):
         self.assertNotIn("token", response.text.lower())
         self.assertNotIn("cookie", response.text.lower())
 
+    def test_openclaw_lab_page_is_served_without_gateway_secret_surface(self):
+        response = self.client.get("/openclaw-lab/")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("text/html", response.headers["content-type"])
+        self.assertIn("OpenClaw Lab", response.text)
+        self.assertIn("/openclaw-api/me", response.text)
+        self.assertIn("/openclaw-api/jobs", response.text)
+        self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
+        self.assertNotIn("openclaw-gateway:18789", response.text)
+        self.assertNotIn("Authorization", response.text)
+        self.assertNotIn("Cookie", response.text)
+
+    def test_openclaw_lab_without_trailing_slash_is_served(self):
+        response = self.client.get("/openclaw-lab")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("OpenClaw Lab", response.text)
+
     def test_me_does_not_expose_raw_dify_ids(self):
         response = self.client.get("/openclaw-api/me", headers=self.auth())
         self.assertEqual(response.status_code, 200, response.text)

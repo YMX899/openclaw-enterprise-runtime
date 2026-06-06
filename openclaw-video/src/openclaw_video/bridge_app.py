@@ -8,7 +8,7 @@ from typing import Any
 
 try:
     from fastapi import FastAPI, HTTPException, Request
-    from fastapi.responses import JSONResponse, StreamingResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 except ImportError as exc:  # pragma: no cover - import checked in container image
     raise RuntimeError("fastapi is required for openclaw-bridge") from exc
 
@@ -86,6 +86,182 @@ def _sse_event(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {payload}\n\n"
 
 
+LAB_PAGE_HTML = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenClaw Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f7f8fa;
+      color: #1d2433;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #f7f8fa; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 40px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    h1 { font-size: 28px; line-height: 1.1; margin: 0; font-weight: 700; }
+    .status { min-width: 128px; border-radius: 8px; padding: 8px 10px; background: #e9edf3; color: #364153; font-size: 14px; text-align: center; }
+    .status.ok { background: #d9f7e7; color: #145a32; }
+    .status.fail { background: #ffe2df; color: #8a1f17; }
+    section { border: 1px solid #dce2ea; border-radius: 8px; background: #ffffff; padding: 16px; margin-top: 14px; }
+    h2 { font-size: 16px; line-height: 1.25; margin: 0 0 12px; }
+    label { display: block; font-size: 13px; color: #596579; margin: 10px 0 6px; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid #c7d0dd;
+      border-radius: 6px;
+      min-height: 40px;
+      padding: 9px 10px;
+      font: inherit;
+      color: #1d2433;
+      background: #fff;
+    }
+    textarea { min-height: 92px; resize: vertical; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      min-height: 40px;
+      padding: 0 14px;
+      font: inherit;
+      font-weight: 600;
+      color: #fff;
+      background: #2563eb;
+      cursor: pointer;
+    }
+    button.secondary { background: #334155; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    pre {
+      min-height: 180px;
+      max-height: 420px;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      border-radius: 8px;
+      background: #101827;
+      color: #e5eefc;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    @media (max-width: 760px) {
+      main { width: min(100% - 20px, 1080px); padding-top: 16px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .status { width: 100%; text-align: left; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>OpenClaw Lab</h1>
+      <div id="authStatus" class="status">Checking</div>
+    </header>
+    <section>
+      <h2>Session</h2>
+      <label for="sessionTitle">Title</label>
+      <input id="sessionTitle" value="Video analysis">
+      <div class="actions">
+        <button id="createSession">Create Session</button>
+        <button id="refreshMe" class="secondary">Refresh Login</button>
+      </div>
+    </section>
+    <section class="grid">
+      <div>
+        <h2>Video Job</h2>
+        <label for="sessionId">Session ID</label>
+        <input id="sessionId" autocomplete="off">
+        <label for="videoUrl">Video URL</label>
+        <input id="videoUrl" placeholder="https://v.douyin.com/...">
+        <label for="prompt">Prompt</label>
+        <textarea id="prompt">Analyze this video.</textarea>
+        <div class="actions">
+          <button id="submitJob">Submit Job</button>
+          <button id="pollJob" class="secondary">Poll Job</button>
+        </div>
+      </div>
+      <div>
+        <h2>Output</h2>
+        <pre id="output">{}</pre>
+      </div>
+    </section>
+  </main>
+  <script>
+    const output = document.getElementById('output');
+    const authStatus = document.getElementById('authStatus');
+    let currentJobId = '';
+
+    function show(value) {
+      output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    }
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options
+      });
+      const text = await response.text();
+      let body;
+      try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
+      return { status: response.status, body };
+    }
+    async function refreshMe() {
+      const result = await api('/openclaw-api/me');
+      if (result.status === 200) {
+        authStatus.textContent = 'Authenticated';
+        authStatus.className = 'status ok';
+      } else {
+        authStatus.textContent = 'Login Required';
+        authStatus.className = 'status fail';
+      }
+      show(result);
+    }
+    async function createSession() {
+      const result = await api('/openclaw-api/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ title: document.getElementById('sessionTitle').value || 'Video analysis' })
+      });
+      if (result.body.session && result.body.session.id) {
+        document.getElementById('sessionId').value = result.body.session.id;
+      }
+      show(result);
+    }
+    async function submitJob() {
+      const result = await api('/openclaw-api/jobs', {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: document.getElementById('sessionId').value,
+          video_url: document.getElementById('videoUrl').value,
+          content: document.getElementById('prompt').value
+        })
+      });
+      if (result.body.job && result.body.job.job_id) currentJobId = result.body.job.job_id;
+      show(result);
+    }
+    async function pollJob() {
+      if (!currentJobId) {
+        show('No job_id is available yet.');
+        return;
+      }
+      show(await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId)));
+    }
+    document.getElementById('refreshMe').addEventListener('click', refreshMe);
+    document.getElementById('createSession').addEventListener('click', createSession);
+    document.getElementById('submitJob').addEventListener('click', submitJob);
+    document.getElementById('pollJob').addEventListener('click', pollJob);
+    refreshMe();
+  </script>
+</body>
+</html>"""
+
+
 def _default_session_store() -> Any:
     database_url = os.environ.get("DATABASE_URL")
     if database_url:
@@ -137,6 +313,18 @@ def create_app(
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:
         return health_payload()
+
+    @app.get("/openclaw-lab", response_class=HTMLResponse)
+    @app.get("/openclaw-lab/", response_class=HTMLResponse)
+    async def openclaw_lab() -> HTMLResponse:
+        return HTMLResponse(
+            LAB_PAGE_HTML,
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "Referrer-Policy": "same-origin",
+            },
+        )
 
     async def current_principal(request: Request) -> DifyPrincipal:
         try:
