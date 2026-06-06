@@ -141,3 +141,63 @@ python scripts/check_phase1_5_host_readiness.py --fail-on-no-go
 
 and only after it passes, run the full Phase 1.5 gates without SkipDocker.
 ```
+
+## Exit Proof Generator Probe
+
+Refresh time:
+
+```text
+2026-06-06T13:05:30+08:00
+```
+
+Uploaded generator build:
+
+```text
+commit: 7292733
+tag: phase1-5-exit-proof-generator-20260606
+archive: tmp/openclaw-dify-phase1.5-7292733.tar.gz
+remote_archive: /tmp/openclaw-dify-phase1.5-7292733.tar.gz
+remote_extract: /tmp/openclaw-dify-phase1.5-7292733
+```
+
+Non-Docker validation on `ubuntu22.04`:
+
+```text
+python3 -m py_compile scripts/write_phase1_5_exit_proof.py scripts/audit_production_readiness.py scripts/check_phase1_5_host_readiness.py: PASS
+bash -n scripts/verify_phase1_5_gates.sh: PASS
+generated proof text self-check through build_proof()/validate_proof_text(): PASS
+```
+
+Docker-permission failure-closed check:
+
+```text
+command: python3 scripts/write_phase1_5_exit_proof.py --worker-image sha256:<dummy>
+result: failed before writing proof because Docker Engine API access was denied
+phase1.5-exit-proof.md present after failed command: NO
+failure_closed: PASS
+```
+
+Host readiness remains:
+
+```text
+overall: NO_GO
+docker_engine: NO_GO
+evidence: permission denied while trying to connect to the docker API at unix:///var/run/docker.sock
+docker_compose: PASS
+disk_free: PASS
+memory_total: PASS
+```
+
+Interpretation:
+
+```text
+The new Phase 1.5 exit proof generator is syntax-valid on ubuntu22.04 and can
+generate proof text that passes its own marker validation. It correctly refuses
+to write phase1.5-exit-proof.md when the operator cannot access Docker. This
+keeps production Phase 2 blocked until a real isolated Docker compose-up proof
+is produced.
+```
+
+No sudo password, docker group change, daemon restart, package install,
+container start, compose build, compose up, or production server operation was
+performed.
