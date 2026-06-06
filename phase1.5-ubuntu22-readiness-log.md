@@ -474,3 +474,51 @@ No Docker group change, sudoers change, Docker daemon restart, package install,
 image build, compose up, production SSH operation, Dify container operation,
 OpenResty reload, `.env` read, Cookie read, token read, or root-server
 deployment was performed.
+
+## OpenClaw Gateway Token Provisioning
+
+Refresh time:
+
+```text
+2026-06-06T14:30:00+08:00
+```
+
+The provided OpenClaw API key was treated as a secret. It was not written to git,
+not printed in logs, and not uploaded to the root production server.
+
+Provisioned on `ubuntu22.04` only:
+
+```text
+/home/xiejuyang/.openclaw-phase1.5-secrets/openclaw_gateway_token
+/tmp/openclaw-dify-phase1.5-e545691/openclaw-video/secrets/openclaw_gateway_token
+```
+
+Recorded evidence:
+
+```text
+openclaw_gateway_token provisioned: PASS
+stash mode: 600
+test-workdir mode: 600
+test-workdir bytes: 36
+```
+
+Remaining missing Phase 1.5 full-run inputs:
+
+```text
+missing openclaw-video/secrets/openclaw_bridge_device_key.pem
+missing openclaw-video/secrets/douyin_chong.env
+missing artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json
+missing artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md
+```
+
+Current interpretation:
+
+```text
+OpenClaw gateway token: provisioned for ubuntu22.04 test only
+Phase 1.5 full isolated Docker proof: NO_GO, still blocked by missing device key, douyin env, real sample evidence, and OpenClaw triage
+Production/root deployment: NO_GO
+```
+
+No secret value, Cookie, Authorization header, CSRF token, `.env`, TLS key,
+database string, Redis password, model key, Dify container state, OpenResty
+config, or root-server file was read or recorded.
