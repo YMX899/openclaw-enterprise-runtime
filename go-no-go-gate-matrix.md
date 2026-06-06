@@ -1,7 +1,7 @@
 # OpenClaw x Dify Go/No-Go Gate Matrix
 
 Generated: 2026-06-06  
-Current commit: `52ec0ea` / tag `go-no-go-gate-matrix-20260606`
+Current commit: `1d0f1e3` / tag `douyin-real-sample-runner-20260606`
 
 ## Current Decision
 
@@ -29,6 +29,10 @@ Git rollback anchors:
   phase1-5-docker-gates-loader-smoke
   phase0-server-readonly-refresh-20260606
   phase0-real-chrome-dify-baseline-20260606
+  go-no-go-gate-matrix-20260606
+  openclaw-3-13-security-no-go-20260606
+  phase1-5-security-approval-gate-20260606
+  douyin-real-sample-runner-20260606
 
 Server read-only audit:
   server-readonly-audit.md
@@ -49,9 +53,13 @@ Real Chrome unauthenticated baseline:
   no current authenticated Dify session in Chrome
 
 Local source/test gates:
-  openclaw-video tests: 92 tests pass
+  openclaw-video tests: 94 tests pass
   vendored douyin_chong SOURCE_SHA256SUMS gate passes locally
   Phase 1.5 scripts pass only with Docker skipped
+  sanitized real-sample runner exists:
+    scripts/run_douyin_real_sample.py
+  runner tests prove no secret file content, raw URL or raw stdout/stderr is
+  recorded in the sanitized evidence summary
 
 OpenClaw 2026.3.13 audit:
   artifacts/openclaw-2026.3.13/SECURITY_DECISION.md
@@ -76,7 +84,8 @@ These are required before production Phase 2 can start:
    openclaw-douyin-adapter using only an explicit runtime env file.
 
 4. The real sample must produce openclaw-video-result.v1 JSON and pass schema
-   validation.
+   validation. Use scripts/run_douyin_real_sample.py to create sanitized
+   evidence without recording secrets.
 
 5. Worker timeout, cleanup and resource profile evidence must be captured:
    CPU, memory, disk, duration, temp path and failure behavior.
@@ -112,8 +121,12 @@ Redis passwords, TLS private keys or model API keys
 ```text
 Provide or configure a non-production Linux Docker host, then run:
 
+  REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
   PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
-  RUN_COMPOSE_UP=1 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
+
+  REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
+  RUN_COMPOSE_UP=1 \
+  PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 
 Bring back the evidence listed in phase1.5-isolated-host-handoff.md.
 ```

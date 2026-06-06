@@ -567,6 +567,43 @@ New handoff:
   phase1.5-isolated-host-handoff.md
 ```
 
+Updated local evidence after OpenClaw security gate and sanitized real sample
+runner:
+
+```text
+OpenClaw 2026.3.13 security:
+  npm audit --omit=dev in .phase1-sandbox/openclaw-3.13 reports
+  7 vulnerability groups: critical=1, high=4, moderate=2.
+
+  artifacts/openclaw-2026.3.13/SECURITY_DECISION.md now records:
+    decision: reject_fixed_version_for_production_currently
+
+  scripts/verify_phase1_5_gates.ps1/.sh now include an OpenClaw security gate.
+  Development mode reports:
+    openclaw security gate: REJECTED_FOR_PRODUCTION
+
+  Phase 1.5 exit must run with:
+    REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
+
+  With the current rejected decision, that strong gate fails as intended.
+
+douyin_chong real sample evidence:
+  scripts/run_douyin_real_sample.py added.
+  It requires --env-file and does not read or print the secret contents.
+  It records only sanitized evidence such as input_url_sha256, input_url_host,
+  elapsed seconds, return code, result schema version, summary length, result
+  JSON hash/size and child max_rss_kb when available.
+
+Tests:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -B -m unittest discover openclaw-video\tests
+  Ran 94 tests; OK.
+
+Phase 1.5 development gate:
+  .\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
+  OK; Docker skipped by operator request and therefore not Phase 1.5 exit
+  proof.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -661,14 +698,17 @@ Verified statically:
 ## Remaining Phase 1 Blockers
 
 - Actual `douyin_chong` artifact has been located as a local candidate, but is
-  not verified. It must still be exported cleanly without secrets/runtime
-  outputs and prove real model-backed execution, schema output, resource limits,
-  timeout handling and cleanup before it can satisfy the production artifact
-  gate.
+  not verified. Minimal source is vendored and a sanitized real-sample runner
+  exists, but it must still prove real model-backed execution, schema output,
+  resource limits, timeout handling and cleanup in Linux Docker before it can
+  satisfy the production artifact gate.
 - OpenClaw Gateway API contract for Bridge is partially locked by local
   fixed-version WS v3 tests, but not yet proven in a Docker/Linux isolated host
   with production model credentials.
-- OpenClaw 2026.3.13 security exception or patch strategy is not decided.
+- OpenClaw 2026.3.13 is currently rejected for production as pinned because
+  npm audit reports critical/high findings affecting the direct package. It
+  needs an approved vendor patch, approved exception or approved upgrade
+  strategy before any Phase 1.5 exit or production deployment.
 - OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated
   fixed-version environment before production.
 - Docker build and compose render are not verified in an isolated Docker host.
