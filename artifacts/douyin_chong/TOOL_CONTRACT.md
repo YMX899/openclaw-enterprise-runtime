@@ -1,6 +1,7 @@
 # douyin_chong Tool Contract
 
-Status: draft placeholder. The real tool contract is not supplied.
+Status: candidate adapter draft. A local candidate Python package has been
+found, but it is not production verified.
 
 ## Planned Invocation Shape
 
@@ -16,9 +17,26 @@ The local wrapper currently allows only a fixed no-shell invocation:
   --no-shell
 ```
 
-This exact shape must be confirmed against the real artifact. If the real tool
-uses different arguments, update the wrapper and tests before any server
-deployment.
+In the sidecar compose draft, `<douyin_chong_binary>` is:
+
+```text
+/usr/local/bin/openclaw-douyin-adapter
+```
+
+The adapter adds an explicit secret file argument only when configured:
+
+```text
+--env-file /run/secrets/douyin_chong_env
+```
+
+The adapter imports the candidate Python package from `DOUYIN_CHONG_PYTHONPATH`
+and must not read the candidate project's default `.env`, `.env.local`, browser
+storage state, cookies, token files or runtime outputs. Runtime credentials must
+be mounted as a read-only secret file and must not be committed.
+
+This exact shape still must be proven with the real candidate source exported
+into the worker image and with real model credentials in an isolated Linux
+Docker host before any server deployment.
 
 ## Required Result Shape
 

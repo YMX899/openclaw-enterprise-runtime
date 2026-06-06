@@ -36,6 +36,25 @@ supplied and verified:
 - final ChatGPT web review captured in git.
 - Phase 1.5 isolated Linux Docker validation.
 
+## douyin_chong Candidate Intake
+
+A local candidate Python package was found outside this repository at:
+
+```text
+D:\DESK\视频解析\tik\douyin_chong
+```
+
+It is not production verified. The sibling project contains `.env`,
+`.env.local` and `.douyin_storage_state*` files; these must not be read, copied,
+committed or deployed. The worker image has a guarded vendor slot at
+`openclaw-video/vendor/douyin_chong`, and runtime model credentials must be
+mounted separately as `./secrets/douyin_chong.env`.
+
+The worker calls the candidate through `openclaw-douyin-adapter`, not through
+the candidate's default CLI. Production remains blocked until a clean source
+export, pinned dependencies, real sample run, schema validation, resource
+profile and isolated Docker validation are complete.
+
 ## Local Unit Tests
 
 The unit tests cover the pure safety logic and do not require server access:

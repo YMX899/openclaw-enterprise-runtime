@@ -40,3 +40,9 @@ __pycache__/
 # Local deployment secrets and generated runtime credentials
 secrets/
 *.local.json
+openclaw-video/vendor/douyin_chong/.env
+openclaw-video/vendor/douyin_chong/.env.*
+openclaw-video/vendor/douyin_chong/*storage*
+openclaw-video/vendor/douyin_chong/**/*.log
+openclaw-video/vendor/douyin_chong/**/__pycache__/
+openclaw-video/vendor/douyin_chong/**/*.pyc

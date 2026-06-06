@@ -62,8 +62,11 @@ def run_douyin_chong(
         str(max_duration_seconds),
         "--max-frames",
         str(max_frames),
-        "--no-shell",
     ]
+    env_file = os.environ.get("DOUYIN_CHONG_ENV_FILE")
+    if env_file:
+        cmd.extend(["--env-file", env_file])
+    cmd.append("--no-shell")
     try:
         completed = subprocess.run(
             cmd,

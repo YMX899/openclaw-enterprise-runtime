@@ -394,6 +394,99 @@ Additional checks:
   OK
 ```
 
+Updated local evidence after execution preflight review and candidate
+`douyin_chong` intake:
+
+```text
+ChatGPT web execution preflight:
+  GPT-5.5 Thinking reviewed commit c4fd167 / tag phase1-5-executable-gates.
+  Verdict: production Phase 2 remains NO-GO.
+  c4fd167 is accepted only as a Phase 1.5 isolated Docker/Linux validation
+  entry point.
+
+Local candidate found:
+  D:\DESK\视频解析\tik\douyin_chong
+
+Candidate git:
+  repository HEAD: 53ba64e
+  branch: main
+  worktree: dirty, with runtime/generated files present.
+
+Sensitive files observed but not read:
+  D:\DESK\视频解析\tik\.env
+  D:\DESK\视频解析\tik\.env.local
+  D:\DESK\视频解析\tik\.douyin_storage_state*.json
+
+Safe local checks:
+  python -m douyin_chong --help
+  OK
+
+  python -m douyin_chong.video_action_extract --help
+  OK
+
+  python -m douyin_chong.video_fashion_extract --help
+  OK
+
+  python -m compileall -q douyin_chong
+  OK
+
+  dependency import probe:
+    httpx=True
+    requests=True
+    volcenginesdkarkruntime=True
+    PIL=True
+    cv2=True
+    playwright=True
+
+New adapter work:
+  - openclaw-video/src/openclaw_video/douyin_legacy_adapter.py added.
+  - openclaw-douyin-adapter console entry point added.
+  - wrapper passes --env-file only through DOUYIN_CHONG_ENV_FILE.
+  - worker compose mounts ./secrets/douyin_chong.env read-only at
+    /run/secrets/douyin_chong_env.
+  - vendor slot keeps secrets, storage state, caches and runtime outputs out.
+
+Gate status:
+  douyin_chong artifact is now candidate located, not verified.
+  Phase 2 remains NO-GO until clean source export, runtime secret format, real
+  model-backed sample, resource profile and isolated Linux Docker gate pass.
+```
+
+Updated local validation after adapter dependency repair:
+
+```text
+Editable install:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m pip install -e .\openclaw-video
+  OK; installed openclaw-video-sidecar editable package and
+  volcengine-python-sdk 5.0.33.
+
+Console entry point:
+  openclaw-douyin-adapter
+  OK; resolves to openclaw_video.douyin_legacy_adapter:main.
+
+Dependency gate:
+  cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests,
+  websockets, volcenginesdkarkruntime
+  OK.
+
+Tests:
+  PYTHONPATH=openclaw-video/src
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests -v
+  Ran 90 tests; OK.
+
+Phase 1.5 local development gate:
+  .\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
+  OK; Docker skipped by operator request and therefore not Phase 1.5 exit
+  proof. Artifact gate remains CANDIDATE_NOT_VERIFIED.
+
+Static checks:
+  git diff --check OK.
+  python -m compileall -q openclaw-video\src openclaw-video\tests OK.
+  node --check scripts\verify_openclaw_gateway_ws_contract.mjs OK.
+  bash -n scripts/verify_phase1_5_gates.sh OK.
+  bash -n scripts/verify_douyin_chong_contract.sh OK.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -425,6 +518,10 @@ Covered:
   worker.
 - `scripts/verify_douyin_chong_contract.sh` now checks the same fixed
   resource-limit arguments used by the wrapper.
+- local `douyin_chong` candidate intake now has an adapter draft that requires
+  an explicit runtime env file, avoids the candidate default `.env`, enforces
+  duration/size/frame metadata gates, invokes Ark video analysis through a
+  schema-normalizing wrapper, and writes `openclaw-video-result.v1`.
 - OpenClaw 2026.3.13 Gateway contract documentation now treats
   `/channels/dify-web/chat` as a rejected V1 placeholder and records the
   observed WebSocket/RPC Gateway CLI surface.
@@ -483,9 +580,11 @@ Verified statically:
 
 ## Remaining Phase 1 Blockers
 
-- Actual `douyin_chong` artifact is still missing.
-- `douyin_chong` must still prove that it accepts and enforces the wrapper's
-  max download bytes, max video duration and max frame-count arguments.
+- Actual `douyin_chong` artifact has been located as a local candidate, but is
+  not verified. It must still be exported cleanly without secrets/runtime
+  outputs and prove real model-backed execution, schema output, resource limits,
+  timeout handling and cleanup before it can satisfy the production artifact
+  gate.
 - OpenClaw Gateway API contract for Bridge is partially locked by local
   fixed-version WS v3 tests, but not yet proven in a Docker/Linux isolated host
   with production model credentials.

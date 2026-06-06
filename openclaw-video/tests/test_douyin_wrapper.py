@@ -46,6 +46,23 @@ class DouyinWrapperTests(unittest.TestCase):
         self.assertEqual(kwargs["timeout"], 123)
         self.assertEqual(result.payload["schema_version"], "openclaw-video-result.v1")
 
+    def test_adds_explicit_env_file_only_when_configured(self):
+        with (
+            TemporaryDirectory() as tmp,
+            patch("openclaw_video.douyin_wrapper.subprocess.run") as run,
+            patch.dict("openclaw_video.douyin_wrapper.os.environ", {"DOUYIN_CHONG_ENV_FILE": "/run/secrets/env"}, clear=True),
+        ):
+            run.return_value = Completed()
+            run_douyin_chong(
+                video_url="https://www.douyin.com/video/1",
+                output_dir=Path(tmp),
+                binary="/usr/local/bin/openclaw-douyin-adapter",
+            )
+        command = run.call_args.args[0]
+        self.assertIn("--env-file", command)
+        self.assertIn("/run/secrets/env", command)
+        self.assertLess(command.index("--env-file"), command.index("--no-shell"))
+
     def test_rejects_non_positive_resource_limits(self):
         with TemporaryDirectory() as tmp:
             with self.assertRaises(DouyinWrapperError):

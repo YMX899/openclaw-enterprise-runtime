@@ -28,7 +28,7 @@ git tag --points-at HEAD
 printf 'PYTHON=%s\n' "$python_cmd"
 
 step "Python dependency gate"
-"$python_cmd" -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, websockets; from psycopg.types.json import Jsonb'
+"$python_cmd" -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb'
 
 step "Python tests"
 export PYTHONPATH="openclaw-video/src"
@@ -52,7 +52,10 @@ required = [
     'MAX_DOWNLOAD_BYTES: "536870912"',
     'MAX_VIDEO_DURATION_SECONDS: "60"',
     'MAX_VIDEO_FRAMES: "1200"',
-    "./vendor/douyin_chong:/opt/douyin_chong:ro",
+    "DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter",
+    "DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env",
+    "./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro",
+    "./vendor/douyin_chong:/app/vendor/douyin_chong:ro",
     "read_only: true",
     "/tmp:size=1024m,nosuid,nodev",
     "pids_limit: 128",
@@ -74,12 +77,14 @@ for forbidden in [
 manifest = Path("artifacts/douyin_chong/ARTIFACT_MANIFEST.md").read_text(encoding="utf-8")
 if "Status: missing" in manifest:
     print("douyin_chong artifact gate: MISSING")
+elif "Status: verified" in manifest:
+    print("douyin_chong artifact gate: VERIFIED")
 else:
-    print("douyin_chong artifact gate: present")
+    print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 PY
 
-if [[ "$require_douyin_artifact" == "1" ]] && grep -q 'Status: missing' artifacts/douyin_chong/ARTIFACT_MANIFEST.md; then
-  fail "REQUIRE_DOUYIN_ARTIFACT=1 but douyin_chong artifact is still missing."
+if [[ "$require_douyin_artifact" == "1" ]] && ! grep -q 'Status: verified' artifacts/douyin_chong/ARTIFACT_MANIFEST.md; then
+  fail "REQUIRE_DOUYIN_ARTIFACT=1 but douyin_chong artifact is not verified."
 fi
 
 if [[ "$skip_docker" == "1" ]]; then

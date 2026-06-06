@@ -1,0 +1,240 @@
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+from datetime import UTC, datetime
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Any, Callable
+
+from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
+
+
+class LegacyAdapterError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class LegacyVideoLimits:
+    max_download_bytes: int
+    max_duration_seconds: int
+    max_frames: int
+    fps: float
+
+
+def _positive_int(value: int, name: str) -> int:
+    if value <= 0:
+        raise LegacyAdapterError(f"{name} must be positive")
+    return value
+
+
+def _positive_float(value: float, name: str) -> float:
+    if value <= 0:
+        raise LegacyAdapterError(f"{name} must be positive")
+    return value
+
+
+def _ensure_legacy_pythonpath() -> None:
+    raw_paths = os.environ.get("DOUYIN_CHONG_PYTHONPATH", "")
+    for raw_path in raw_paths.split(os.pathsep):
+        path = raw_path.strip()
+        if path and path not in sys.path:
+            sys.path.insert(0, path)
+
+
+def _load_legacy_components() -> tuple[type, type, type]:
+    _ensure_legacy_pythonpath()
+    try:
+        from douyin_chong.clients.ark_video import ArkVideoClient
+        from douyin_chong.clients.resolver import UniversalVideoResolver
+        from douyin_chong.config import AppConfig
+    except ImportError as exc:
+        raise LegacyAdapterError("douyin_chong package is not importable") from exc
+    return AppConfig, UniversalVideoResolver, ArkVideoClient
+
+
+def _duration_seconds(video: Any) -> float | None:
+    duration_ms = getattr(video, "duration_ms", None)
+    if isinstance(duration_ms, (int, float)) and duration_ms >= 0:
+        return float(duration_ms) / 1000.0
+    return None
+
+
+def _size_bytes(video: Any) -> int | None:
+    size_mb = getattr(video, "size_mb", None)
+    if isinstance(size_mb, (int, float)) and size_mb >= 0:
+        return int(float(size_mb) * 1024 * 1024)
+    return None
+
+
+def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
+    duration = _duration_seconds(video)
+    if duration is None:
+        raise LegacyAdapterError("video duration is unavailable")
+    if duration > limits.max_duration_seconds:
+        raise LegacyAdapterError("video duration exceeds limit")
+    estimated_frames = duration * limits.fps
+    if estimated_frames > limits.max_frames:
+        raise LegacyAdapterError("video frame budget exceeds limit")
+    size = _size_bytes(video)
+    if size is None:
+        raise LegacyAdapterError("video size is unavailable")
+    if size > limits.max_download_bytes:
+        raise LegacyAdapterError("video size exceeds limit")
+
+
+def _default_prompt() -> str:
+    return (
+        "Analyze this Douyin short video and write the final answer in Simplified Chinese. "
+        "Cover topic, opening hook, structure, visuals, actions, audience, risks, and improvement suggestions. "
+        "Do not include links, secrets, request headers, cookies, or internal paths."
+    )
+
+
+def _safe_text(value: Any, *, limit: int = 12000) -> str:
+    text = str(value or "").replace("\r\n", "\n").strip()
+    if len(text) > limit:
+        return text[:limit].rstrip() + "\n[truncated]"
+    return text
+
+
+def _build_payload(
+    *,
+    input_url: str,
+    video: Any,
+    completion: Any,
+    limits: LegacyVideoLimits,
+) -> dict[str, Any]:
+    output_text = _safe_text(getattr(completion, "output_text", ""))
+    if not output_text:
+        detail = (
+            getattr(completion, "api_error_message", "")
+            or getattr(completion, "error_message", "")
+            or "empty analysis output"
+        )
+        raise LegacyAdapterError(f"legacy tool returned no analysis output: {detail}")
+
+    duration = _duration_seconds(video)
+    size = _size_bytes(video)
+    raw_tool_result: dict[str, Any] = {
+        "tool": "douyin_chong",
+        "adapter": "openclaw_video.douyin_legacy_adapter",
+        "video_id": str(getattr(video, "video_id", "") or ""),
+        "author": str(getattr(video, "author", "") or ""),
+        "desc": _safe_text(getattr(video, "desc", ""), limit=500),
+        "content_type": getattr(video, "content_type", None),
+        "size_bytes": size,
+        "video_url_source": str(getattr(video, "video_url_source", "") or ""),
+        "request_id": str(getattr(completion, "request_id", "") or ""),
+        "usage": getattr(completion, "usage", None),
+        "limits": {
+            "max_download_bytes": limits.max_download_bytes,
+            "max_duration_seconds": limits.max_duration_seconds,
+            "max_frames": limits.max_frames,
+            "fps": limits.fps,
+        },
+    }
+    payload = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "source": {
+            "video_url_canonical": input_url,
+            "platform": "douyin",
+            "duration_seconds": duration,
+        },
+        "summary": output_text,
+        "signals": {
+            "hook": None,
+            "topic": None,
+            "audience": None,
+            "structure": None,
+            "visual_notes": output_text,
+            "risk_notes": None,
+        },
+        "raw_tool_result": raw_tool_result,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    return validate_result_payload(payload)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="OpenClaw-safe adapter for the legacy douyin_chong package.")
+    parser.add_argument("--input-url", required=True)
+    parser.add_argument("--output-json", required=True)
+    parser.add_argument("--max-bytes", type=int, required=True)
+    parser.add_argument("--max-duration-seconds", type=int, required=True)
+    parser.add_argument("--max-frames", type=int, required=True)
+    parser.add_argument("--env-file", required=True)
+    parser.add_argument("--no-shell", action="store_true", required=True)
+    parser.add_argument("--fps", type=float, default=float(os.environ.get("DOUYIN_CHONG_FPS", "4.0")))
+    parser.add_argument("--max-tokens", type=int, default=int(os.environ.get("DOUYIN_CHONG_MAX_TOKENS", "12000")))
+    parser.add_argument("--connect-timeout", type=float, default=float(os.environ.get("DOUYIN_CHONG_CONNECT_TIMEOUT", "60")))
+    parser.add_argument("--read-timeout", type=float, default=float(os.environ.get("DOUYIN_CHONG_READ_TIMEOUT", "900")))
+    parser.add_argument("--retries", type=int, default=int(os.environ.get("DOUYIN_CHONG_RETRIES", "1")))
+    return parser
+
+
+def run_adapter(
+    argv: list[str] | None = None,
+    *,
+    component_loader: Callable[[], tuple[type, type, type]] = _load_legacy_components,
+) -> dict[str, Any]:
+    args = build_parser().parse_args(argv)
+    if not args.no_shell:
+        raise LegacyAdapterError("--no-shell is required")
+    env_file = Path(args.env_file)
+    if not env_file.is_file():
+        raise LegacyAdapterError("--env-file must point to an existing file")
+
+    limits = LegacyVideoLimits(
+        max_download_bytes=_positive_int(args.max_bytes, "max_bytes"),
+        max_duration_seconds=_positive_int(args.max_duration_seconds, "max_duration_seconds"),
+        max_frames=_positive_int(args.max_frames, "max_frames"),
+        fps=_positive_float(args.fps, "fps"),
+    )
+    AppConfig, UniversalVideoResolver, ArkVideoClient = component_loader()
+    config = AppConfig.from_env(
+        env_path=env_file.resolve(),
+        mode="ark",
+        max_workers=1,
+        fps=limits.fps,
+        max_tokens=_positive_int(args.max_tokens, "max_tokens"),
+        connect_timeout=_positive_float(args.connect_timeout, "connect_timeout"),
+        read_timeout=_positive_float(args.read_timeout, "read_timeout"),
+        max_retries=max(0, int(args.retries)),
+    )
+    video = UniversalVideoResolver().resolve(args.input_url)
+    _enforce_limits(video, limits)
+    video_urls = [
+        url
+        for url in (
+            getattr(video, "video_url", ""),
+            getattr(video, "playwm_url", ""),
+        )
+        if url
+    ]
+    completion = ArkVideoClient(config).analyze(video_urls=video_urls, prompt=_default_prompt())
+    payload = _build_payload(
+        input_url=args.input_url,
+        video=video,
+        completion=completion,
+        limits=limits,
+    )
+    output_json = Path(args.output_json)
+    output_json.parent.mkdir(parents=True, exist_ok=True)
+    output_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return payload
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        run_adapter(argv)
+        return 0
+    except LegacyAdapterError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

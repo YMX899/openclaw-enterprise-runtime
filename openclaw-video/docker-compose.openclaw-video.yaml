@@ -80,14 +80,17 @@ services:
       dockerfile: docker/worker/Dockerfile
     environment:
       DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
-      DOUYIN_CHONG_BIN: /opt/douyin_chong/douyin_chong
+      DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter
+      DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
+      DOUYIN_CHONG_PYTHONPATH: /app/vendor
       WORKER_CONCURRENCY: "1"
       JOB_TIMEOUT_SECONDS: "900"
       MAX_DOWNLOAD_BYTES: "536870912"
       MAX_VIDEO_DURATION_SECONDS: "60"
       MAX_VIDEO_FRAMES: "1200"
     volumes:
-      - ./vendor/douyin_chong:/opt/douyin_chong:ro
+      - ./vendor/douyin_chong:/app/vendor/douyin_chong:ro
+      - ./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro
       - worker-tmp:/tmp/openclaw-video
     read_only: true
     tmpfs:

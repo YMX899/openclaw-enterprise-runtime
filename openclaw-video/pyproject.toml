@@ -11,8 +11,13 @@ dependencies = [
   "pydantic>=2.10,<3",
   "jsonschema>=4.23,<5",
   "websockets>=14,<17",
-  "cryptography>=43,<46"
+  "cryptography>=43,<46",
+  "requests>=2.32,<3",
+  "volcengine-python-sdk>=5.0,<6"
 ]
+
+[project.scripts]
+openclaw-douyin-adapter = "openclaw_video.douyin_legacy_adapter:main"
 
 [project.optional-dependencies]
 dev = [

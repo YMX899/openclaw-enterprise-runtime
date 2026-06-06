@@ -7,6 +7,10 @@ __pycache__
 .env
 .env.*
 secrets
-vendor/douyin_chong/*
-!vendor/douyin_chong/.gitkeep
-
+vendor/douyin_chong/.env
+vendor/douyin_chong/.env.*
+vendor/douyin_chong/*storage*
+vendor/douyin_chong/**/*.json
+vendor/douyin_chong/**/*.log
+vendor/douyin_chong/**/__pycache__
+vendor/douyin_chong/**/*.pyc

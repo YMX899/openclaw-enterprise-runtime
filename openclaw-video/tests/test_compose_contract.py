@@ -5,6 +5,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "docker-compose.openclaw-video.yaml"
 GATEWAY_DOCKERFILE = ROOT / "docker" / "openclaw-gateway" / "Dockerfile"
+WORKER_DOCKERFILE = ROOT / "docker" / "worker" / "Dockerfile"
+DOCKERIGNORE = ROOT / ".dockerignore"
+VENDOR_GITIGNORE = ROOT / "vendor" / "douyin_chong" / ".gitignore"
 
 
 class ComposeContractTests(unittest.TestCase):
@@ -61,7 +64,10 @@ class ComposeContractTests(unittest.TestCase):
             "MAX_DOWNLOAD_BYTES: \"536870912\"",
             "MAX_VIDEO_DURATION_SECONDS: \"60\"",
             "MAX_VIDEO_FRAMES: \"1200\"",
-            "./vendor/douyin_chong:/opt/douyin_chong:ro",
+            "DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter",
+            "DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env",
+            "./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro",
+            "./vendor/douyin_chong:/app/vendor/douyin_chong:ro",
             "- worker-tmp:/tmp/openclaw-video",
             "read_only: true",
             "/tmp:size=1024m,nosuid,nodev",
@@ -80,6 +86,35 @@ class ComposeContractTests(unittest.TestCase):
         self.assertNotIn("- dify-default", gateway_block)
         self.assertNotIn("- dify-default", worker_block)
         self.assertNotIn("- dify-default", postgres_block)
+
+    def test_douyin_tool_secrets_are_file_mounted_not_inline(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        self.assertIn("DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env", compose)
+        self.assertIn("./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro", compose)
+        self.assertNotIn("ARK_API_KEY:", compose)
+        self.assertNotIn("MEDIAKIT_API_KEY:", compose)
+
+    def test_worker_image_uses_adapter_and_vendor_source_slot(self):
+        dockerfile = WORKER_DOCKERFILE.read_text(encoding="utf-8")
+        self.assertIn("DOUYIN_CHONG_PYTHONPATH=/app/vendor", dockerfile)
+        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
+        self.assertIn("openclaw-douyin-adapter", (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    def test_vendor_slot_keeps_secrets_and_runtime_outputs_out(self):
+        dockerignore = DOCKERIGNORE.read_text(encoding="utf-8")
+        vendor_gitignore = VENDOR_GITIGNORE.read_text(encoding="utf-8")
+        for forbidden in [
+            "vendor/douyin_chong/.env",
+            "vendor/douyin_chong/.env.*",
+            "vendor/douyin_chong/*storage*",
+            "vendor/douyin_chong/**/*.log",
+            "vendor/douyin_chong/**/__pycache__",
+            "vendor/douyin_chong/**/*.pyc",
+        ]:
+            with self.subTest(forbidden=forbidden):
+                self.assertIn(forbidden, dockerignore)
+        self.assertIn("*", vendor_gitignore)
+        self.assertIn("!README.md", vendor_gitignore)
 
 
 if __name__ == "__main__":
