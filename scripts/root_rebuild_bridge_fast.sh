@@ -25,7 +25,11 @@ fi
 if [ -L secrets ]; then
   :
 elif [ -d secrets ]; then
-  find secrets -mindepth 1 -maxdepth 1 -type d -empty -exec rmdir {} +
+  if find secrets -mindepth 1 ! -type d | grep -q .; then
+    echo "release secrets directory contains non-placeholder entries: $ROOT/secrets" >&2
+    exit 1
+  fi
+  find secrets -mindepth 1 -depth -type d -empty -exec rmdir {} +
   rmdir secrets
 else
   echo "unexpected secrets path under release: $ROOT/secrets" >&2
