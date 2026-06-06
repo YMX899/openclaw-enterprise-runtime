@@ -1,0 +1,54 @@
+name: openclaw-video
+
+services:
+  dify-openclaw-bridge:
+    image: ${OPENCLAW_BRIDGE_IMAGE:-openclaw-video-openclaw-bridge:fast}
+    environment:
+      DIFY_API_BASE: http://api:5001
+      BRIDGE_IDENTITY_PROVIDER: dify
+      HUAHUO_FRONT_BASE: ${HUAHUO_FRONT_BASE:-https://www.huahuoai.com}
+      HUAHUO_FRONT_TENANT_ID: ${HUAHUO_FRONT_TENANT_ID:-huahuo-front}
+      DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
+      BRIDGE_IDENTITY_SECRET: ${BRIDGE_IDENTITY_SECRET:?}
+      OPENCLAW_GATEWAY_URL: ws://openclaw-gateway:18789
+      OPENCLAW_GATEWAY_TOKEN_FILE: /run/secrets/openclaw_gateway_token
+      OPENCLAW_GATEWAY_DEVICE_KEY_FILE: /run/secrets/openclaw_bridge_device_key.pem
+      KNOWLEDGE_BASE_DIR: /knowledge/short-video
+      KNOWLEDGE_BASE_VERSION_FILE: /knowledge/short-video/VERSION
+      OPENCLAW_VERSION: "2026.3.13"
+      OPENCLAW_VIDEO_RELEASE: ${OPENCLAW_VIDEO_RELEASE:-unknown}
+      OPENCLAW_TENANT_ALLOWLIST_HASHES: ${OPENCLAW_TENANT_ALLOWLIST_HASHES:-}
+      OPENCLAW_ACCOUNT_ALLOWLIST_HASHES: ${OPENCLAW_ACCOUNT_ALLOWLIST_HASHES:-}
+      OPENCLAW_USER_ACTIVE_JOB_LIMIT: ${OPENCLAW_USER_ACTIVE_JOB_LIMIT:-2}
+      OPENCLAW_USER_RATE_LIMIT_PER_MINUTE: ${OPENCLAW_USER_RATE_LIMIT_PER_MINUTE:-12}
+      OPENCLAW_DATA_RETENTION_DAYS: ${OPENCLAW_DATA_RETENTION_DAYS:-30}
+      BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: "0"
+      BRIDGE_TEST_IDENTITY_SECRET: ""
+      BRIDGE_UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_BYTES: "536870912"
+    ports:
+      - "127.0.0.1:18182:3000"
+    volumes:
+      - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
+      - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
+      - ./secrets/openclaw_bridge_device_key.pem:/run/secrets/openclaw_bridge_device_key.pem:ro
+      - uploaded-videos:/data/uploads
+    networks:
+      - openclaw-internal
+      - dify-default
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  uploaded-videos:
+
+networks:
+  openclaw-internal:
+    external: true
+    name: openclaw_video_internal
+  dify-default:
+    external: true
+    name: ${DIFY_DOCKER_NETWORK:-docker_default}
