@@ -141,15 +141,31 @@ class ComposeContractTests(unittest.TestCase):
 
         self.assertIn("ARG PYTHON_BASE_IMAGE=python:3.12-slim", bridge)
         self.assertIn("FROM ${PYTHON_BASE_IMAGE}", bridge)
+        self.assertIn("ARG PIP_INDEX_URL=", bridge)
+        self.assertIn('pip install --no-cache-dir -i "$PIP_INDEX_URL" /app', bridge)
         self.assertIn("ARG PYTHON_BASE_IMAGE=python:3.12-slim", worker)
         self.assertIn("FROM ${PYTHON_BASE_IMAGE}", worker)
+        self.assertIn("ARG PIP_INDEX_URL=", worker)
+        self.assertIn('pip install --no-cache-dir -i "$PIP_INDEX_URL" /app', worker)
         self.assertIn("ARG NODE_BASE_IMAGE=node:22.18-slim", gateway)
         self.assertIn("FROM ${NODE_BASE_IMAGE}", gateway)
+        self.assertIn("ARG APT_DEBIAN_MIRROR=http://deb.debian.org/debian", gateway)
+        self.assertIn("ARG APT_SECURITY_MIRROR=http://deb.debian.org/debian-security", gateway)
+        self.assertIn("ARG NPM_CONFIG_REGISTRY=", gateway)
         self.assertIn("apt-get install -y --no-install-recommends ca-certificates git", gateway)
+        self.assertIn('npm config set registry "$NPM_CONFIG_REGISTRY"', gateway)
         self.assertIn("rm -rf /var/lib/apt/lists/*", gateway)
         self.assertIn("PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}", compose)
+        self.assertIn("PIP_INDEX_URL: ${PIP_INDEX_URL:-}", compose)
         self.assertIn("NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22.18-slim}", compose)
+        self.assertIn("APT_DEBIAN_MIRROR: ${APT_DEBIAN_MIRROR:-http://deb.debian.org/debian}", compose)
+        self.assertIn(
+            "APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://deb.debian.org/debian-security}",
+            compose,
+        )
+        self.assertIn("NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}", compose)
         self.assertNotIn("public.ecr.aws", compose)
+        self.assertNotIn("pypi.tuna.tsinghua.edu.cn", compose)
 
     def test_vendor_slot_keeps_secrets_and_runtime_outputs_out(self):
         dockerignore = DOCKERIGNORE.read_text(encoding="utf-8")

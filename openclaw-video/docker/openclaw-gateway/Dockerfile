@@ -2,11 +2,22 @@ ARG NODE_BASE_IMAGE=node:22.18-slim
 FROM ${NODE_BASE_IMAGE}
 
 ARG OPENCLAW_VERSION=2026.3.13
+ARG APT_DEBIAN_MIRROR=http://deb.debian.org/debian
+ARG APT_SECURITY_MIRROR=http://deb.debian.org/debian-security
+ARG NPM_CONFIG_REGISTRY=
 USER root
-RUN apt-get update \
+RUN set -eux; \
+    find /etc/apt -type f \( -name "*.list" -o -name "*.sources" \) -print0 \
+        | xargs -0 sed -i \
+            -e "s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" \
+            -e "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g"; \
+    apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
-RUN npm install -g "openclaw@${OPENCLAW_VERSION}" --ignore-scripts \
+RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
+        npm config set registry "$NPM_CONFIG_REGISTRY"; \
+    fi \
+    && npm install -g "openclaw@${OPENCLAW_VERSION}" --ignore-scripts \
     && openclaw --version
 
 ENV OPENCLAW_STATE_DIR=/var/lib/openclaw \
