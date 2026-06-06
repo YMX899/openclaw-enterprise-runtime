@@ -518,3 +518,137 @@ After the Huahuo user web is logged in again at https://www.huahuoai.com/ai/?id=
 3. Tiny Upload must return a succeeded async job.
 4. A Huahuo user-web chat message must still reply normally while OpenClaw is available.
 ```
+
+## Post-Login Acceptance Check Deployment
+
+Date: 2026-06-07T03:55-03:58+08:00.
+
+Commit and version:
+
+```text
+85685dc463a1bd849a385347e9110e8d1b4b69b2
+tag: phase4-post-login-acceptance-check-20260607
+bundle: tmp\root-private-sidecar-bundles\openclaw-root-private-sidecar-85685dc463a1.tar.gz
+bundle_sha256: a841508b0d6bbf9944b061d8e2c66e4356f49fac95ad618531d13c6a5539e5dd
+```
+
+Implemented:
+
+```text
+OpenClaw Lab now has a Post-Login Acceptance button.
+The button runs identity diagnostics, /me, random session/job/result 404 checks,
+three URL security negative jobs, Tiny Upload async job completion, result fetch,
+and owner-visible message retrieval.
+The output is structured as post_login_acceptance.overall with per-step ok flags.
+```
+
+Local verification before deployment:
+
+```text
+PYTHONPATH=openclaw-video\src .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
+Ran 229 tests
+Result: OK
+JavaScript extracted from the Lab page passed node --check.
+git diff --check passed.
+```
+
+Pre-deploy root baseline:
+
+```text
+time=2026-06-07T03:55:26+08:00
+current=/app/bin/openclaw-video/releases/84e13d007d33
+same_origin_lab=200
+same_origin_me_unauth=401
+```
+
+Dify core containers before deployment:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Deployment:
+
+```text
+previous=/app/bin/openclaw-video/releases/84e13d007d33
+current=/app/bin/openclaw-video/releases/85685dc463a1
+bridge_fast_rebuild=PASS
+deploy_post_login_acceptance=PASS
+Only openclaw-video-openclaw-bridge-1 was recreated.
+Original Dify api/web/nginx containers were not rebuilt or restarted.
+```
+
+Post-deploy root baseline:
+
+```text
+time=2026-06-07T03:57:13+08:00
+current=/app/bin/openclaw-video/releases/85685dc463a1
+previous_marker=/app/bin/openclaw-video/releases/84e13d007d33
+same_origin_lab=200
+post_login_button=present
+same_origin_me_unauth=401
+huahuo_user_ai=200
+```
+
+Dify core containers after deployment:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Post-deploy resource snapshot:
+
+```text
+openclaw-video-openclaw-bridge-1         0.10% CPU  47.23 MiB  5 PIDs
+openclaw-video-video-analysis-worker-1   0.00% CPU  33.33 MiB  1 PID
+openclaw-video-openclaw-gateway-1        0.00% CPU  439.5 MiB  18 PIDs
+openclaw-video-bridge-postgres-1         0.00% CPU  36.75 MiB  6 PIDs
+docker-nginx-1                           0.00% CPU  11.74 MiB  10 PIDs
+docker-api-1                             0.82% CPU  4.291 GiB  61 PIDs
+docker-web-1                             0.39% CPU  366.2 MiB  34 PIDs
+```
+
+Post-deploy public smoke:
+
+```text
+Command: python scripts\run_public_browser_smoke.py --timeout-seconds 90
+Run dir: tmp\playwright-public-browser\20260606T195713Z
+Overall: PASS
+Targets: openclaw-lab, openclaw-api-me-unauthenticated, huahuo-user-web, huahuo-admin-configuration
+http_5xx_count: 0
+gateway_direct_request_count: 0
+token_url_leak_count: 0
+headers_recorded: false
+bodies_recorded: false
+secrets_recorded: false
+```
+
+Chrome verification:
+
+```text
+OpenClaw Lab: https://www.huahuoai.com/openclaw-lab/
+Post-Login Acceptance button: visible
+Lab current state: Login Required
+Huahuo user web after navigation: https://www.huahuoai.com/home/
+Huahuo user state: landing page with login action, not authenticated chat
+```
+
+Pending:
+
+```text
+The Post-Login Acceptance browser gate is deployed and ready.
+It cannot pass until the Huahuo user web at https://www.huahuoai.com/ai/?id=4 is logged in again in Chrome.
+The current unauthenticated behavior remains correct and fails closed.
+```
+
+Rollback to the previous sidecar release:
+
+```bash
+ln -sfn /app/bin/openclaw-video/releases/84e13d007d33 /app/bin/openclaw-video/current
+OPENCLAW_VIDEO_ROOT=/app/bin/openclaw-video/current/openclaw-video \
+bash /app/bin/openclaw-video/current/scripts/root_rebuild_bridge_fast.sh
+```
