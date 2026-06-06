@@ -238,3 +238,72 @@ Interpretation:
 - `401` for profile without login remains expected.
 - Authenticated browser baseline is still incomplete and remains mandatory
   before any future public `/openclaw-lab/` or `/openclaw-api/` route exposure.
+
+## Real Chrome Refresh 2026-06-06
+
+Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
+storage, request headers, CSRF values, authorization tokens or passwords were
+read.
+
+Route:
+
+```text
+https://ai001.huahuoai.com/apps
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible page: Dify login page
+visible controls: language selector, email input, password input, login button
+console/dev error summary: none captured for the signin page
+```
+
+Visible text included:
+
+```text
+登录 Dify
+欢迎！请登录以开始使用。
+邮箱
+密码
+忘记密码？
+登录
+```
+
+Direct route:
+
+```text
+https://ai001.huahuoai.com/signin
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible controls: email input, password input
+```
+
+Direct browser navigation to API route:
+
+```text
+https://ai001.huahuoai.com/console/api/account/profile
+```
+
+Observed:
+
+```text
+browser-side error: net::ERR_BLOCKED_BY_CLIENT
+visible browser page text: ai001.huahuoai.com 已被屏蔽 / ERR_BLOCKED_BY_CLIENT
+```
+
+Interpretation:
+
+- The current Chrome profile still does not have an authenticated Dify session.
+- Public unauthenticated UX remains consistent: `/apps` redirects to `/signin`.
+- The API direct-tab browser block is still a browser/client behavior and is not
+  used as a Dify server failure signal.
+- Authenticated existing-app workflow testing remains incomplete and is still a
+  required gate before any public OpenClaw route exposure.
