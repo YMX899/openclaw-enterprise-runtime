@@ -38,7 +38,7 @@ REQUIRED_MARKERS = [
     r"healthz",
     r"port exposure check",
     r"127\.0\.0\.1:18181",
-    r"docker compose down --remove-orphans",
+    r"docker compose down --remove-orphans --volumes",
     r"no 0\.0\.0\.0 listener",
     r"worker image",
 ]
@@ -221,7 +221,7 @@ worker image: {context.worker_image}
 docker compose up -d: PASS
 Bridge healthz at http://127.0.0.1:18181/healthz: PASS
 port exposure check: PASS, no 0.0.0.0 listener for 18181/18789/5432
-docker compose down --remove-orphans: PASS
+docker compose down --remove-orphans --volumes: PASS
 ```
 
 ## Sanitization

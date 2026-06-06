@@ -149,7 +149,7 @@ docker compose up -d
 healthz
 port exposure check
 127.0.0.1:18181
-docker compose down --remove-orphans
+docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
 """,
@@ -207,7 +207,7 @@ docker compose up -d
 healthz
 port exposure check
 127.0.0.1:18181
-docker compose down --remove-orphans
+docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
 """,
@@ -359,7 +359,7 @@ docker compose up -d
 healthz
 port exposure check
 127.0.0.1:18181
-docker compose down --remove-orphans
+docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
 operator: <fill-me>

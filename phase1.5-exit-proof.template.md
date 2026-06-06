@@ -56,7 +56,7 @@ docker compose up
 healthz
 port exposure check
 127.0.0.1:18181
-docker compose down --remove-orphans
+docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
 ```
@@ -77,7 +77,7 @@ worker image smoke: PASS
 docker compose up: PASS
 Bridge healthz at http://127.0.0.1:18181/healthz: PASS
 port exposure check: PASS, no 0.0.0.0 listener for 18181/18789/5432
-docker compose down --remove-orphans: PASS
+docker compose down --remove-orphans --volumes: PASS
 ```
 
 ## Sanitization

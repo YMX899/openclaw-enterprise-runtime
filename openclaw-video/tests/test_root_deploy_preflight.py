@@ -51,7 +51,7 @@ production_host: NO
 host_os: Linux
 RUN_COMPOSE_UP=1
 docker compose up -d
-docker compose down --remove-orphans
+docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 """
 

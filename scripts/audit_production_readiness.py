@@ -187,7 +187,7 @@ def check_phase1_5_exit(repo: Path) -> GateResult:
         r"healthz",
         r"port exposure check",
         r"127\.0\.0\.1:18181",
-        r"docker compose down --remove-orphans",
+        r"docker compose down --remove-orphans --volumes",
         r"no 0\.0\.0\.0 listener",
         r"worker image",
     ]

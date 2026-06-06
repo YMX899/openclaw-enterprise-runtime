@@ -74,7 +74,7 @@ class Phase15ExitProofWriterTests(unittest.TestCase):
     def test_generated_proof_records_cleanup_before_pass(self):
         proof = writer.build_proof(self.context())
 
-        self.assertIn("docker compose down --remove-orphans: PASS", proof)
+        self.assertIn("docker compose down --remove-orphans --volumes: PASS", proof)
         self.assertIn("port exposure check: PASS, no 0.0.0.0 listener", proof)
         self.assertIn("Bridge healthz at http://127.0.0.1:18181/healthz: PASS", proof)
         self.assertIn("DOCKER_CMD=sudo -n docker", proof)

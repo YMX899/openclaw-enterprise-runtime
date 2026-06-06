@@ -278,7 +278,7 @@ if ($RunComposeUp) {
         }
     }
     finally {
-        docker compose -f $ComposeFile down --remove-orphans
+        docker compose -f $ComposeFile down --remove-orphans --volumes
         Assert-LastExitCode "docker compose down"
     }
 } else {

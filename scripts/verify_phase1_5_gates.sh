@@ -293,14 +293,25 @@ fi
 if [[ "$run_compose_up" == "1" ]]; then
   step "compose up isolated sidecar"
   cleanup() {
-    "${docker_cmd_parts[@]}" compose -f "$compose_file" down --remove-orphans
+    "${docker_cmd_parts[@]}" compose -f "$compose_file" down --remove-orphans --volumes
   }
   trap cleanup EXIT
   "${docker_cmd_parts[@]}" compose -f "$compose_file" up -d
   "${docker_cmd_parts[@]}" compose -f "$compose_file" ps
 
   step "localhost health"
-  curl -fsS http://127.0.0.1:18181/healthz >/dev/null
+  for attempt in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:18181/healthz >/dev/null 2>&1; then
+      printf 'healthz: PASS attempt=%s\n' "$attempt"
+      break
+    fi
+    if [[ "$attempt" == "30" ]]; then
+      "${docker_cmd_parts[@]}" compose -f "$compose_file" ps
+      "${docker_cmd_parts[@]}" compose -f "$compose_file" logs --tail=80 openclaw-bridge
+      fail "Bridge healthz did not pass after 30 attempts."
+    fi
+    sleep 2
+  done
 
   step "port exposure check"
   if ss -lntp | grep -E '0\.0\.0\.0:18181|0\.0\.0\.0:18789|0\.0\.0\.0:5432'; then

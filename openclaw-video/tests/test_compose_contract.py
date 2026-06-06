@@ -92,6 +92,14 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("compose -f \"$compose_file\" images -q video-analysis-worker", gate_script)
         self.assertIn("image inspect openclaw-video-video-analysis-worker:latest", gate_script)
 
+    def test_phase1_5_compose_up_waits_for_health_and_cleans_volumes(self):
+        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
+
+        self.assertIn("down --remove-orphans --volumes", gate_script)
+        self.assertIn("for attempt in $(seq 1 30)", gate_script)
+        self.assertIn("healthz: PASS attempt=", gate_script)
+        self.assertIn("logs --tail=80 openclaw-bridge", gate_script)
+
     def test_worker_resource_and_filesystem_limits_are_declared(self):
         compose = COMPOSE.read_text(encoding="utf-8")
         for required in [
@@ -224,6 +232,7 @@ class ComposeContractTests(unittest.TestCase):
                 data = subprocess.check_output(
                     ["git", "show", f"HEAD:openclaw-video/vendor/douyin_chong/{relative}"],
                     cwd=Path(__file__).resolve().parents[2],
+                    stderr=subprocess.DEVNULL,
                 )
             except (FileNotFoundError, subprocess.CalledProcessError):
                 data = path.read_bytes()

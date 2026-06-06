@@ -79,19 +79,6 @@ def check_phase1_5_proof(repo: Path) -> PreflightCheck:
     if not path.exists():
         return PreflightCheck("phase1_5_proof_source", "NO_GO", "missing phase1.5-exit-proof.md")
     text = path.read_text(encoding="utf-8")
-    required = [
-        r"status:\s*PASS\b",
-        r"source:\s*isolated-linux-docker-host\b",
-        r"production_host:\s*NO\b",
-        r"host_os:\s*Linux\b",
-        r"RUN_COMPOSE_UP=1",
-        r"docker compose up",
-        r"docker compose down --remove-orphans",
-        r"no 0\.0\.0\.0 listener",
-    ]
-    missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
-    if missing:
-        return PreflightCheck("phase1_5_proof_source", "NO_GO", "proof missing required isolated-host markers")
     forbidden = [
         r"production_host:\s*YES\b",
         r"host_name:\s*AI-01\b",
@@ -100,6 +87,19 @@ def check_phase1_5_proof(repo: Path) -> PreflightCheck:
     ]
     if any(re.search(pattern, text, re.IGNORECASE) for pattern in forbidden):
         return PreflightCheck("phase1_5_proof_source", "NO_GO", "proof appears to come from production host")
+    required = [
+        r"status:\s*PASS\b",
+        r"source:\s*isolated-linux-docker-host\b",
+        r"production_host:\s*NO\b",
+        r"host_os:\s*Linux\b",
+        r"RUN_COMPOSE_UP=1",
+        r"docker compose up",
+        r"docker compose down --remove-orphans --volumes",
+        r"no 0\.0\.0\.0 listener",
+    ]
+    missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
+    if missing:
+        return PreflightCheck("phase1_5_proof_source", "NO_GO", "proof missing required isolated-host markers")
     return PreflightCheck("phase1_5_proof_source", "PASS", "isolated non-production Phase 1.5 proof is present")
 
 
