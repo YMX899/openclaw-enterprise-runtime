@@ -162,6 +162,19 @@ RUN_COMPOSE_UP=1 \
 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 ```
 
+When the full isolated sidecar boot gate succeeds, the script automatically
+writes:
+
+```text
+phase1.5-exit-proof.md
+```
+
+The proof is generated only after `docker compose up`, Bridge `healthz`, the
+host port exposure check, and `docker compose down --remove-orphans` all
+succeed. It is not generated when `SKIP_DOCKER=1`, when `RUN_COMPOSE_UP=0`, or
+when either `REQUIRE_OPENCLAW_SECURITY_APPROVAL=1` or
+`REQUIRE_DOUYIN_ARTIFACT=1` is missing.
+
 The full script must prove:
 
 ```text
@@ -213,7 +226,7 @@ summary of successful gates
 docker compose ps output if RUN_COMPOSE_UP=1
 ss -lntp filtered output for 18181/18789/5432
 worker image id/digest if available
-phase1.5-exit-proof.md filled from phase1.5-exit-proof.template.md
+generated phase1.5-exit-proof.md
 ```
 
 Do not capture or share:

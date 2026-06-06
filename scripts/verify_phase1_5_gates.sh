@@ -200,6 +200,14 @@ if [[ "$require_openclaw_security_approval" == "1" ]] && ! grep -Eq 'decision: (
   fail "REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 but OpenClaw 2026.3.13 is not approved for production."
 fi
 
+if [[ "$run_compose_up" == "1" && "$require_douyin_artifact" != "1" ]]; then
+  fail "RUN_COMPOSE_UP=1 requires REQUIRE_DOUYIN_ARTIFACT=1 for Phase 1.5 exit proof."
+fi
+
+if [[ "$run_compose_up" == "1" && "$require_openclaw_security_approval" != "1" ]]; then
+  fail "RUN_COMPOSE_UP=1 requires REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 for Phase 1.5 exit proof."
+fi
+
 if [[ "$skip_docker" == "1" ]]; then
   printf 'Docker gates skipped by operator request. This is not a Phase 1.5 exit proof.\n'
   exit 0
@@ -244,6 +252,17 @@ if [[ "$run_compose_up" == "1" ]]; then
   if ss -lntp | grep -E '0\.0\.0\.0:18181|0\.0\.0\.0:18789|0\.0\.0\.0:5432'; then
     fail "forbidden public listener detected"
   fi
+
+  step "compose down isolated sidecar"
+  cleanup
+  trap - EXIT
+
+  step "write Phase 1.5 exit proof"
+  "$python_cmd" -B scripts/write_phase1_5_exit_proof.py \
+    --compose-file "$compose_file" \
+    --python-cmd "$python_cmd" \
+    --node-cmd "$node_cmd" \
+    --worker-image "$worker_image"
 else
   printf 'Compose up skipped. Use RUN_COMPOSE_UP=1 only in an isolated Docker/Linux validation host.\n'
 fi
