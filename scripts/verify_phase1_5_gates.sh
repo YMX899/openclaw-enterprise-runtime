@@ -31,9 +31,48 @@ step "Python dependency gate"
 "$python_cmd" -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb'
 
 step "Python tests"
+export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="openclaw-video/src"
 "$python_cmd" -m unittest discover openclaw-video/tests -v
 "$python_cmd" -m compileall openclaw-video/src openclaw-video/tests
+
+step "vendored douyin_chong source gate"
+"$python_cmd" - <<'PY'
+from hashlib import sha256
+from pathlib import Path
+
+vendor = Path("openclaw-video/vendor/douyin_chong")
+hashes = vendor / "SOURCE_SHA256SUMS"
+expected_files = {
+    "__init__.py",
+    "clients/__init__.py",
+    "clients/ark_video.py",
+    "clients/douyin.py",
+    "clients/resolver.py",
+    "clients/tiktok.py",
+    "config.py",
+    "models.py",
+    "README.md",
+}
+entries = {}
+for line in hashes.read_text(encoding="utf-8").splitlines():
+    digest, relative = line.split("  ", 1)
+    entries[relative] = digest
+if set(entries) != expected_files:
+    raise SystemExit(f"vendor hash manifest mismatch: {sorted(set(entries) ^ expected_files)}")
+for relative, expected_digest in entries.items():
+    actual = sha256((vendor / relative).read_bytes()).hexdigest()
+    if actual != expected_digest:
+        raise SystemExit(f"vendor source digest mismatch: {relative}")
+for forbidden in [".env", ".env.local", ".douyin_storage_state.json", "douyin_login_state.py", "profile_batch_fashion.py"]:
+    if (vendor / forbidden).exists():
+        raise SystemExit(f"forbidden vendor file present: {forbidden}")
+for path in vendor.rglob("*"):
+    text = str(path).lower()
+    if "__pycache__" in text or path.suffix in {".pyc", ".log", ".json"} or "storage" in text or "cookie" in text:
+        raise SystemExit(f"forbidden vendor runtime artifact present: {path}")
+print("vendor source gate: OK")
+PY
 
 step "Node syntax"
 node --check scripts/verify_openclaw_gateway_ws_contract.mjs
@@ -79,6 +118,8 @@ if "Status: missing" in manifest:
     print("douyin_chong artifact gate: MISSING")
 elif "Status: verified" in manifest:
     print("douyin_chong artifact gate: VERIFIED")
+elif "Status: minimal candidate source vendored" in manifest:
+    print("douyin_chong artifact gate: MINIMAL_SOURCE_NOT_MODEL_VERIFIED")
 else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 PY
@@ -107,8 +148,20 @@ grep -q 'ws://openclaw-gateway:18789' "$rendered"
 step "compose build"
 docker compose -f "$compose_file" build --no-cache
 
+step "worker image smoke"
+worker_image="$(docker compose -f "$compose_file" images -q video-analysis-worker)"
+if [[ -z "$worker_image" ]]; then
+  fail "could not resolve built video-analysis-worker image id"
+fi
+docker run --rm "$worker_image" openclaw-douyin-adapter --help >/dev/null
+docker run --rm "$worker_image" python -c 'from douyin_chong.config import AppConfig; from douyin_chong.clients.ark_video import ArkVideoClient; from douyin_chong.clients.resolver import UniversalVideoResolver; print("vendored-import-ok")'
+
 if [[ "$run_compose_up" == "1" ]]; then
   step "compose up isolated sidecar"
+  cleanup() {
+    docker compose -f "$compose_file" down --remove-orphans
+  }
+  trap cleanup EXIT
   docker compose -f "$compose_file" up -d
   docker compose -f "$compose_file" ps
 

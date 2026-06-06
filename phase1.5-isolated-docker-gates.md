@@ -116,6 +116,17 @@ This static check is useful while editing, but it is not Phase 1.5 exit
 evidence. Phase 1.5 exit requires a clean worktree and a non-production Linux
 Docker host running the full script without `SKIP_DOCKER=1`.
 
+The full Linux/Docker script must also prove:
+
+- vendored `douyin_chong` files match `SOURCE_SHA256SUMS`.
+- no `.env`, storage state, cache, `.pyc`, log or browser-state utility exists
+  in the vendored V1 subset.
+- the worker image builds from the compose file.
+- `openclaw-douyin-adapter --help` works inside the built worker image.
+- the vendored candidate package imports inside the built worker image.
+- when `RUN_COMPOSE_UP=1`, the stack is torn down afterward with
+  `docker compose down --remove-orphans`.
+
 Verify host exposure:
 
 ```bash

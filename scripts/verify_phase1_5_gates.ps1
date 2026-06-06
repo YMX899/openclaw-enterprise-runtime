@@ -36,9 +36,49 @@ Step "Python dependency gate"
 & $PythonCmd -c "import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb"
 
 Step "Python tests"
+$env:PYTHONDONTWRITEBYTECODE = "1"
 $env:PYTHONPATH = "openclaw-video/src"
 & $PythonCmd -m unittest discover openclaw-video/tests -v
 & $PythonCmd -m compileall openclaw-video/src openclaw-video/tests
+
+Step "vendored douyin_chong source gate"
+$vendorGate = @'
+from hashlib import sha256
+from pathlib import Path
+
+vendor = Path("openclaw-video/vendor/douyin_chong")
+hashes = vendor / "SOURCE_SHA256SUMS"
+expected_files = {
+    "__init__.py",
+    "clients/__init__.py",
+    "clients/ark_video.py",
+    "clients/douyin.py",
+    "clients/resolver.py",
+    "clients/tiktok.py",
+    "config.py",
+    "models.py",
+    "README.md",
+}
+entries = {}
+for line in hashes.read_text(encoding="utf-8").splitlines():
+    digest, relative = line.split("  ", 1)
+    entries[relative] = digest
+if set(entries) != expected_files:
+    raise SystemExit(f"vendor hash manifest mismatch: {sorted(set(entries) ^ expected_files)}")
+for relative, expected_digest in entries.items():
+    actual = sha256((vendor / relative).read_bytes()).hexdigest()
+    if actual != expected_digest:
+        raise SystemExit(f"vendor source digest mismatch: {relative}")
+for forbidden in [".env", ".env.local", ".douyin_storage_state.json", "douyin_login_state.py", "profile_batch_fashion.py"]:
+    if (vendor / forbidden).exists():
+        raise SystemExit(f"forbidden vendor file present: {forbidden}")
+for path in vendor.rglob("*"):
+    text = str(path).lower()
+    if "__pycache__" in text or path.suffix in {".pyc", ".log", ".json"} or "storage" in text or "cookie" in text:
+        raise SystemExit(f"forbidden vendor runtime artifact present: {path}")
+print("vendor source gate: OK")
+'@
+$vendorGate | & $PythonCmd -
 
 Step "Node syntax"
 node --check scripts/verify_openclaw_gateway_ws_contract.mjs
@@ -84,6 +124,8 @@ if "Status: missing" in manifest:
     print("douyin_chong artifact gate: MISSING")
 elif "Status: verified" in manifest:
     print("douyin_chong artifact gate: VERIFIED")
+elif "Status: minimal candidate source vendored" in manifest:
+    print("douyin_chong artifact gate: MINIMAL_SOURCE_NOT_MODEL_VERIFIED")
 else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 '@
@@ -119,18 +161,31 @@ foreach ($forbidden in @("0.0.0.0:18789", "0.0.0.0:5432", "/var/run/docker.sock"
 Step "compose build"
 docker compose -f $ComposeFile build --no-cache
 
+Step "worker image smoke"
+$workerImage = docker compose -f $ComposeFile images -q video-analysis-worker
+if (-not $workerImage) {
+    Fail "could not resolve built video-analysis-worker image id"
+}
+docker run --rm $workerImage openclaw-douyin-adapter --help | Out-Null
+docker run --rm $workerImage python -c "from douyin_chong.config import AppConfig; from douyin_chong.clients.ark_video import ArkVideoClient; from douyin_chong.clients.resolver import UniversalVideoResolver; print('vendored-import-ok')"
+
 if ($RunComposeUp) {
     Step "compose up isolated sidecar"
-    docker compose -f $ComposeFile up -d
-    docker compose -f $ComposeFile ps
+    try {
+        docker compose -f $ComposeFile up -d
+        docker compose -f $ComposeFile ps
 
-    Step "localhost health"
-    Invoke-WebRequest -Uri "http://127.0.0.1:18181/healthz" -UseBasicParsing -TimeoutSec 10 | Out-Null
+        Step "localhost health"
+        Invoke-WebRequest -Uri "http://127.0.0.1:18181/healthz" -UseBasicParsing -TimeoutSec 10 | Out-Null
 
-    Step "port exposure check"
-    $ports = netstat -ano -p tcp
-    if ($ports -match "0\.0\.0\.0:18181|0\.0\.0\.0:18789|0\.0\.0\.0:5432") {
-        Fail "forbidden public listener detected"
+        Step "port exposure check"
+        $ports = netstat -ano -p tcp
+        if ($ports -match "0\.0\.0\.0:18181|0\.0\.0\.0:18789|0\.0\.0\.0:5432") {
+            Fail "forbidden public listener detected"
+        }
+    }
+    finally {
+        docker compose -f $ComposeFile down --remove-orphans
     }
 } else {
     Write-Host "Compose up skipped. Use -RunComposeUp only in an isolated Docker/Linux validation host."

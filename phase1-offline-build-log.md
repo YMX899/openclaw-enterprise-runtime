@@ -528,6 +528,25 @@ Status:
   proof, image digest and security decision are complete.
 ```
 
+Updated Phase 1.5 gate script hardening:
+
+```text
+scripts/verify_phase1_5_gates.sh and scripts/verify_phase1_5_gates.ps1 now
+include:
+
+- vendored douyin_chong SOURCE_SHA256SUMS validation.
+- explicit failure for vendor .env, storage, cache, .pyc, log and excluded
+  browser/profile utilities.
+- worker image smoke test after Docker build:
+  openclaw-douyin-adapter --help
+  python import of AppConfig, ArkVideoClient and UniversalVideoResolver.
+- compose-up cleanup with docker compose down --remove-orphans when the isolated
+  host opts into RUN_COMPOSE_UP=1 / -RunComposeUp.
+
+Local workstation still has no Docker CLI, so this remains script readiness, not
+Phase 1.5 exit proof.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
