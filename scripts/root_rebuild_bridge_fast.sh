@@ -31,6 +31,8 @@ elif [ -d secrets ]; then
   fi
   find secrets -mindepth 1 -depth -type d -empty -exec rmdir {} +
   rmdir secrets
+elif [ ! -e secrets ]; then
+  :
 else
   echo "unexpected secrets path under release: $ROOT/secrets" >&2
   exit 1

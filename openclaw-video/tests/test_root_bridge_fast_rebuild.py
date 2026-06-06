@@ -19,6 +19,7 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("OPENCLAW_SHARED_SECRETS_DIR:-/app/bin/openclaw-video/shared/secrets", text)
         self.assertIn("release secrets directory contains non-placeholder entries", text)
         self.assertIn("find secrets -mindepth 1 -depth -type d -empty -exec rmdir {} +", text)
+        self.assertIn("elif [ ! -e secrets ]; then", text)
         self.assertIn("ln -s \"$SHARED_SECRETS_DIR\" secrets", text)
         self.assertIn("up -d --no-deps --force-recreate openclaw-bridge", text)
         self.assertIn("bridge_fast_rebuild=PASS", text)
