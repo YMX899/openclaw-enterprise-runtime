@@ -151,3 +151,25 @@ python scripts/build_root_deploy_bundle.py --target-host root --fail-on-no-go
 
 The bundle builder records the git commit, tags, SHA256 digest and preflight
 report, and refuses to create a bundle while the preflight is `NO_GO`.
+
+## Root Private Sidecar Deployment
+
+When the production public browser baseline is still blocked, the only allowed
+root deployment scope is a private Phase 2 sidecar:
+
+- no OpenResty route.
+- no Dify compose change.
+- no Dify container restart.
+- `openclaw-bridge` bound only to `127.0.0.1:18181`.
+- OpenClaw Gateway, worker and Postgres without host-published ports.
+
+Use the narrower private preflight and bundle builder for that scope:
+
+```bash
+python scripts/preflight_root_private_sidecar.py --target-host root --fail-on-no-go
+python scripts/build_root_private_sidecar_bundle.py --target-host root --fail-on-no-go
+```
+
+This private gate does not authorize `/openclaw-lab/` or `/openclaw-api/`
+public routes. Public routing still requires the full
+`scripts/preflight_root_deploy.py` gate to return `GO`.
