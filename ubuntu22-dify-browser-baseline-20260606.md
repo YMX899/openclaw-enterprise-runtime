@@ -3,7 +3,8 @@
 Audit time: 2026-06-06 19:15 Asia/Shanghai
 Target host: `ubuntu22.04`
 Base URL: `http://192.168.206.130:8088`
-Mode: non-mutating Dify baseline after Phase 1.5 isolated OpenClaw validation.
+Mode: Ubuntu 22.04 test-host Dify baseline after Phase 1.5 isolated
+OpenClaw validation.
 
 ## Server Facts
 
@@ -126,11 +127,144 @@ OpenClaw compose down --remove-orphans --volumes: PASS
 ```text
 Ubuntu 22.04 unauthenticated real-browser Dify baseline: PASS
 Ubuntu 22.04 server-side Dify HTTP/API baseline: PASS
-Authenticated Dify app conversation baseline: NOT RUN
+Authenticated Dify app conversation baseline: PASS
 ```
 
-Authenticated Dify app testing remains required before any production public
-OpenClaw route exposure. It requires a real logged-in Dify session, opening an
-existing app, sending a normal message, confirming reply behavior, refreshing
-the page, and checking history/entry navigation without recording cookies,
-tokens, CSRF values, or full request headers.
+## Authenticated Chrome Baseline
+
+Audit time: 2026-06-06 19:42-19:52 Asia/Shanghai
+
+Test account and workspace:
+
+```text
+test account: openclaw-baseline+ubuntu22@local.test
+workspace: OpenClaw Ubuntu22 Baseline
+purpose: Ubuntu 22.04 Dify authenticated browser baseline only
+credential storage: /home/xiejuyang/.openclaw-phase1.5-secrets/dify_baseline_login.json
+credential file mode: 600
+```
+
+The test password was generated on the Ubuntu test host and was not printed,
+committed, copied into logs, or written into this document. Browser testing did
+not read or record cookies, Authorization headers, CSRF tokens, local storage,
+session storage, full request headers, `.env` files, database connection
+strings, Redis credentials, private keys, or model API keys.
+
+Temporary secret copies staged inside the Dify API container were removed:
+
+```text
+TEMP_SECRET_RESIDUE_CLEARED
+```
+
+Created baseline app:
+
+```text
+app name: OpenClaw Baseline Fixed Reply
+app id: 06c9e25c-f763-4fa0-b49b-cd90c1fc1725
+mode: advanced-chat
+workflow: Start -> Answer
+model dependency: none
+published: PASS
+```
+
+The app was intentionally created as a no-model Chatflow using an Answer node,
+so the baseline proves Dify login, workspace routing, app opening, workflow
+publishing, webapp runtime, message submission, response rendering, refresh and
+logout without depending on an external LLM provider.
+
+Authenticated browser observations:
+
+```text
+GET /apps after login:
+  finalUrl: http://192.168.206.130:8088/apps
+  title: 工作室 - Dify
+  workspace visible: OpenClaw Ubuntu22 Baseline
+  app visible: OpenClaw Baseline Fixed Reply
+  browser console errors: none captured
+
+Open app:
+  finalUrl: http://192.168.206.130:8088/app/06c9e25c-f763-4fa0-b49b-cd90c1fc1725/workflow
+  title: OpenClaw Baseline Fixed Reply - Dify
+  page visible: workflow orchestration page
+  publish state: 已发布
+  browser console errors: none captured
+
+Run webapp:
+  finalUrl: http://192.168.206.130:8088/chat/WUJNxt0ATrXul8rm
+  title: OpenClaw Baseline Fixed Reply - Dify
+  input visible: 和 OpenClaw Baseline Fixed Reply 聊天
+  browser console errors: none captured
+
+Message flow:
+  user message: ping baseline 0606
+  expected reply: OpenClaw baseline reply ping baseline 0606
+  reply visible: PASS
+  browser console errors: none captured
+
+Refresh:
+  route: http://192.168.206.130:8088/chat/WUJNxt0ATrXul8rm
+  prior user message visible after refresh: PASS
+  prior answer visible after refresh: PASS
+  browser console errors: none captured
+
+Return to /apps:
+  route: http://192.168.206.130:8088/apps
+  app entry visible: PASS
+  browser console errors: none captured
+
+Logout:
+  menu item: 登出
+  after logout /apps finalUrl: http://192.168.206.130:8088/signin
+  signin page visible: PASS
+  browser console errors: none captured
+```
+
+Recent Dify container status after the authenticated baseline:
+
+```text
+dify_v1110_a8be-nginx-1: Up 7 hours, 0.0.0.0:8088->80/tcp
+dify_v1110_a8be-worker-1: Up 7 hours
+dify_v1110_a8be-api-1: Up 7 hours
+dify_v1110_a8be-worker_beat-1: Up 7 hours
+dify_v1110_a8be-plugin_daemon-1: Up 7 hours
+dify_v1110_a8be-db_postgres-1: Up 7 hours (healthy)
+dify_v1110_a8be-redis-1: Up 7 hours (healthy)
+dify_v1110_a8be-web-1: Up 7 hours
+dify_v1110_a8be-sandbox-1: Up 7 hours (healthy)
+dify_v1110_a8be-weaviate-1: Up 7 hours
+dify_v1110_a8be-ssrf_proxy-1: Up 7 hours
+```
+
+Recent log summary after the authenticated baseline:
+
+```text
+dify_v1110_a8be-web-1: 0 recent error/exception/traceback/5xx matches
+dify_v1110_a8be-api-1: 0 recent error/exception/traceback/5xx matches
+dify_v1110_a8be-nginx-1: 0 confirmed recent 5xx; grep produced false positives from static CSS/API 200 access lines
+```
+
+Post-test sidecar isolation:
+
+```text
+OpenClaw sidecar containers: none remaining
+Test listeners on 18181/18789/5432: none remaining
+```
+
+Gate markers for Ubuntu 22.04 test host:
+
+```text
+ubuntu22_authenticated_baseline: PASS
+authenticated_baseline: PASS
+existing app message: PASS
+streaming reply: PASS
+refresh: PASS
+history: PASS
+logout: PASS
+profile 401: PASS
+new 5xx: NONE
+```
+
+This is Ubuntu 22.04 test-host evidence. It does not replace the separate
+production/root public baseline for `https://ai001.huahuoai.com`, which still
+requires its own authenticated real-browser run before any production public
+OpenClaw route exposure.
