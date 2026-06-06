@@ -456,6 +456,66 @@ profile 401: PASS
 new 5xx: NONE
 ```
 
+## Real Chrome Tab Discovery 2026-06-06 20:10 Asia/Shanghai
+
+Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
+storage, session storage, request headers, CSRF values, Authorization tokens or
+passwords were read or recorded.
+
+Discovery scope:
+
+```text
+open Chrome tabs with URL containing ai001.huahuoai.com
+open Chrome tabs with visible title containing Dify
+```
+
+Observed:
+
+```text
+matching open tab count: 0
+```
+
+Interpretation:
+
+- There was no existing logged-in production Dify tab that could be safely
+  claimed for authenticated baseline testing.
+- The browser-side blocker from the earlier direct navigation attempt is not
+  treated as production Dify downtime.
+- Authenticated existing-app open/message/reply/refresh/history/logout testing
+  remains incomplete.
+
+Root server read-only internal refresh at the same time:
+
+```text
+time: 2026-06-06T20:11:37+08:00
+host: AI-01
+http://127.0.0.1:8081/ -> 307
+http://127.0.0.1:8081/signin -> 200
+http://127.0.0.1:8081/apps -> 200
+http://127.0.0.1:8081/console/api/account/profile -> 401
+openresty-prod: Up 10 days
+docker-nginx-1: Up 5 months
+docker-web-1: Up 5 months (unhealthy, historical healthcheck issue)
+docker-api-1: Up 5 months
+docker-nginx-1 recent error/exception/traceback/5xx matches: 0
+docker-web-1 recent error/exception/traceback/5xx matches: 0
+docker-api-1 recent error/exception/traceback/5xx matches: 1
+```
+
+Gate markers:
+
+```text
+authenticated_baseline: NO_GO
+existing app message: NO_GO
+streaming reply: NO_GO
+refresh: NO_GO
+history: NO_GO
+logout: NO_GO
+profile 401: PASS
+new 5xx: NONE
+api recent log match review: REQUIRED
+```
+
 ## Real Chrome Refresh 2026-06-06 12:45 Asia/Shanghai
 
 Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
