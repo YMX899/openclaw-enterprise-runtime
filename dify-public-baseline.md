@@ -307,3 +307,90 @@ Interpretation:
   used as a Dify server failure signal.
 - Authenticated existing-app workflow testing remains incomplete and is still a
   required gate before any public OpenClaw route exposure.
+
+## Real Chrome Refresh 2026-06-06 12:16 Asia/Shanghai
+
+Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
+storage, session storage, request headers, CSRF values, Authorization tokens or
+passwords were read or recorded.
+
+Route:
+
+```text
+https://ai001.huahuoai.com/apps
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible page: Dify login page
+console/dev error count: 0
+```
+
+Visible text:
+
+```text
+简体中文
+登录 Dify
+欢迎！请登录以开始使用。
+邮箱
+密码
+忘记密码？
+登录
+使用即代表您同意我们的 使用协议 & 隐私政策
+如果您还没有初始化账户，请前往初始化页面 设置管理员账户
+© 2026 LangGenius, Inc. All rights reserved.
+```
+
+Direct route:
+
+```text
+https://ai001.huahuoai.com/signin
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible page: Dify login page
+console/dev error count: 0
+```
+
+Direct browser navigation to:
+
+```text
+https://ai001.huahuoai.com/console/api/account/profile
+```
+
+Observed:
+
+```text
+net::ERR_BLOCKED_BY_CLIENT
+```
+
+Interpretation:
+
+- Current Chrome profile still has no authenticated Dify session for
+  `https://ai001.huahuoai.com`.
+- `/apps` redirecting to `/signin` is expected unauthenticated behavior.
+- The direct API navigation error is from the browser automation layer and is
+  not treated as a Dify failure. Server-local internal checks in
+  `server-readonly-audit.md` still show unauthenticated profile returns `401`.
+- Authenticated existing-app open/message/reply/refresh/history/logout testing
+  remains incomplete and continues to block any future public OpenClaw route.
+
+Gate markers:
+
+```text
+authenticated_baseline: NO_GO
+existing app message: NO_GO
+streaming reply: NO_GO
+refresh: NO_GO
+history: NO_GO
+logout: NO_GO
+profile 401: PASS
+new 5xx: NONE
+```

@@ -218,6 +218,103 @@ Template path:
 /app/bin/dify/dify-1.11.2/docker/nginx/conf.d/default.conf.template
 ```
 
+## Read-only Refresh 2026-06-06 12:13 Asia/Shanghai
+
+Mode: `ssh-skill` read-only commands only. No deployment, restart, reload,
+install, file edit, `.env` read, full environment dump or secret output was
+performed.
+
+System and resource baseline:
+
+```text
+date: 2026-06-06T12:13:27+08:00
+host: AI-01
+kernel: Linux AI-01 6.8.0-57-generic #59-Ubuntu SMP PREEMPT_DYNAMIC Sat Mar 15 17:40:59 UTC 2025 x86_64
+docker server: 28.1.1
+docker compose: v2.35.1
+cpu cores: 8
+uptime: 378 days, 20:40
+load average: 1.21, 1.16, 1.14
+memory: 14Gi total, 11Gi used, 976Mi free, 3.7Gi available
+swap: 0B
+/app: 500G size, 63G used, 438G available, 13% used
+```
+
+Container resource baseline:
+
+```text
+openresty-prod               0.00% CPU   47.69MiB / 14.72GiB   2 PIDs
+docker-nginx-1               0.00% CPU   11.33MiB / 14.72GiB   10 PIDs
+docker-api-1                 0.70% CPU   4.308GiB / 14.72GiB   61 PIDs
+docker-worker-1              0.13% CPU   296.8MiB / 14.72GiB   10 PIDs
+docker-worker_beat-1         0.00% CPU   263.5MiB / 14.72GiB   17 PIDs
+docker-web-1                 0.37% CPU   395.7MiB / 14.72GiB   34 PIDs
+docker-plugin_daemon-1       0.50% CPU   1.216GiB / 14.72GiB   77 PIDs
+docker-sandbox-1             0.00% CPU   448.5MiB / 14.72GiB   12 PIDs
+docker-ssrf_proxy-1          0.02% CPU   18.76MiB / 14.72GiB   9 PIDs
+weaviate-weaviate-master-1   3.09% CPU   194.8MiB / 14.72GiB   15 PIDs
+huahuo-ai-test               0.01% CPU   336.1MiB / 14.72GiB   6 PIDs
+huahuo-web-test              0.06% CPU   528.2MiB / 14.72GiB   46 PIDs
+huahuo-web-prod              0.06% CPU   801.9MiB / 14.72GiB   46 PIDs
+mysql                        0.27% CPU   716.9MiB / 14.72GiB   54 PIDs
+```
+
+Dify compose refresh:
+
+```text
+project: docker
+compose file: /app/bin/dify/dify-1.11.2/docker/docker-compose.yaml
+services: plugin_daemon, sandbox, web, init_permissions, worker, api, nginx, ssrf_proxy, worker_beat
+images:
+  langgenius/dify-plugin-daemon:0.5.2-local
+  nginx:latest
+  langgenius/dify-web:1.11.2
+  langgenius/dify-sandbox:0.2.12
+  busybox:latest
+  langgenius/dify-api:1.11.2
+  ubuntu/squid:latest
+```
+
+Running Dify services remain up. `docker-web-1` remains `unhealthy`; the latest
+health log still confirms the historical cause:
+
+```text
+exec: "pg_isready": executable file not found in $PATH
+```
+
+Internal Dify HTTP refresh:
+
+```text
+http://127.0.0.1:8081/ -> 200 after redirect to /apps
+http://127.0.0.1:8081/apps -> 200
+http://127.0.0.1:8081/signin -> 200
+http://127.0.0.1:8081/console/api/account/profile -> 401
+docker-api-1 http://127.0.0.1:5001/console/api/account/profile -> 401
+```
+
+OpenClaw artifact refresh:
+
+```text
+MISSING /app/bin/openclaw
+MISSING /app/bin/openclaw-bridge
+MISSING /opt/openclaw
+MISSING /opt/openclaw-bridge
+OpenClaw/Douyin/Bridge containers: none found
+OpenClaw/Douyin/Bridge images: none found
+```
+
+OpenResty mount summary was inspected as JSON only. No full OpenResty config,
+TLS private key, credential file, Cookie, token, full request header or full
+environment variable dump was read.
+
+Conclusion for this refresh:
+
+```text
+Production Dify remains unchanged by this audit.
+No OpenClaw sidecar exists on the server.
+Production Phase 2 remains NO-GO.
+```
+
 SHA256:
 
 ```text
