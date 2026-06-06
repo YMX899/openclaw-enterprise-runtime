@@ -123,7 +123,8 @@ The full Linux/Docker script must also prove:
   in the vendored V1 subset.
 - the worker image builds from the compose file.
 - `openclaw-douyin-adapter --help` works inside the built worker image.
-- the vendored candidate package imports inside the built worker image.
+- the adapter loader imports the vendored candidate package inside the built
+  worker image.
 - when `RUN_COMPOSE_UP=1`, the stack is torn down afterward with
   `docker compose down --remove-orphans`.
 

@@ -154,7 +154,7 @@ if [[ -z "$worker_image" ]]; then
   fail "could not resolve built video-analysis-worker image id"
 fi
 docker run --rm "$worker_image" openclaw-douyin-adapter --help >/dev/null
-docker run --rm "$worker_image" python -c 'from douyin_chong.config import AppConfig; from douyin_chong.clients.ark_video import ArkVideoClient; from douyin_chong.clients.resolver import UniversalVideoResolver; print("vendored-import-ok")'
+docker run --rm "$worker_image" python -c 'from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])'
 
 if [[ "$run_compose_up" == "1" ]]; then
   step "compose up isolated sidecar"

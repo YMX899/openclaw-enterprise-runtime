@@ -167,7 +167,7 @@ if (-not $workerImage) {
     Fail "could not resolve built video-analysis-worker image id"
 }
 docker run --rm $workerImage openclaw-douyin-adapter --help | Out-Null
-docker run --rm $workerImage python -c "from douyin_chong.config import AppConfig; from douyin_chong.clients.ark_video import ArkVideoClient; from douyin_chong.clients.resolver import UniversalVideoResolver; print('vendored-import-ok')"
+docker run --rm $workerImage python -c "from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])"
 
 if ($RunComposeUp) {
     Step "compose up isolated sidecar"

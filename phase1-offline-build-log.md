@@ -539,7 +539,8 @@ include:
   browser/profile utilities.
 - worker image smoke test after Docker build:
   openclaw-douyin-adapter --help
-  python import of AppConfig, ArkVideoClient and UniversalVideoResolver.
+  python adapter-loader import of AppConfig, ArkVideoClient and
+  UniversalVideoResolver through DOUYIN_CHONG_PYTHONPATH.
 - compose-up cleanup with docker compose down --remove-orphans when the isolated
   host opts into RUN_COMPOSE_UP=1 / -RunComposeUp.
 
