@@ -28,14 +28,20 @@ class DifyClientTests(unittest.TestCase):
             {
                 "Authorization": "Bearer dify",
                 "Cookie": "session=1",
+                "Host": "ai001.huahuoai.com",
                 "X-CSRF-Token": "csrf",
+                "X-Forwarded-Proto": "https",
                 "User-Agent": "browser",
                 "OpenClaw-Gateway-Token": "gateway-secret",
             }
         )
         self.assertEqual(selected["Authorization"], "Bearer dify")
         self.assertEqual(selected["Cookie"], "session=1")
+        self.assertEqual(selected["Host"], "ai001.huahuoai.com")
+        self.assertEqual(selected["Origin"], "https://ai001.huahuoai.com")
+        self.assertEqual(selected["Referer"], "https://ai001.huahuoai.com/")
         self.assertEqual(selected["X-CSRF-Token"], "csrf")
+        self.assertEqual(selected["X-Forwarded-Proto"], "https")
         self.assertNotIn("User-Agent", selected)
         self.assertNotIn("OpenClaw-Gateway-Token", selected)
         self.assertTrue(dify_identity_material_present({"Cookie": "access_token=secret"}))

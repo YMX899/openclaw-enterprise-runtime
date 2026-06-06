@@ -17,7 +17,13 @@ except ImportError as exc:  # pragma: no cover
 FORWARDED_IDENTITY_HEADERS = {
     "authorization",
     "cookie",
+    "host",
     "x-csrf-token",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-port",
+    "x-forwarded-proto",
+    "x-real-ip",
     "x-xsrf-token",
 }
 
@@ -37,6 +43,10 @@ def identity_headers(headers: Mapping[str, str]) -> dict[str, str]:
     for key, value in headers.items():
         if key.lower() in FORWARDED_IDENTITY_HEADERS:
             forwarded[key] = value
+    host = _header_value(headers, "host")
+    if host:
+        forwarded.setdefault("Origin", f"https://{host}")
+        forwarded.setdefault("Referer", f"https://{host}/")
     return forwarded
 
 
