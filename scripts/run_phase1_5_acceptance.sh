@@ -73,12 +73,11 @@ else
 fi
 
 step "host readiness"
-read -r -a docker_cmd_parts <<<"$docker_cmd"
-if [[ "${#docker_cmd_parts[@]}" -eq 0 ]]; then
+if [[ -z "$docker_cmd" ]]; then
   fail "DOCKER_CMD must not be empty."
 fi
 "$python_cmd" scripts/check_phase1_5_host_readiness.py \
-  --docker-cmd "${docker_cmd_parts[@]}" \
+  --docker-cmd "$docker_cmd" \
   --fail-on-no-go
 
 if [[ "$require_secrets" != "1" ]]; then

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 import json
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -136,6 +137,19 @@ def readiness_report(min_free_gb: int, min_memory_gb: int, docker_cmd: list[str]
     }
 
 
+def parse_docker_cmd(value: list[str], use_sudo_docker: bool = False) -> list[str]:
+    if use_sudo_docker:
+        return ["sudo", "-n", "docker"]
+    if not value:
+        return ["docker"]
+    if len(value) == 1:
+        parts = shlex.split(value[0])
+        if not parts:
+            raise ValueError("--docker-cmd must not be empty")
+        return parts
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read-only Phase 1.5 isolated host readiness check.")
     parser.add_argument("--min-free-gb", type=int, default=20)
@@ -144,7 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--docker-cmd",
         nargs="+",
         default=["docker"],
-        help="Docker command prefix, for example: docker or sudo -n docker",
+        help="Docker command prefix, for example: docker or 'sudo -n docker'",
     )
     parser.add_argument(
         "--use-sudo-docker",
@@ -157,7 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    docker_cmd = ["sudo", "-n", "docker"] if args.use_sudo_docker else args.docker_cmd
+    try:
+        docker_cmd = parse_docker_cmd(args.docker_cmd, args.use_sudo_docker)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     report = readiness_report(args.min_free_gb, args.min_memory_gb, docker_cmd)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if args.fail_on_no_go and report["overall"] != "PASS":

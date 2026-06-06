@@ -50,7 +50,13 @@ class HostReadinessTests(unittest.TestCase):
 
     def test_use_sudo_docker_option_overrides_docker_cmd(self):
         args = host_readiness.build_parser().parse_args(["--use-sudo-docker"])
-        docker_cmd = ["sudo", "-n", "docker"] if args.use_sudo_docker else args.docker_cmd
+        docker_cmd = host_readiness.parse_docker_cmd(args.docker_cmd, args.use_sudo_docker)
+
+        self.assertEqual(docker_cmd, ["sudo", "-n", "docker"])
+
+    def test_docker_cmd_accepts_quoted_sudo_prefix(self):
+        args = host_readiness.build_parser().parse_args(["--docker-cmd", "sudo -n docker"])
+        docker_cmd = host_readiness.parse_docker_cmd(args.docker_cmd, args.use_sudo_docker)
 
         self.assertEqual(docker_cmd, ["sudo", "-n", "docker"])
 

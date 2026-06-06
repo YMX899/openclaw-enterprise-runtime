@@ -40,6 +40,7 @@ class Phase15AcceptanceRunnerTests(unittest.TestCase):
 
         self.assertLess(readiness_index, full_gate_index)
         self.assertIn("--fail-on-no-go", self.text)
+        self.assertIn('--docker-cmd "$docker_cmd"', self.text)
 
     def test_full_gate_requires_hard_gates_and_compose_up(self):
         self.assertIn("REQUIRE_OPENCLAW_SECURITY_APPROVAL=1", self.text)
