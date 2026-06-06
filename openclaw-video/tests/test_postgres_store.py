@@ -3,7 +3,7 @@ import unittest
 
 from openclaw_video.job_state import JobStatus
 from openclaw_video.job_store import JobLeaseError
-from openclaw_video.postgres_store import Jsonb, PostgresJobStore
+from openclaw_video.postgres_store import Jsonb, PostgresJobStore, PostgresSessionStore
 
 
 def job_row(**overrides):
@@ -162,6 +162,71 @@ class PostgresJobStoreTests(unittest.TestCase):
         self.assertIn("idempotency_key = %s", sql)
         self.assertEqual(params, ("owner", "session", "same-request"))
         self.assertEqual(job.idempotency_key, "same-request")
+
+    def test_cleanup_terminal_jobs_before_returns_deleted_ids_and_upload_uris(self):
+        cutoff = datetime(2026, 6, 1, tzinfo=UTC)
+        fake = FakeConnection(
+            [
+                {
+                    "deleted_jobs": 2,
+                    "deleted_results": 1,
+                    "deleted_job_ids": [
+                        "11111111-1111-1111-1111-111111111111",
+                        "22222222-2222-2222-2222-222222222222",
+                    ],
+                    "upload_uris": ["upload://11111111-1111-1111-1111-111111111111/sample.mp4"],
+                }
+            ]
+        )
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        result = store.cleanup_terminal_jobs_before("owner", cutoff)
+
+        sql, params = fake.queries[0]
+        self.assertIn("WITH doomed AS", sql)
+        self.assertIn("owner_principal_id = %s", sql)
+        self.assertIn("DELETE FROM video_results", sql)
+        self.assertIn("DELETE FROM video_jobs", sql)
+        self.assertIn("array_agg(job_id::text)", sql)
+        self.assertEqual(params, ("owner", cutoff, "owner", "owner"))
+        self.assertEqual(result.deleted_jobs, 2)
+        self.assertEqual(result.deleted_results, 1)
+        self.assertEqual(
+            result.deleted_job_ids,
+            (
+                "11111111-1111-1111-1111-111111111111",
+                "22222222-2222-2222-2222-222222222222",
+            ),
+        )
+        self.assertEqual(result.upload_uris, ("upload://11111111-1111-1111-1111-111111111111/sample.mp4",))
+
+
+class PostgresSessionStoreTests(unittest.TestCase):
+    def test_delete_messages_for_jobs_is_scoped_by_owner_and_job_ids(self):
+        fake = FakeConnection([[{"id": "message-1"}, {"id": "message-2"}]])
+        store = PostgresSessionStore(connection_factory=lambda: fake)
+        deleted = store.delete_messages_for_jobs(
+            "owner",
+            (
+                "11111111-1111-1111-1111-111111111111",
+                "22222222-2222-2222-2222-222222222222",
+            ),
+        )
+
+        sql, params = fake.queries[0]
+        self.assertIn("DELETE FROM bridge_messages", sql)
+        self.assertIn("owner_principal_id = %s", sql)
+        self.assertIn("job_id = ANY(%s::uuid[])", sql)
+        self.assertEqual(
+            params,
+            (
+                "owner",
+                [
+                    "11111111-1111-1111-1111-111111111111",
+                    "22222222-2222-2222-2222-222222222222",
+                ],
+            ),
+        )
+        self.assertEqual(deleted, 2)
 
 
 if __name__ == "__main__":

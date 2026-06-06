@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/retention-cleanup-response.schema.json",
+  "type": "object",
+  "required": [
+    "status",
+    "retention_days",
+    "cutoff",
+    "deleted_jobs",
+    "deleted_results",
+    "deleted_messages",
+    "deleted_uploads"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "status": {"const": "ok"},
+    "retention_days": {"type": "integer", "minimum": 1},
+    "cutoff": {"type": "string", "format": "date-time"},
+    "deleted_jobs": {"type": "integer", "minimum": 0},
+    "deleted_results": {"type": "integer", "minimum": 0},
+    "deleted_messages": {"type": "integer", "minimum": 0},
+    "deleted_uploads": {"type": "integer", "minimum": 0}
+  }
+}

@@ -143,5 +143,22 @@ def resolve_upload_uri(uri: str, *, upload_dir: Path | None = None) -> Path:
     return path
 
 
+def delete_upload_uri(uri: str, *, upload_dir: Path | None = None) -> bool:
+    if not is_upload_uri(uri):
+        return False
+    try:
+        path = resolve_upload_uri(uri, upload_dir=upload_dir)
+    except UploadNotFound:
+        return False
+    upload_root = path.parent
+    root = (upload_dir or _default_upload_dir()).resolve()
+    try:
+        upload_root.resolve().relative_to(root)
+    except ValueError as exc:
+        raise UploadStoreError("upload path escapes storage root") from exc
+    shutil.rmtree(upload_root, ignore_errors=True)
+    return True
+
+
 def is_upload_uri(value: str) -> bool:
     return bool(UPLOAD_URI_RE.match(value))

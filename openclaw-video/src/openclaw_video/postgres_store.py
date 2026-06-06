@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .job_state import JobStatus
-from .job_store import JobLeaseError, JobNotFound, JobOwnershipError, VideoJob, VideoResult
+from .job_store import JobLeaseError, JobNotFound, JobOwnershipError, RetentionCleanupResult, VideoJob, VideoResult
 from .session_store import (
     BridgeMessage,
     BridgeSession,
@@ -226,6 +226,22 @@ class PostgresSessionStore(_BasePostgresStore):
                     (session_id, owner_principal_id),
                 )
                 return [_row_to_message(row) for row in cur.fetchall()]
+
+    def delete_messages_for_jobs(self, owner_principal_id: str, job_ids: list[str] | tuple[str, ...]) -> int:
+        if not job_ids:
+            return 0
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM bridge_messages
+                    WHERE owner_principal_id = %s
+                      AND job_id = ANY(%s::uuid[])
+                    RETURNING id
+                    """,
+                    (owner_principal_id, list(job_ids)),
+                )
+                return len(cur.fetchall())
 
 
 class PostgresJobStore(_BasePostgresStore):
@@ -541,3 +557,51 @@ class PostgresJobStore(_BasePostgresStore):
         if owner_principal_id is not None and result.owner_principal_id != owner_principal_id:
             raise JobOwnershipError(job_id)
         return result
+
+    def cleanup_terminal_jobs_before(self, owner_principal_id: str, cutoff: Any) -> RetentionCleanupResult:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    WITH doomed AS (
+                      SELECT job_id, video_url_canonical
+                      FROM video_jobs
+                      WHERE owner_principal_id = %s
+                        AND status IN ('succeeded', 'failed', 'timed_out', 'cancelled')
+                        AND finished_at IS NOT NULL
+                        AND finished_at < %s
+                    ),
+                    deleted_results AS (
+                      DELETE FROM video_results
+                      WHERE owner_principal_id = %s
+                        AND job_id IN (SELECT job_id FROM doomed)
+                      RETURNING job_id
+                    ),
+                    deleted_jobs AS (
+                      DELETE FROM video_jobs
+                      WHERE owner_principal_id = %s
+                        AND job_id IN (SELECT job_id FROM doomed)
+                      RETURNING job_id
+                    )
+                    SELECT
+                      (SELECT count(*) FROM deleted_jobs) AS deleted_jobs,
+                      (SELECT count(*) FROM deleted_results) AS deleted_results,
+                      COALESCE(array_agg(job_id::text), ARRAY[]::text[]) AS deleted_job_ids,
+                      COALESCE(
+                        array_agg(video_url_canonical)
+                          FILTER (WHERE video_url_canonical LIKE 'upload://%%'),
+                        ARRAY[]::text[]
+                      ) AS upload_uris
+                    FROM doomed
+                    """,
+                    (owner_principal_id, cutoff, owner_principal_id, owner_principal_id),
+                )
+                row = cur.fetchone()
+        if not row:
+            return RetentionCleanupResult(0, 0, (), ())
+        return RetentionCleanupResult(
+            deleted_jobs=int(row["deleted_jobs"]),
+            deleted_results=int(row["deleted_results"]),
+            deleted_job_ids=tuple(row["deleted_job_ids"] or ()),
+            upload_uris=tuple(row["upload_uris"] or ()),
+        )

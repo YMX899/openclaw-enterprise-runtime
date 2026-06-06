@@ -2,7 +2,7 @@ import unittest
 from datetime import timedelta
 
 from openclaw_video.job_state import JobStatus
-from openclaw_video.job_store import InMemoryJobStore, JobLeaseError, JobNotFound, JobOwnershipError
+from openclaw_video.job_store import InMemoryJobStore, JobLeaseError, JobNotFound, JobOwnershipError, now_utc
 
 
 class JobStoreTests(unittest.TestCase):
@@ -122,6 +122,42 @@ class JobStoreTests(unittest.TestCase):
         store = InMemoryJobStore()
         with self.assertRaises(JobNotFound):
             store.cancel_job("missing", "owner")
+
+    def test_cleanup_terminal_jobs_before_only_removes_owner_expired_terminal_jobs(self):
+        store = InMemoryJobStore()
+        old_cutoff = now_utc() - timedelta(days=7)
+        old_finished_at = old_cutoff - timedelta(seconds=1)
+        recent_finished_at = old_cutoff + timedelta(seconds=1)
+
+        old_upload = store.create_job("owner", "session", "upload://11111111-1111-1111-1111-111111111111/sample.mp4")
+        old_douyin = store.create_job("owner", "session", "https://v.douyin.com/old")
+        recent = store.create_job("owner", "session", "https://v.douyin.com/recent")
+        active = store.create_job("owner", "session", "https://v.douyin.com/active")
+        other_owner = store.create_job("other-owner", "session", "https://v.douyin.com/other")
+
+        store.complete_job(old_upload.job_id, {"ok": True}, "schema")
+        store.fail_job(old_douyin.job_id, "failed")
+        store.cancel_job(recent.job_id, "owner")
+        store.complete_job(other_owner.job_id, {"ok": True}, "schema")
+
+        old_upload.finished_at = old_finished_at
+        old_douyin.finished_at = old_finished_at
+        recent.finished_at = recent_finished_at
+        other_owner.finished_at = old_finished_at
+
+        result = store.cleanup_terminal_jobs_before("owner", old_cutoff)
+
+        self.assertEqual(result.deleted_jobs, 2)
+        self.assertEqual(result.deleted_results, 1)
+        self.assertEqual(set(result.deleted_job_ids), {old_upload.job_id, old_douyin.job_id})
+        self.assertEqual(result.upload_uris, (old_upload.video_url_canonical,))
+        with self.assertRaises(JobNotFound):
+            store.get_job(old_upload.job_id, "owner")
+        with self.assertRaises(JobNotFound):
+            store.get_job(old_douyin.job_id, "owner")
+        self.assertEqual(store.get_job(recent.job_id, "owner").status, JobStatus.CANCELLED)
+        self.assertEqual(store.get_job(active.job_id, "owner").status, JobStatus.QUEUED)
+        self.assertEqual(store.get_job(other_owner.job_id, "other-owner").status, JobStatus.SUCCEEDED)
 
 
 if __name__ == "__main__":

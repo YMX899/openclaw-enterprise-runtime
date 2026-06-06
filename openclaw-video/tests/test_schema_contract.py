@@ -1,5 +1,6 @@
 import json
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
@@ -246,6 +247,41 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
         result_response = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth())
         self.assertEqual(result_response.status_code, 200, result_response.text)
         validate_schema(result_response.json(), "job-result-response.schema.json")
+
+    def test_retention_cleanup_response_matches_committed_schema(self):
+        from openclaw_video.bridge_app import create_app
+
+        sessions = InMemorySessionStore()
+        jobs = InMemoryJobStore()
+        with mock.patch.dict(os.environ, {"OPENCLAW_DATA_RETENTION_DAYS": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=sessions,
+                    job_store=jobs,
+                    gateway=FakeGateway(),
+                    identity_secret="test-secret",
+                )
+            )
+        session = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Video analysis"},
+            headers=self.auth(),
+        ).json()["session"]
+        job_response = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/old"},
+            headers=self.auth(),
+        )
+        self.assertEqual(job_response.status_code, 202, job_response.text)
+        job_id = job_response.json()["job"]["job_id"]
+        jobs.fail_job(job_id, "old_failed")
+        jobs.get_job(job_id).finished_at = datetime.now(UTC) - timedelta(days=2)
+
+        cleanup_response = client.post("/openclaw-api/retention/cleanup", headers=self.auth())
+
+        self.assertEqual(cleanup_response.status_code, 200, cleanup_response.text)
+        validate_schema(cleanup_response.json(), "retention-cleanup-response.schema.json")
 
     def test_text_chat_response_matches_schema_and_video_chat_uses_job_response_schema(self):
         session = self.create_session()

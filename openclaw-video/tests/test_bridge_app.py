@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -504,6 +505,75 @@ class BridgeAppTests(unittest.TestCase):
             self.assertEqual(second.status_code, 429, second.text)
             stored_files = [item.name for item in Path(tmp).rglob("*.mp4")]
             self.assertEqual(stored_files, ["first.mp4"])
+
+    def test_retention_cleanup_removes_expired_job_result_message_and_upload(self):
+        from openclaw_video.bridge_app import create_app
+
+        sessions = InMemorySessionStore()
+        jobs = InMemoryJobStore()
+        with TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {
+                "OPENCLAW_DATA_RETENTION_DAYS": "1",
+                "BRIDGE_UPLOAD_DIR": tmp,
+                "MAX_UPLOAD_BYTES": "64",
+            },
+        ):
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=sessions,
+                    job_store=jobs,
+                    identity_secret="test-secret",
+                )
+            )
+            session = client.post(
+                "/openclaw-api/sessions",
+                json={"title": "Video analysis"},
+                headers=self.auth("account-a"),
+            ).json()["session"]
+            upload_response = client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"], "content": "upload"},
+                files={"video": ("old.mp4", b"video bytes", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(upload_response.status_code, 202, upload_response.text)
+            job = upload_response.json()["job"]
+            upload_path = Path(tmp) / job["video_url_canonical"].split("/", 3)[2] / "old.mp4"
+            self.assertTrue(upload_path.is_file())
+            jobs.complete_job(
+                job["job_id"],
+                {
+                    "schema_version": "openclaw-video-result.v1",
+                    "source": {"video_url_canonical": job["video_url_canonical"], "platform": "upload"},
+                    "summary": "old",
+                    "signals": {},
+                    "raw_tool_result": {},
+                    "created_at": "2026-06-06T00:00:00Z",
+                },
+                "openclaw-video-result.v1",
+            )
+            jobs.get_job(job["job_id"]).finished_at = datetime.now(UTC) - timedelta(days=2)
+
+            cleanup = client.post("/openclaw-api/retention/cleanup", headers=self.auth("account-a"))
+
+            self.assertEqual(cleanup.status_code, 200, cleanup.text)
+            body = cleanup.json()
+            self.assertEqual(body["status"], "ok")
+            self.assertEqual(body["retention_days"], 1)
+            self.assertEqual(body["deleted_jobs"], 1)
+            self.assertEqual(body["deleted_results"], 1)
+            self.assertEqual(body["deleted_messages"], 1)
+            self.assertEqual(body["deleted_uploads"], 1)
+            self.assertFalse(upload_path.exists())
+            messages = client.get(
+                f"/openclaw-api/sessions/{session['id']}/messages",
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(messages.json()["messages"], [])
+            read_job = client.get(f"/openclaw-api/jobs/{job['job_id']}", headers=self.auth("account-a"))
+            self.assertEqual(read_job.status_code, 404)
 
     def test_job_submission_respects_per_user_rate_limit(self):
         from openclaw_video.bridge_app import create_app

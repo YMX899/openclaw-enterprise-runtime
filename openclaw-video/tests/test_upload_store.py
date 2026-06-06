@@ -5,6 +5,7 @@ import unittest
 from openclaw_video.upload_store import (
     UploadNotFound,
     UploadStoreError,
+    delete_upload_uri,
     is_upload_uri,
     resolve_upload_uri,
     store_upload_bytes,
@@ -27,6 +28,10 @@ class UploadStoreTests(unittest.TestCase):
             self.assertEqual(len(stored.sha256), 64)
             self.assertEqual(resolve_upload_uri(stored.uri, upload_dir=Path(tmp)), stored.path)
             self.assertEqual(stored.path.read_bytes(), b"video bytes")
+            self.assertEqual(delete_upload_uri(stored.uri, upload_dir=Path(tmp)), True)
+            self.assertFalse(stored.path.exists())
+            self.assertEqual(delete_upload_uri(stored.uri, upload_dir=Path(tmp)), False)
+            self.assertEqual(delete_upload_uri("https://example.com/video.mp4", upload_dir=Path(tmp)), False)
 
     def test_rejects_unsupported_empty_and_oversized_uploads_without_leftover_files(self):
         with TemporaryDirectory() as tmp:

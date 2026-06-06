@@ -133,3 +133,18 @@ class InMemorySessionStore:
                 raise SessionOwnershipError(session_id)
             messages: Iterable[BridgeMessage] = self._messages.get(session_id, [])
             return sorted(messages, key=lambda item: item.created_at)
+
+    def delete_messages_for_jobs(self, owner_principal_id: str, job_ids: Iterable[str]) -> int:
+        targets = set(job_ids)
+        if not targets:
+            return 0
+        deleted = 0
+        with self._lock:
+            for session_id, messages in list(self._messages.items()):
+                session = self._sessions.get(session_id)
+                if not session or session.owner_principal_id != owner_principal_id:
+                    continue
+                kept = [message for message in messages if message.job_id not in targets]
+                deleted += len(messages) - len(kept)
+                self._messages[session_id] = kept
+        return deleted

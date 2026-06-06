@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 try:
@@ -48,7 +49,7 @@ from .session_store import (
     SessionNotFound,
     SessionOwnershipError,
 )
-from .upload_store import UploadStoreError, store_upload_fileobj
+from .upload_store import UploadStoreError, delete_upload_uri, store_upload_fileobj
 
 
 def _serialize_dt(value: Any) -> str | None:
@@ -775,6 +776,36 @@ def create_app(
             media_type="text/event-stream",
             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
         )
+
+    @app.post("/openclaw-api/retention/cleanup")
+    async def cleanup_retention(request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        retention_days = phase4_config.data_retention_days
+        if retention_days <= 0:
+            raise HTTPException(status_code=400, detail="data retention cleanup is disabled")
+        if not hasattr(job_store, "cleanup_terminal_jobs_before"):
+            raise HTTPException(status_code=501, detail="job store does not support retention cleanup")
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+        result = job_store.cleanup_terminal_jobs_before(principal.principal_id, cutoff)
+        deleted_messages = 0
+        if hasattr(session_store, "delete_messages_for_jobs"):
+            deleted_messages = session_store.delete_messages_for_jobs(principal.principal_id, result.deleted_job_ids)
+        deleted_uploads = 0
+        for uri in result.upload_uris:
+            try:
+                if delete_upload_uri(uri):
+                    deleted_uploads += 1
+            except UploadStoreError:
+                continue
+        return {
+            "status": "ok",
+            "retention_days": retention_days,
+            "cutoff": cutoff.isoformat(),
+            "deleted_jobs": result.deleted_jobs,
+            "deleted_results": result.deleted_results,
+            "deleted_messages": deleted_messages,
+            "deleted_uploads": deleted_uploads,
+        }
 
     @app.post("/openclaw-api/chat")
     async def chat(request: Request) -> JSONResponse:

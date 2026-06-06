@@ -53,6 +53,14 @@ class VideoResult:
     created_at: datetime = field(default_factory=now_utc)
 
 
+@dataclass(frozen=True)
+class RetentionCleanupResult:
+    deleted_jobs: int
+    deleted_results: int
+    deleted_job_ids: tuple[str, ...]
+    upload_uris: tuple[str, ...]
+
+
 class InMemoryJobStore:
     """Small deterministic job store for offline tests.
 
@@ -238,3 +246,31 @@ class InMemoryJobStore:
             if owner_principal_id is not None and result.owner_principal_id != owner_principal_id:
                 raise JobOwnershipError(job_id)
             return result
+
+    def cleanup_terminal_jobs_before(self, owner_principal_id: str, cutoff: datetime) -> RetentionCleanupResult:
+        with self._lock:
+            deleted_job_ids = [
+                job_id
+                for job_id, job in self._jobs.items()
+                if job.owner_principal_id == owner_principal_id
+                and job.status in TERMINAL_STATUSES
+                and job.finished_at is not None
+                and job.finished_at < cutoff
+            ]
+            upload_uris = tuple(
+                self._jobs[job_id].video_url_canonical
+                for job_id in deleted_job_ids
+                if self._jobs[job_id].video_url_canonical.startswith("upload://")
+            )
+            deleted_results = 0
+            for job_id in deleted_job_ids:
+                if job_id in self._results:
+                    del self._results[job_id]
+                    deleted_results += 1
+                del self._jobs[job_id]
+        return RetentionCleanupResult(
+            deleted_jobs=len(deleted_job_ids),
+            deleted_results=deleted_results,
+            deleted_job_ids=tuple(deleted_job_ids),
+            upload_uris=upload_uris,
+        )
