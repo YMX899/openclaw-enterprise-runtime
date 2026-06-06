@@ -75,6 +75,16 @@ class ComposeContractTests(unittest.TestCase):
                 self.assertIn("config --no-interpolate", script)
                 self.assertIn("rm -f", script)
 
+    def test_compose_render_checks_accept_compose_v5_normalized_port_shape(self):
+        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
+        helper_script = (ROOT.parents[0] / "scripts" / "verify_compose_render.sh").read_text(encoding="utf-8")
+
+        for script in [gate_script, helper_script]:
+            with self.subTest(script=script[:40]):
+                self.assertIn("host_ip: 127.0.0.1", script)
+                self.assertIn('published: "18181"', script)
+                self.assertIn("target: 3000", script)
+
     def test_worker_resource_and_filesystem_limits_are_declared(self):
         compose = COMPOSE.read_text(encoding="utf-8")
         for required in [
