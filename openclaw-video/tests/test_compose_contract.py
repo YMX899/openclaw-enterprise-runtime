@@ -162,7 +162,7 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn('npm config set registry "$NPM_CONFIG_REGISTRY"', gateway)
         self.assertIn('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', gateway)
         self.assertIn(
-            'npm install -g "openclaw@${OPENCLAW_VERSION}" --omit=optional --ignore-scripts',
+            'npm install -g "openclaw@${OPENCLAW_VERSION}" --omit=optional --ignore-scripts --no-audit --no-fund',
             gateway,
         )
         self.assertIn("rm -rf /var/lib/apt/lists/*", gateway)

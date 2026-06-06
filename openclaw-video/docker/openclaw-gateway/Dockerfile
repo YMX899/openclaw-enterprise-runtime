@@ -18,7 +18,7 @@ RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
         npm config set registry "$NPM_CONFIG_REGISTRY"; \
     fi \
     && git config --global url."https://github.com/".insteadOf ssh://git@github.com/ \
-    && npm install -g "openclaw@${OPENCLAW_VERSION}" --omit=optional --ignore-scripts \
+    && npm install -g "openclaw@${OPENCLAW_VERSION}" --omit=optional --ignore-scripts --no-audit --no-fund \
     && openclaw --version
 
 ENV OPENCLAW_STATE_DIR=/var/lib/openclaw \
