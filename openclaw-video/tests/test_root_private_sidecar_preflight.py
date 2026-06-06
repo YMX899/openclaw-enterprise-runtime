@@ -44,10 +44,13 @@ services:
       OPENCLAW_GATEWAY_DEVICE_KEY_FILE: /run/secrets/openclaw_bridge_device_key.pem
       DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
       WORKER_CONCURRENCY: "1"
+      BRIDGE_UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_BYTES: "536870912"
     ports:
       - "127.0.0.1:18181:3000"
     volumes:
       - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
+      - uploaded-videos:/data/uploads
     networks:
       - openclaw-internal
       - dify-default
@@ -61,8 +64,15 @@ services:
     networks:
       - openclaw-internal
   video-analysis-worker:
+    environment:
+      BRIDGE_UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploaded-videos:/data/uploads:ro
     networks:
       - openclaw-internal
+
+volumes:
+  uploaded-videos:
 
 networks:
   openclaw-internal:
@@ -127,8 +137,8 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
             write(
                 repo / "openclaw-video/docker-compose.openclaw-video.yaml",
                 MIN_COMPOSE.replace(
-                    "  video-analysis-worker:\n    networks:\n      - openclaw-internal",
-                    "  video-analysis-worker:\n    networks:\n      - openclaw-internal\n      - dify-default",
+                    "    networks:\n      - openclaw-internal\n\nvolumes:",
+                    "    networks:\n      - openclaw-internal\n      - dify-default\n\nvolumes:",
                 ),
             )
 
@@ -150,6 +160,20 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("postgres:15-alpine", result.evidence)
+
+    def test_private_compose_contract_requires_upload_volume_shape(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
+            write(
+                repo / "openclaw-video/docker-compose.openclaw-video.yaml",
+                MIN_COMPOSE.replace("- uploaded-videos:/data/uploads:ro", "- uploaded-videos:/data/uploads"),
+            )
+
+            result = preflight_module.check_private_compose_contract(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("uploaded-videos", result.evidence)
 
     def test_private_compose_contract_rejects_gateway_control_ui_break_glass(self):
         with TemporaryDirectory() as tmp:

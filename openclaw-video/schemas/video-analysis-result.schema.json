@@ -12,7 +12,7 @@
       "additionalProperties": false,
       "properties": {
         "video_url_canonical": {"type": "string"},
-        "platform": {"const": "douyin"},
+        "platform": {"enum": ["douyin", "upload"]},
         "duration_seconds": {"type": ["number", "null"], "minimum": 0}
       }
     },
@@ -33,4 +33,3 @@
     "created_at": {"type": "string", "format": "date-time"}
   }
 }
-

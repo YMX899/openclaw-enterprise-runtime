@@ -31,4 +31,10 @@ OPENCLAW_GATEWAY_DEVICE_KEY_FILE="$(
 )"
 export OPENCLAW_GATEWAY_TOKEN_FILE OPENCLAW_GATEWAY_DEVICE_KEY_FILE
 
+if [ -n "${BRIDGE_UPLOAD_DIR:-}" ]; then
+  mkdir -p "$BRIDGE_UPLOAD_DIR"
+  chown "$APP_UID:$APP_GID" "$BRIDGE_UPLOAD_DIR"
+  chmod 0750 "$BRIDGE_UPLOAD_DIR"
+fi
+
 exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"

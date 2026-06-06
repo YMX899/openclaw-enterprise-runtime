@@ -1,6 +1,9 @@
 import json
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import mock
+import os
 
 try:
     from fastapi.testclient import TestClient
@@ -179,6 +182,24 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
         self.assertEqual(read_job_response.status_code, 200, read_job_response.text)
         validate_schema(read_job_response.json(), "job-response.schema.json")
 
+        result_payload = {
+            "schema_version": "openclaw-video-result.v1",
+            "source": {
+                "video_url_canonical": "https://v.douyin.com/abc",
+                "platform": "douyin",
+                "duration_seconds": 1,
+            },
+            "summary": "ok",
+            "signals": {"hook": "ok"},
+            "raw_tool_result": {"ok": True},
+            "created_at": "2026-06-06T00:00:00Z",
+        }
+        validate_schema(result_payload, "video-analysis-result.schema.json")
+        self.jobs.complete_job(job_id, result_payload, "openclaw-video-result.v1")
+        result_response = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth())
+        self.assertEqual(result_response.status_code, 200, result_response.text)
+        validate_schema(result_response.json(), "job-result-response.schema.json")
+
         messages_response = self.client.get(
             f"/openclaw-api/sessions/{session['id']}/messages",
             headers=self.auth(),
@@ -189,6 +210,42 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
         unauthenticated = self.client.get("/openclaw-api/me")
         self.assertEqual(unauthenticated.status_code, 401)
         validate_schema(unauthenticated.json(), "error-response.schema.json")
+
+    def test_upload_job_response_and_upload_result_match_committed_schemas(self):
+        session = self.create_session()
+        with TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BRIDGE_UPLOAD_DIR": tmp}):
+            upload_response = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"], "content": "upload"},
+                files={"video": ("sample.mp4", b"video bytes", "video/mp4")},
+                headers=self.auth(),
+            )
+        self.assertEqual(upload_response.status_code, 202, upload_response.text)
+        validate_schema(upload_response.json(), "upload-job-response.schema.json")
+
+        job_id = upload_response.json()["job"]["job_id"]
+        upload_result = {
+            "schema_version": "openclaw-video-result.v1",
+            "source": {
+                "video_url_canonical": upload_response.json()["job"]["video_url_canonical"],
+                "platform": "upload",
+                "duration_seconds": None,
+            },
+            "summary": "uploaded file validated",
+            "signals": {"visual_notes": "uploaded_file=sample.mp4; size_bytes=11"},
+            "raw_tool_result": {
+                "tool": "openclaw-upload-file-analyzer",
+                "mode": "file-level-validation",
+                "filename": "sample.mp4",
+                "size_bytes": 11,
+            },
+            "created_at": "2026-06-06T00:00:00Z",
+        }
+        validate_schema(upload_result, "video-analysis-result.schema.json")
+        self.jobs.complete_job(job_id, upload_result, "openclaw-video-result.v1")
+        result_response = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth())
+        self.assertEqual(result_response.status_code, 200, result_response.text)
+        validate_schema(result_response.json(), "job-result-response.schema.json")
 
     def test_text_chat_response_matches_schema_and_video_chat_uses_job_response_schema(self):
         session = self.create_session()

@@ -1,10 +1,14 @@
 import unittest
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import mock
 
 from openclaw_video.douyin_wrapper import DouyinAnalysisResult
 from openclaw_video.job_state import JobStatus
 from openclaw_video.job_store import InMemoryJobStore
 from openclaw_video.result_schema import RESULT_SCHEMA_VERSION
+from openclaw_video.upload_store import store_upload_bytes
 from openclaw_video.worker_service import VideoAnalysisWorker
 
 
@@ -142,6 +146,23 @@ class WorkerServiceTests(unittest.TestCase):
         self.assertEqual(completed.job_id, job.job_id)
         self.assertEqual(completed.status, JobStatus.SUCCEEDED)
         self.assertEqual(seen["video_url"], "https://www.douyin.com/video/1")
+
+    def test_run_once_analyzes_uploaded_video_without_url_guard(self):
+        store = InMemoryJobStore()
+        with TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BRIDGE_UPLOAD_DIR": tmp}):
+            stored = store_upload_bytes(b"video bytes", filename="sample.mp4", upload_dir=Path(tmp))
+            job = store.create_job("owner", "session", stored.uri)
+            worker = VideoAnalysisWorker(store)
+
+            completed = worker.run_once()
+
+            self.assertEqual(completed.job_id, job.job_id)
+            self.assertEqual(completed.status, JobStatus.SUCCEEDED)
+            result = store.get_result(job.job_id, "owner").result
+            self.assertEqual(result["source"]["platform"], "upload")
+            self.assertEqual(result["source"]["video_url_canonical"], stored.uri)
+            self.assertEqual(result["raw_tool_result"]["mode"], "file-level-validation")
+            self.assertNotIn("douyin", result["summary"].lower())
 
 
 if __name__ == "__main__":

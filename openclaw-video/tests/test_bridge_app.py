@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest import mock
 
@@ -88,6 +90,10 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("/openclaw-api/me", response.text)
         self.assertIn("/openclaw-api/identity/diagnostics", response.text)
         self.assertIn("/openclaw-api/jobs", response.text)
+        self.assertIn("/openclaw-api/uploads", response.text)
+        self.assertIn("/openclaw-api/jobs/' + encodeURIComponent(currentJobId) + '/result", response.text)
+        self.assertIn("Upload Video", response.text)
+        self.assertIn("FormData", response.text)
         self.assertIn("Self Test", response.text)
         self.assertIn("https://example.com/not-douyin", response.text)
         self.assertIn("random_session_404", response.text)
@@ -258,6 +264,104 @@ class BridgeAppTests(unittest.TestCase):
         read_response = self.client.get(f"/openclaw-api/jobs/{job['job_id']}", headers=self.auth("account-a"))
         self.assertEqual(read_response.status_code, 200, read_response.text)
         self.assertEqual(read_response.json()["job"]["job_id"], job["job_id"])
+
+    def test_upload_job_returns_202_and_records_private_upload_uri(self):
+        session = self.create_session("account-a")
+        with TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {"BRIDGE_UPLOAD_DIR": tmp, "MAX_UPLOAD_BYTES": "64"},
+        ):
+            response = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"], "content": "analyze upload"},
+                files={"video": ("sample clip.mp4", b"video bytes", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(response.status_code, 202, response.text)
+            body = response.json()
+            job = body["job"]
+            upload = body["upload"]
+            self.assertEqual(job["status"], "queued")
+            self.assertEqual(job["session_id"], session["id"])
+            self.assertTrue(job["video_url_canonical"].startswith("upload://"))
+            self.assertEqual(upload["filename"], "sample_clip.mp4")
+            self.assertEqual(upload["size_bytes"], len(b"video bytes"))
+            self.assertEqual(len(upload["sha256"]), 64)
+            self.assertTrue((Path(tmp) / job["video_url_canonical"].split("/", 3)[2] / upload["filename"]).is_file())
+
+        messages = self.client.get(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(messages.status_code, 200, messages.text)
+        self.assertEqual(messages.json()["messages"][0]["video_url"], job["video_url_canonical"])
+
+    def test_upload_job_requires_login_and_supported_extension(self):
+        session = self.create_session("account-a")
+        with TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BRIDGE_UPLOAD_DIR": tmp}):
+            unauthenticated = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"]},
+                files={"video": ("sample.mp4", b"video", "video/mp4")},
+            )
+            self.assertEqual(unauthenticated.status_code, 401)
+
+            invalid = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"]},
+                files={"video": ("sample.txt", b"not video", "text/plain")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(invalid.status_code, 400, invalid.text)
+            self.assertIn("unsupported video file type", invalid.text)
+
+            oversized = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"]},
+                files={"video": ("sample.mp4", b"123456", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(oversized.status_code, 202, oversized.text)
+
+        with TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {"BRIDGE_UPLOAD_DIR": tmp, "MAX_UPLOAD_BYTES": "4"},
+        ):
+            too_big = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"]},
+                files={"video": ("sample.mp4", b"123456", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(too_big.status_code, 400, too_big.text)
+            self.assertIn("uploaded video exceeds size limit", too_big.text)
+
+    def test_owner_can_read_result_and_cross_user_gets_404(self):
+        session = self.create_session("account-a")
+        job_response = self.client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        )
+        job_id = job_response.json()["job"]["job_id"]
+        result = {
+            "schema_version": "openclaw-video-result.v1",
+            "source": {
+                "video_url_canonical": "https://v.douyin.com/abc",
+                "platform": "douyin",
+                "duration_seconds": 1,
+            },
+            "summary": "ok",
+            "signals": {"hook": "ok"},
+            "raw_tool_result": {"ok": True},
+            "created_at": "2026-06-06T00:00:00Z",
+        }
+        self.jobs.complete_job(job_id, result, "openclaw-video-result.v1")
+        read = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth("account-a"))
+        self.assertEqual(read.status_code, 200, read.text)
+        self.assertEqual(read.json()["result"]["result"]["summary"], "ok")
+        other = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth("account-b"))
+        self.assertEqual(other.status_code, 404)
 
     def test_job_events_stream_returns_current_job_snapshot(self):
         session = self.create_session("account-a")

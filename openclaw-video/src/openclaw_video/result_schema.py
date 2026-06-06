@@ -20,8 +20,8 @@ def validate_result_payload(payload: dict) -> dict:
     source = payload.get("source")
     if not isinstance(source, dict):
         raise ResultSchemaError("source is required")
-    if source.get("platform") != "douyin":
-        raise ResultSchemaError("source.platform must be douyin")
+    if source.get("platform") not in {"douyin", "upload"}:
+        raise ResultSchemaError("source.platform must be douyin or upload")
     if not source.get("video_url_canonical"):
         raise ResultSchemaError("source.video_url_canonical is required")
     if not isinstance(payload.get("summary"), str) or not payload["summary"].strip():
@@ -31,4 +31,3 @@ def validate_result_payload(payload: dict) -> dict:
     if not payload.get("created_at"):
         payload = {**payload, "created_at": datetime.now(UTC).isoformat()}
     return payload
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
@@ -9,6 +10,7 @@ from typing import Callable
 from .douyin_wrapper import DouyinAnalysisResult, DouyinWrapperError, run_douyin_chong
 from .job_store import InMemoryJobStore, JobLeaseError, VideoJob
 from .result_schema import RESULT_SCHEMA_VERSION, ResultSchemaError, validate_result_payload
+from .upload_store import UploadNotFound, UploadStoreError, is_upload_uri, resolve_upload_uri
 from .url_guard import (
     RedirectFetcher,
     Resolver,
@@ -49,6 +51,8 @@ class VideoAnalysisWorker:
         self.redirect_fetcher = redirect_fetcher
 
     def _default_analyzer(self, video_url: str, output_dir: Path) -> DouyinAnalysisResult:
+        if is_upload_uri(video_url):
+            return self._analyze_uploaded_video(video_url, output_dir)
         return run_douyin_chong(
             video_url=video_url,
             output_dir=output_dir,
@@ -57,6 +61,43 @@ class VideoAnalysisWorker:
             max_duration_seconds=self.config.max_duration_seconds,
             max_frames=self.config.max_frames,
         )
+
+    def _analyze_uploaded_video(self, video_uri: str, _output_dir: Path) -> DouyinAnalysisResult:
+        path = resolve_upload_uri(video_uri)
+        size_bytes = path.stat().st_size
+        if size_bytes <= 0:
+            raise DouyinWrapperError("uploaded video is empty")
+        if size_bytes > self.config.max_download_bytes:
+            raise DouyinWrapperError("uploaded video exceeds size limit")
+        payload = {
+            "schema_version": RESULT_SCHEMA_VERSION,
+            "source": {
+                "video_url_canonical": video_uri,
+                "platform": "upload",
+                "duration_seconds": None,
+            },
+            "summary": (
+                "Uploaded video received and validated at file level. The V1 upload path verifies async jobs, "
+                "owner isolation, persisted job state, and worker processing; deeper visual understanding can be "
+                "connected as the next analyzer step."
+            ),
+            "signals": {
+                "hook": None,
+                "topic": None,
+                "audience": None,
+                "structure": None,
+                "visual_notes": f"uploaded_file={path.name}; size_bytes={size_bytes}",
+                "risk_notes": None,
+            },
+            "raw_tool_result": {
+                "tool": "openclaw-upload-file-analyzer",
+                "mode": "file-level-validation",
+                "filename": path.name,
+                "size_bytes": size_bytes,
+            },
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        return DouyinAnalysisResult(payload=payload, stdout="", stderr="")
 
     def _start_heartbeat(self, job: VideoJob) -> Callable[[], None]:
         interval = self.config.heartbeat_interval_seconds
@@ -97,13 +138,17 @@ class VideoAnalysisWorker:
             return None
         stop_heartbeat = self._start_heartbeat(job)
         try:
-            validated = validate_video_url_with_redirects(
-                job.video_url_canonical,
-                resolver=self.url_resolver,
-                redirect_fetcher=self.redirect_fetcher,
-            )
+            if is_upload_uri(job.video_url_canonical):
+                canonical = job.video_url_canonical
+            else:
+                validated = validate_video_url_with_redirects(
+                    job.video_url_canonical,
+                    resolver=self.url_resolver,
+                    redirect_fetcher=self.redirect_fetcher,
+                )
+                canonical = validated.canonical
             with TemporaryDirectory(prefix="openclaw-video-") as tmp:
-                analysis = self.analyzer(validated.canonical, Path(tmp))
+                analysis = self.analyzer(canonical, Path(tmp))
             payload = validate_result_payload(analysis.payload)
             return self.store.complete_job(
                 job.job_id,
@@ -115,7 +160,7 @@ class VideoAnalysisWorker:
             return self._fail_job(job, "tool_timeout", timed_out=True)
         except UrlRejected:
             return self._fail_job(job, "url_rejected")
-        except (DouyinWrapperError, ResultSchemaError, ValueError):
+        except (DouyinWrapperError, ResultSchemaError, ValueError, UploadStoreError, UploadNotFound):
             return self._fail_job(job, "tool_failed")
         except JobLeaseError:
             return self.store.get_job(job.job_id)

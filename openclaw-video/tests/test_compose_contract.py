@@ -102,6 +102,9 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn('APP_UID="${APP_UID:-1000}"', gateway)
         self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', gateway)
         self.assertIn('SKIP_SECRET_STAGING:-0', worker)
+        self.assertIn('mkdir -p "$BRIDGE_UPLOAD_DIR"', bridge)
+        self.assertIn('chown "$APP_UID:$APP_GID" "$BRIDGE_UPLOAD_DIR"', bridge)
+        self.assertIn('chmod 0750 "$BRIDGE_UPLOAD_DIR"', bridge)
         self.assertIn("ENTRYPOINT", BRIDGE_DOCKERFILE.read_text(encoding="utf-8"))
         self.assertIn("ENTRYPOINT", WORKER_DOCKERFILE.read_text(encoding="utf-8"))
         self.assertIn("ENTRYPOINT", GATEWAY_DOCKERFILE.read_text(encoding="utf-8"))
@@ -170,9 +173,12 @@ class ComposeContractTests(unittest.TestCase):
             "MAX_VIDEO_FRAMES: \"1200\"",
             "DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter",
             "DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env",
+            "BRIDGE_UPLOAD_DIR: /data/uploads",
+            "MAX_UPLOAD_BYTES: \"536870912\"",
             "./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro",
             "./vendor/douyin_chong:/app/vendor/douyin_chong:ro",
             "- worker-tmp:/tmp/openclaw-video",
+            "- uploaded-videos:/data/uploads:ro",
             "read_only: true",
             "/tmp:size=1024m,nosuid,nodev",
             'cpus: "1.00"',
@@ -182,6 +188,16 @@ class ComposeContractTests(unittest.TestCase):
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, compose)
+
+    def test_upload_volume_is_bridge_writable_and_worker_read_only(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        bridge_block = compose.split("  bridge-postgres:", 1)[0]
+        worker_block = compose.split("  video-analysis-worker:", 1)[1].split("\nvolumes:", 1)[0]
+
+        self.assertIn("- uploaded-videos:/data/uploads", bridge_block)
+        self.assertNotIn("- uploaded-videos:/data/uploads:ro", bridge_block)
+        self.assertIn("- uploaded-videos:/data/uploads:ro", worker_block)
+        self.assertIn("uploaded-videos:", compose)
 
     def test_only_bridge_joins_dify_network(self):
         compose = COMPOSE.read_text(encoding="utf-8")

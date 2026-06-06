@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/job-result-response.schema.json",
+  "type": "object",
+  "required": ["result"],
+  "additionalProperties": false,
+  "properties": {
+    "result": {
+      "type": "object",
+      "required": ["job_id", "schema_version", "result", "created_at"],
+      "additionalProperties": false,
+      "properties": {
+        "job_id": {"type": "string", "format": "uuid"},
+        "schema_version": {"const": "openclaw-video-result.v1"},
+        "result": {"$ref": "https://huahuoai.local/schemas/openclaw-video/video-analysis-result.schema.json"},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

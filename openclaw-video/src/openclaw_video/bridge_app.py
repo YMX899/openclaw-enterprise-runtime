@@ -40,6 +40,7 @@ from .session_store import (
     SessionNotFound,
     SessionOwnershipError,
 )
+from .upload_store import UploadStoreError, store_upload_fileobj
 
 
 def _serialize_dt(value: Any) -> str | None:
@@ -81,6 +82,25 @@ def _serialize_job(job: VideoJob) -> dict[str, Any]:
         "result_schema_version": job.result_schema_version,
         "result_location": job.result_location,
     }
+
+
+def _serialize_result(result: Any) -> dict[str, Any]:
+    return {
+        "job_id": result.job_id,
+        "schema_version": result.schema_version,
+        "result": result.result,
+        "created_at": _serialize_dt(result.created_at),
+    }
+
+
+def _is_form_upload(value: Any) -> bool:
+    return bool(
+        value is not None
+        and getattr(value, "filename", None)
+        and hasattr(value, "file")
+        and hasattr(value, "close")
+        and hasattr(value, "seek")
+    )
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> str:
@@ -202,6 +222,12 @@ LAB_PAGE_HTML = """<!doctype html>
           <button id="submitJob">Submit Job</button>
           <button id="pollJob" class="secondary">Poll Job</button>
         </div>
+        <h2 style="margin-top:18px">Upload Video</h2>
+        <label for="videoFile">Video File</label>
+        <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
+        <div class="actions">
+          <button id="uploadJob">Upload Job</button>
+        </div>
       </div>
       <div>
         <h2>Output</h2>
@@ -321,18 +347,49 @@ LAB_PAGE_HTML = """<!doctype html>
       if (result.body.job && result.body.job.job_id) currentJobId = result.body.job.job_id;
       show(result);
     }
+    async function uploadJob() {
+      const fileInput = document.getElementById('videoFile');
+      const file = fileInput.files && fileInput.files[0];
+      const sessionId = document.getElementById('sessionId').value;
+      if (!file || !sessionId) {
+        show('Select a video file and session first.');
+        return;
+      }
+      const form = new FormData();
+      form.append('session_id', sessionId);
+      form.append('content', document.getElementById('prompt').value || 'Analyze uploaded video.');
+      form.append('video', file);
+      const response = await fetch('/openclaw-api/uploads', {
+        method: 'POST',
+        credentials: 'include',
+        body: form
+      });
+      const text = await response.text();
+      let body;
+      try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
+      if (body.job && body.job.job_id) currentJobId = body.job.job_id;
+      show({ status: response.status, body });
+    }
     async function pollJob() {
       if (!currentJobId) {
         show('No job_id is available yet.');
         return;
       }
-      show(await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId)));
+      const jobResult = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId));
+      const job = jobResult.body.job;
+      if (job && job.status === 'succeeded') {
+        const result = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId) + '/result');
+        show({ job: jobResult, result });
+        return;
+      }
+      show(jobResult);
     }
     document.getElementById('refreshMe').addEventListener('click', refreshMe);
     document.getElementById('identityDiagnostics').addEventListener('click', identityDiagnostics);
     document.getElementById('runSelfTest').addEventListener('click', runSelfTest);
     document.getElementById('createSession').addEventListener('click', createSession);
     document.getElementById('submitJob').addEventListener('click', submitJob);
+    document.getElementById('uploadJob').addEventListener('click', uploadJob);
     document.getElementById('pollJob').addEventListener('click', pollJob);
     refreshMe();
   </script>
@@ -536,6 +593,52 @@ def create_app(
         )
         return JSONResponse(status_code=202, content={"job": _serialize_job(job)})
 
+    @app.post("/openclaw-api/uploads")
+    async def create_upload_job(request: Request) -> JSONResponse:
+        principal = await current_principal(request)
+        form = await request.form()
+        session_id = str(form.get("session_id") or "")
+        content = str(form.get("content") or "Analyze uploaded video")
+        file = form.get("video")
+        if not session_id or not _is_form_upload(file):
+            raise HTTPException(status_code=400, detail="session_id and video file are required")
+        try:
+            session_store.get_session(session_id, principal.principal_id)
+        except (SessionNotFound, SessionOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="session not found") from exc
+        max_upload_bytes = int(os.environ.get("MAX_UPLOAD_BYTES", str(512 * 1024 * 1024)))
+        try:
+            await file.seek(0)
+            stored = store_upload_fileobj(
+                file.file,
+                filename=str(file.filename or "video.mp4"),
+                max_bytes=max_upload_bytes,
+            )
+        except UploadStoreError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        finally:
+            await file.close()
+        job = job_store.create_job(principal.principal_id, session_id, stored.uri)
+        session_store.add_message(
+            session_id,
+            principal.principal_id,
+            "user",
+            content,
+            video_url=stored.uri,
+            job_id=job.job_id,
+        )
+        return JSONResponse(
+            status_code=202,
+            content={
+                "job": _serialize_job(job),
+                "upload": {
+                    "filename": stored.filename,
+                    "size_bytes": stored.size_bytes,
+                    "sha256": stored.sha256,
+                },
+            },
+        )
+
     @app.get("/openclaw-api/jobs/{job_id}")
     async def get_job(job_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
@@ -544,6 +647,15 @@ def create_app(
         except (JobNotFound, JobOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="job not found") from exc
         return {"job": _serialize_job(job)}
+
+    @app.get("/openclaw-api/jobs/{job_id}/result")
+    async def get_job_result(job_id: str, request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        try:
+            result = job_store.get_result(job_id, principal.principal_id)
+        except (JobNotFound, JobOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="job result not found") from exc
+        return {"result": _serialize_result(result)}
 
     @app.get("/openclaw-api/jobs/{job_id}/events")
     async def job_events(job_id: str, request: Request) -> StreamingResponse:

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/upload-job-response.schema.json",
+  "type": "object",
+  "required": ["job", "upload"],
+  "additionalProperties": false,
+  "properties": {
+    "job": {"$ref": "https://huahuoai.local/schemas/openclaw-video/video-job.schema.json"},
+    "upload": {
+      "type": "object",
+      "required": ["filename", "size_bytes", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "filename": {"type": "string"},
+        "size_bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
