@@ -287,8 +287,8 @@ fi
 if [[ -z "$worker_image" ]]; then
   fail "could not resolve built video-analysis-worker image id"
 fi
-"${docker_cmd_parts[@]}" run --rm "$worker_image" openclaw-douyin-adapter --help >/dev/null
-"${docker_cmd_parts[@]}" run --rm "$worker_image" python -c 'from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])'
+"${docker_cmd_parts[@]}" run --rm -e SKIP_SECRET_STAGING=1 "$worker_image" openclaw-douyin-adapter --help >/dev/null
+"${docker_cmd_parts[@]}" run --rm -e SKIP_SECRET_STAGING=1 "$worker_image" python -c 'from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])'
 
 if [[ "$run_compose_up" == "1" ]]; then
   step "compose up isolated sidecar"

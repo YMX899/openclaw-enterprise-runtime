@@ -23,9 +23,11 @@ stage_secret() {
 umask 077
 mkdir -p /tmp/openclaw-video
 chown "$APP_UID:$APP_GID" /tmp/openclaw-video
-DOUYIN_CHONG_ENV_FILE="$(
-  stage_secret "${DOUYIN_CHONG_ENV_FILE:-/run/secrets/douyin_chong_env}" douyin_chong.env
-)"
-export DOUYIN_CHONG_ENV_FILE
+if [ "${SKIP_SECRET_STAGING:-0}" != "1" ]; then
+  DOUYIN_CHONG_ENV_FILE="$(
+    stage_secret "${DOUYIN_CHONG_ENV_FILE:-/run/secrets/douyin_chong_env}" douyin_chong.env
+  )"
+  export DOUYIN_CHONG_ENV_FILE
+fi
 
 exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"

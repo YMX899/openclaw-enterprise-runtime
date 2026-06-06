@@ -78,9 +78,11 @@ class ComposeContractTests(unittest.TestCase):
 
         self.assertIn('APP_UID="${APP_UID:-1000}"', gateway)
         self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', gateway)
+        self.assertIn('SKIP_SECRET_STAGING:-0', worker)
         self.assertIn("ENTRYPOINT", BRIDGE_DOCKERFILE.read_text(encoding="utf-8"))
         self.assertIn("ENTRYPOINT", WORKER_DOCKERFILE.read_text(encoding="utf-8"))
         self.assertIn("ENTRYPOINT", GATEWAY_DOCKERFILE.read_text(encoding="utf-8"))
+        self.assertNotIn("SKIP_SECRET_STAGING", COMPOSE.read_text(encoding="utf-8"))
 
     def test_sidecar_private_network_allows_required_egress(self):
         compose = COMPOSE.read_text(encoding="utf-8")
@@ -118,6 +120,7 @@ class ComposeContractTests(unittest.TestCase):
 
         self.assertIn("compose -f \"$compose_file\" images -q video-analysis-worker", gate_script)
         self.assertIn("image inspect openclaw-video-video-analysis-worker:latest", gate_script)
+        self.assertIn("SKIP_SECRET_STAGING=1", gate_script)
 
     def test_phase1_5_compose_up_waits_for_health_and_cleans_volumes(self):
         gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")

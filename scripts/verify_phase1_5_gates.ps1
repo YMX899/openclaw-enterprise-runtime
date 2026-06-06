@@ -255,9 +255,9 @@ Assert-LastExitCode "docker compose images"
 if (-not $workerImage) {
     Fail "could not resolve built video-analysis-worker image id"
 }
-docker run --rm $workerImage openclaw-douyin-adapter --help | Out-Null
+docker run --rm -e SKIP_SECRET_STAGING=1 $workerImage openclaw-douyin-adapter --help | Out-Null
 Assert-LastExitCode "worker image adapter help smoke"
-docker run --rm $workerImage python -c "from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])"
+docker run --rm -e SKIP_SECRET_STAGING=1 $workerImage python -c "from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])"
 Assert-LastExitCode "worker image adapter loader smoke"
 
 if ($RunComposeUp) {
