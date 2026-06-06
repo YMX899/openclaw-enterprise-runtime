@@ -18,6 +18,66 @@ def write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+SECURITY_TRIAGE_PASS = """
+status: reviewed
+openclaw_version: 2026.3.13
+production_decision: approve_exception
+npm_audit_command: npm audit --omit=dev --json
+npm_audit_total: 7
+npm_audit_critical: 1
+npm_audit_high: 4
+runtime_scope: private OpenClaw Gateway behind Bridge only
+browser_exposure: Gateway token never sent to browser
+bridge_scopes: operator.read, operator.write
+operator_admin: forbidden
+approved_by_security_owner: alice
+approved_by_engineering_owner: bob
+approval_date: 2026-06-06
+
+package: openclaw
+severity: critical
+reachable: no
+mitigation: private gateway plus vendor analysis
+decision: approve_exception
+
+package: @buape/carbon
+severity: high
+reachable: no
+mitigation: not used by Bridge path
+decision: approve_exception
+
+package: @hono/node-server
+severity: high
+reachable: no
+mitigation: gateway not browser exposed
+decision: approve_exception
+
+package: @larksuiteoapi/node-sdk
+severity: high
+reachable: no
+mitigation: larksuite integration disabled
+decision: approve_exception
+
+package: axios
+severity: high
+reachable: no
+mitigation: larksuite integration disabled
+decision: approve_exception
+
+package: hono
+severity: moderate
+reachable: no
+mitigation: private gateway only
+decision: approve_exception
+
+package: ws
+severity: moderate
+reachable: no
+mitigation: Bridge-only authenticated channel
+decision: approve_exception
+"""
+
+
 class ProductionReadinessAuditTests(unittest.TestCase):
     def test_current_repo_is_no_go(self):
         report = audit_module.audit(Path(__file__).resolve().parents[2])
@@ -38,6 +98,7 @@ security_owner: alice
 engineering_owner: bob
 """,
             )
+            write(repo / "artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md", SECURITY_TRIAGE_PASS)
             write(repo / "artifacts/douyin_chong/ARTIFACT_MANIFEST.md", "Status: verified\n")
             write(
                 repo / "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json",
@@ -120,6 +181,7 @@ security_owner: alice
 engineering_owner: bob
 """,
             )
+            write(repo / "artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md", SECURITY_TRIAGE_PASS)
             write(repo / "artifacts/douyin_chong/ARTIFACT_MANIFEST.md", "Status: verified\n")
             write(
                 repo / "phase1.5-exit-proof.md",
@@ -167,6 +229,65 @@ new 5xx: NONE
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
+
+    def test_openclaw_security_requires_triage_when_decision_approved(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/openclaw-2026.3.13/SECURITY_DECISION.md",
+                """
+decision: approve_exception
+security_owner: alice
+engineering_owner: bob
+""",
+            )
+
+            result = audit_module.check_openclaw_security(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("SECURITY_TRIAGE.md", result.evidence)
+
+    def test_openclaw_security_rejects_triage_placeholders(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/openclaw-2026.3.13/SECURITY_DECISION.md",
+                """
+decision: approve_exception
+security_owner: alice
+engineering_owner: bob
+""",
+            )
+            write(
+                repo / "artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md",
+                SECURITY_TRIAGE_PASS + "\nreviewer: <fill-me>\n",
+            )
+
+            result = audit_module.check_openclaw_security(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("template placeholders", result.evidence)
+
+    def test_openclaw_security_rejects_reachable_critical(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/openclaw-2026.3.13/SECURITY_DECISION.md",
+                """
+decision: approve_exception
+security_owner: alice
+engineering_owner: bob
+""",
+            )
+            write(
+                repo / "artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md",
+                SECURITY_TRIAGE_PASS.replace("reachable: no", "reachable: unknown", 1),
+            )
+
+            result = audit_module.check_openclaw_security(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("critical", result.evidence)
 
     def test_real_sample_evidence_rejects_raw_url_leak(self):
         with TemporaryDirectory() as tmp:

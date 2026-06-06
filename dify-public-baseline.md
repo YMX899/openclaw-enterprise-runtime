@@ -394,3 +394,46 @@ logout: NO_GO
 profile 401: PASS
 new 5xx: NONE
 ```
+
+## Real Chrome Refresh 2026-06-06 12:45 Asia/Shanghai
+
+Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
+storage, session storage, request headers, CSRF values, Authorization tokens or
+passwords were read or recorded.
+
+Route:
+
+```text
+https://ai001.huahuoai.com/apps
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible page: Dify login page
+console/dev error count: 0
+```
+
+Interpretation:
+
+- Current Chrome profile still has no authenticated Dify session for
+  `https://ai001.huahuoai.com`.
+- `/apps` redirecting to `/signin` remains expected unauthenticated behavior.
+- Authenticated existing-app open/message/reply/refresh/history/logout testing
+  remains incomplete and continues to block any future public OpenClaw route or
+  production sidecar deployment.
+
+Gate markers:
+
+```text
+authenticated_baseline: NO_GO
+existing app message: NO_GO
+streaming reply: NO_GO
+refresh: NO_GO
+history: NO_GO
+logout: NO_GO
+profile 401: PASS
+new 5xx: NONE
+```

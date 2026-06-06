@@ -36,6 +36,7 @@ def _is_sha256(value: Any) -> bool:
 
 def check_openclaw_security(repo: Path) -> GateResult:
     path = repo / "artifacts" / "openclaw-2026.3.13" / "SECURITY_DECISION.md"
+    triage_path = repo / "artifacts" / "openclaw-2026.3.13" / "SECURITY_TRIAGE.md"
     if not path.exists():
         return GateResult("openclaw_security", "NO_GO", f"missing {path}")
     text = _read(path)
@@ -51,6 +52,46 @@ def check_openclaw_security(repo: Path) -> GateResult:
         return GateResult("openclaw_security", "NO_GO", "no approved OpenClaw security decision")
     if "security_owner: not assigned" in lower or "engineering_owner: codex draft" in lower:
         return GateResult("openclaw_security", "NO_GO", "security decision is not human-approved")
+    if not triage_path.exists():
+        return GateResult("openclaw_security", "NO_GO", f"missing {triage_path.name}")
+    triage = _read(triage_path)
+    triage_lower = triage.lower()
+    if re.search(r"template_pending|<[^>\n]+>|\btodo\b|\btbd\b", triage, re.IGNORECASE):
+        return GateResult("openclaw_security", "NO_GO", "security triage still contains template placeholders")
+    required_triage = [
+        r"openclaw_version:\s*2026\.3\.13",
+        r"npm_audit_command:\s*npm audit --omit=dev --json",
+        r"runtime_scope:\s*private OpenClaw Gateway behind Bridge only",
+        r"browser_exposure:\s*Gateway token never sent to browser",
+        r"bridge_scopes:\s*operator\.read,\s*operator\.write",
+        r"operator_admin:\s*forbidden",
+        r"approved_by_security_owner:\s*\S+",
+        r"approved_by_engineering_owner:\s*\S+",
+        r"approval_date:\s*\d{4}-\d{2}-\d{2}",
+    ]
+    missing_triage = [pattern for pattern in required_triage if not re.search(pattern, triage, re.IGNORECASE)]
+    if missing_triage:
+        return GateResult("openclaw_security", "NO_GO", "security triage missing required approval markers")
+    packages = [
+        "openclaw",
+        "@buape/carbon",
+        "@hono/node-server",
+        "@larksuiteoapi/node-sdk",
+        "axios",
+        "hono",
+        "ws",
+    ]
+    missing_packages = [package for package in packages if package.lower() not in triage_lower]
+    if missing_packages:
+        return GateResult(
+            "openclaw_security",
+            "NO_GO",
+            f"security triage missing package rows: {', '.join(missing_packages)}",
+        )
+    if re.search(r"severity:\s*critical[\s\S]{0,240}reachable:\s*(yes|unknown)", triage, re.IGNORECASE):
+        return GateResult("openclaw_security", "NO_GO", "critical reachable or unknown advisory not closed")
+    if re.search(r"severity:\s*high[\s\S]{0,240}reachable:\s*(yes|unknown)", triage, re.IGNORECASE):
+        return GateResult("openclaw_security", "NO_GO", "high reachable or unknown advisory not closed")
     return GateResult("openclaw_security", "PASS", f"approved decision: {approved.group(1)}")
 
 
