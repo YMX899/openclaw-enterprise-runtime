@@ -276,3 +276,114 @@ bash /app/bin/openclaw-video/current/scripts/root_rebuild_bridge_fast.sh
 ```
 
 The rollback path does not require rebuilding or restarting original Dify containers.
+
+## Security Negative Test And Identity Probe Update
+
+Additional commits deployed after the initial same-origin evidence:
+
+```text
+b910bd4f724515ab7dc215fbd98421c172cef028  phase4-openclaw-security-negative-20260607
+833262eb6e4adcca4a46e6ff7c8ad01549dab538  phase4-huahuo-business-expiry-refresh-20260607
+84e13d007d33fa6b80b601d4b55c13271013aee3  phase4-huahuo-safe-identity-probe-20260607
+```
+
+Current deployed release:
+
+```text
+/app/bin/openclaw-video/current -> /app/bin/openclaw-video/releases/84e13d007d33
+previous marker: /app/bin/openclaw-video/releases/833262eb6e4a
+```
+
+Implemented in this update:
+
+```text
+OpenClaw Lab now includes a Security Test button.
+Security Test covers random session/job/result 404 checks.
+Security Test submits non-allowlisted URL, localhost, and cloud-metadata URL jobs and expects url_rejected.
+Huahuo identity lookup now retries when the frontend API returns HTTP 200 with a business status indicating expiry.
+Identity diagnostics now include provider_probe safe metadata only.
+provider_probe never returns Cookie, Authorization, access token, refresh token, user id, tenant id, mobile, email, or full headers.
+```
+
+Local verification:
+
+```text
+PYTHONPATH=openclaw-video\src .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
+Ran 229 tests
+Result: OK
+Only warning: StarletteDeprecationWarning from the local FastAPI TestClient dependency.
+```
+
+Post-update public checks:
+
+```text
+http://127.0.0.1:18181/healthz                         -> 200
+https://www.huahuoai.com/openclaw-lab/                  -> 200
+https://www.huahuoai.com/openclaw-api/me                -> 401 without login material
+https://www.huahuoai.com/ai/?id=4                       -> 200
+```
+
+Dify core containers were still not rebuilt or restarted:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Resource snapshot after the update:
+
+```text
+openclaw-video-openclaw-bridge-1         0.10% CPU  49.4 MiB   5 PIDs
+openclaw-video-video-analysis-worker-1   0.00% CPU  33.33 MiB  1 PID
+openclaw-video-openclaw-gateway-1        0.00% CPU  439.2 MiB  18 PIDs
+openclaw-video-bridge-postgres-1         0.00% CPU  36.75 MiB  6 PIDs
+docker-nginx-1                           0.00% CPU  11.74 MiB  10 PIDs
+docker-api-1                             0.78% CPU  4.273 GiB  61 PIDs
+docker-web-1                             0.47% CPU  359.9 MiB  34 PIDs
+```
+
+Chrome identity probe result after the update:
+
+```text
+URL: https://www.huahuoai.com/openclaw-lab/
+Action: Identity Check
+authenticated=false
+login_material_present=false
+huahuo_access_token_present=false
+huahuo_app_uuid_present=false
+profile_ok=false
+failure_stage=profile
+provider_probe.provider=huahuo_front
+provider_probe.identity_headers_present=false
+provider_probe.profile_http_status=401
+provider_probe.refresh_attempted=true
+provider_probe.error_stage=refresh_missing
+```
+
+Interpretation:
+
+```text
+The current Chrome profile no longer has Huahuo frontend login material available to the same-origin Lab page.
+The Huahuo user web also showed the landing/login page after refresh, not the authenticated chat UI.
+This blocks authenticated Security Test execution until the user logs in to Huahuo again.
+Unauthenticated behavior is correct: /openclaw-api/me returns 401 and Lab cannot create sessions or jobs without identity.
+```
+
+Next browser gate:
+
+```text
+After Huahuo user login is restored in Chrome, rerun:
+1. Identity Check: expect authenticated=true, profile_ok=true, workspace_ok=true, access_ok=true.
+2. Security Test: expect random resource checks to return 404 and all negative URL jobs to finish failed/url_rejected.
+3. Tiny Upload: expect 202 job creation and succeeded result.
+4. Huahuo user web regression: send one short message at https://www.huahuoai.com/ai/?id=4 and confirm reply.
+```
+
+Rollback to the previous sidecar release:
+
+```bash
+ln -sfn /app/bin/openclaw-video/releases/833262eb6e4a /app/bin/openclaw-video/current
+OPENCLAW_VIDEO_ROOT=/app/bin/openclaw-video/current/openclaw-video \
+bash /app/bin/openclaw-video/current/scripts/root_rebuild_bridge_fast.sh
+```
