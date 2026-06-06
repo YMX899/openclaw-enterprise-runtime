@@ -1,7 +1,7 @@
 # OpenClaw x Dify Go/No-Go Gate Matrix
 
 Generated: 2026-06-06  
-Current commit: `1d0f1e3` / tag `douyin-real-sample-runner-20260606`
+Current commit: `b52933c` / tag `chatgpt-production-readiness-no-go-20260606`
 
 ## Current Decision
 
@@ -33,6 +33,8 @@ Git rollback anchors:
   openclaw-3-13-security-no-go-20260606
   phase1-5-security-approval-gate-20260606
   douyin-real-sample-runner-20260606
+  production-readiness-audit-20260606
+  chatgpt-production-readiness-no-go-20260606
 
 Server read-only audit:
   server-readonly-audit.md
@@ -53,13 +55,19 @@ Real Chrome unauthenticated baseline:
   no current authenticated Dify session in Chrome
 
 Local source/test gates:
-  openclaw-video tests: 94 tests pass
+  openclaw-video tests: 98 tests pass
   vendored douyin_chong SOURCE_SHA256SUMS gate passes locally
   Phase 1.5 scripts pass only with Docker skipped
+  production readiness audit exists:
+    scripts/audit_production_readiness.py
+    current overall: NO_GO
+    fail-on-no-go exits nonzero as intended
   sanitized real-sample runner exists:
     scripts/run_douyin_real_sample.py
   runner tests prove no secret file content, raw URL or raw stdout/stderr is
   recorded in the sanitized evidence summary
+  production audit now requires sanitized REAL_SAMPLE_EVIDENCE.json; manifest
+  text alone cannot make the douyin artifact gate sufficient for Phase 2
 
 OpenClaw 2026.3.13 audit:
   artifacts/openclaw-2026.3.13/SECURITY_DECISION.md

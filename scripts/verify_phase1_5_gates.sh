@@ -82,7 +82,18 @@ step "Node syntax"
 
 step "static phase gates"
 "$python_cmd" -B - <<'PY'
+import json
 from pathlib import Path
+import re
+
+
+def is_sha256(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def json_text(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
 
 compose = Path("openclaw-video/docker-compose.openclaw-video.yaml").read_text(encoding="utf-8")
 required = [
@@ -125,6 +136,41 @@ elif "Status: minimal candidate source vendored" in manifest:
     print("douyin_chong artifact gate: MINIMAL_SOURCE_NOT_MODEL_VERIFIED")
 else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
+
+sample = Path("artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json")
+if not sample.exists():
+    print("douyin real sample gate: MISSING")
+else:
+    evidence = json.loads(sample.read_text(encoding="utf-8"))
+    if evidence.get("schema_version") != "douyin-real-sample-evidence.v1":
+        raise SystemExit("unexpected real sample evidence schema version")
+    if evidence.get("status") != "succeeded":
+        raise SystemExit("real sample did not succeed")
+    if evidence.get("secret_file_contents_recorded") is not False:
+        raise SystemExit("real sample evidence may record secret file contents")
+    if evidence.get("env_file_present") is not True:
+        raise SystemExit("real sample did not use an explicit runtime env file")
+    if not is_sha256(evidence.get("input_url_sha256")):
+        raise SystemExit("real sample evidence is missing input URL hash")
+    if "https://" in json_text(evidence):
+        raise SystemExit("real sample evidence contains a raw URL")
+    process = evidence.get("process") or {}
+    if process.get("returncode") != 0:
+        raise SystemExit("real sample adapter return code was not zero")
+    if not isinstance(process.get("elapsed_seconds"), (int, float)) or process["elapsed_seconds"] <= 0:
+        raise SystemExit("real sample elapsed time is missing")
+    if process.get("stdout_recorded") is not False or process.get("stderr_recorded") is not False:
+        raise SystemExit("real sample stdout/stderr contents must not be recorded")
+    result = evidence.get("result") or {}
+    if result.get("schema_version") != "openclaw-video-result.v1":
+        raise SystemExit("real sample result schema was not validated")
+    if result.get("platform") != "douyin":
+        raise SystemExit("real sample platform is not douyin")
+    if not is_sha256(result.get("result_json_sha256")):
+        raise SystemExit("real sample result hash is missing")
+    if not isinstance(result.get("result_json_bytes"), int) or result["result_json_bytes"] <= 0:
+        raise SystemExit("real sample result size is missing")
+    print("douyin real sample gate: VERIFIED")
 PY
 
 step "OpenClaw 2026.3.13 security decision"
@@ -144,6 +190,10 @@ PY
 
 if [[ "$require_douyin_artifact" == "1" ]] && ! grep -q 'Status: verified' artifacts/douyin_chong/ARTIFACT_MANIFEST.md; then
   fail "REQUIRE_DOUYIN_ARTIFACT=1 but douyin_chong artifact is not verified."
+fi
+
+if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json ]]; then
+  fail "REQUIRE_DOUYIN_ARTIFACT=1 but REAL_SAMPLE_EVIDENCE.json is missing."
 fi
 
 if [[ "$require_openclaw_security_approval" == "1" ]] && ! grep -Eq 'decision: (approve_exception|vendor_patch|upgrade_strategy)' artifacts/openclaw-2026.3.13/SECURITY_DECISION.md; then
