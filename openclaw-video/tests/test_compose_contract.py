@@ -10,6 +10,9 @@ COMPOSE = ROOT / "docker-compose.openclaw-video.yaml"
 GATEWAY_DOCKERFILE = ROOT / "docker" / "openclaw-gateway" / "Dockerfile"
 BRIDGE_DOCKERFILE = ROOT / "docker" / "bridge" / "Dockerfile"
 WORKER_DOCKERFILE = ROOT / "docker" / "worker" / "Dockerfile"
+BRIDGE_ENTRYPOINT = ROOT / "docker" / "bridge" / "entrypoint.sh"
+GATEWAY_ENTRYPOINT = ROOT / "docker" / "openclaw-gateway" / "entrypoint.sh"
+WORKER_ENTRYPOINT = ROOT / "docker" / "worker" / "entrypoint.sh"
 DOCKERIGNORE = ROOT / ".dockerignore"
 VENDOR_GITIGNORE = ROOT / "vendor" / "douyin_chong" / ".gitignore"
 VENDOR_HASHES = ROOT / "vendor" / "douyin_chong" / "SOURCE_SHA256SUMS"
@@ -52,9 +55,32 @@ class ComposeContractTests(unittest.TestCase):
 
     def test_gateway_entrypoint_does_not_expand_token_into_process_args(self):
         dockerfile = GATEWAY_DOCKERFILE.read_text(encoding="utf-8")
-        self.assertIn("--auth token", dockerfile)
+        entrypoint = GATEWAY_ENTRYPOINT.read_text(encoding="utf-8")
+        self.assertIn('"--auth", "token"', dockerfile)
         self.assertNotIn("--token", dockerfile)
-        self.assertIn("/run/secrets/openclaw_gateway_token", dockerfile)
+        self.assertIn("/run/secrets/openclaw_gateway_token", entrypoint)
+        self.assertIn('OPENCLAW_GATEWAY_TOKEN="$(cat "$TOKEN_FILE")"', entrypoint)
+        self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
+        self.assertNotIn("exec openclaw", entrypoint)
+        self.assertNotIn("--token", entrypoint)
+
+    def test_service_entrypoints_stage_secrets_then_drop_privileges(self):
+        bridge = BRIDGE_ENTRYPOINT.read_text(encoding="utf-8")
+        worker = WORKER_ENTRYPOINT.read_text(encoding="utf-8")
+        gateway = GATEWAY_ENTRYPOINT.read_text(encoding="utf-8")
+
+        for entrypoint in [bridge, worker]:
+            with self.subTest(entrypoint=entrypoint[:32]):
+                self.assertIn('APP_UID="${APP_UID:-65532}"', entrypoint)
+                self.assertIn("stage_secret", entrypoint)
+                self.assertIn('chmod 0400 "$target_path"', entrypoint)
+                self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
+
+        self.assertIn('APP_UID="${APP_UID:-1000}"', gateway)
+        self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', gateway)
+        self.assertIn("ENTRYPOINT", BRIDGE_DOCKERFILE.read_text(encoding="utf-8"))
+        self.assertIn("ENTRYPOINT", WORKER_DOCKERFILE.read_text(encoding="utf-8"))
+        self.assertIn("ENTRYPOINT", GATEWAY_DOCKERFILE.read_text(encoding="utf-8"))
 
     def test_sidecar_private_network_allows_required_egress(self):
         compose = COMPOSE.read_text(encoding="utf-8")

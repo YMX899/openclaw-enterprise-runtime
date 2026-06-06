@@ -8,12 +8,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 COPY pyproject.toml /app/
 COPY src /app/src
+COPY docker/bridge/entrypoint.sh /usr/local/bin/openclaw-bridge-entrypoint.sh
 RUN if [ -n "$PIP_INDEX_URL" ]; then \
         pip install --no-cache-dir -i "$PIP_INDEX_URL" /app; \
     else \
         pip install --no-cache-dir /app; \
     fi
 
-USER 65532:65532
 EXPOSE 3000
+ENTRYPOINT ["sh", "/usr/local/bin/openclaw-bridge-entrypoint.sh"]
 CMD ["uvicorn", "openclaw_video.bridge_app:app", "--host", "0.0.0.0", "--port", "3000"]

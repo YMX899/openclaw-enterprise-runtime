@@ -16,6 +16,7 @@ RUN set -eux; \
     && apt-get install -y --no-install-recommends ca-certificates git openssh-client \
     && rm -rf /var/lib/apt/lists/*
 COPY docker/openclaw-gateway/package*.json /opt/openclaw-runtime/
+COPY docker/openclaw-gateway/entrypoint.sh /usr/local/bin/openclaw-gateway-entrypoint.sh
 RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
         npm config set registry "$NPM_CONFIG_REGISTRY"; \
     fi \
@@ -31,6 +32,6 @@ ENV OPENCLAW_STATE_DIR=/var/lib/openclaw \
 RUN mkdir -p /var/lib/openclaw /etc/openclaw \
     && chown -R node:node /var/lib/openclaw /etc/openclaw
 
-USER node
 EXPOSE 18789
-CMD ["sh", "-lc", "OPENCLAW_GATEWAY_TOKEN=\"$(cat /run/secrets/openclaw_gateway_token)\" exec openclaw gateway run --bind custom --port 18789 --auth token"]
+ENTRYPOINT ["sh", "/usr/local/bin/openclaw-gateway-entrypoint.sh"]
+CMD ["openclaw", "gateway", "run", "--bind", "custom", "--port", "18789", "--auth", "token"]
