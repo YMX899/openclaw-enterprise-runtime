@@ -162,6 +162,22 @@ RUN_COMPOSE_UP=1 \
 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 ```
 
+If the isolated test host grants Docker through passwordless non-interactive
+sudo instead of direct docker-group access, run the same gate with an explicit
+Docker command prefix:
+
+```bash
+REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
+REQUIRE_DOUYIN_ARTIFACT=1 \
+RUN_COMPOSE_UP=1 \
+DOCKER_CMD='sudo -n docker' \
+PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
+```
+
+The script still fails closed if Docker cannot be reached. It does not prompt
+for a sudo password and does not install, enable, restart, or reconfigure
+Docker.
+
 When the full isolated sidecar boot gate succeeds, the script automatically
 writes:
 

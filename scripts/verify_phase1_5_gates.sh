@@ -4,6 +4,7 @@ set -euo pipefail
 compose_file="${COMPOSE_FILE:-openclaw-video/docker-compose.openclaw-video.yaml}"
 python_cmd="${PYTHON:-python}"
 node_cmd="${NODE:-node}"
+docker_cmd="${DOCKER_CMD:-docker}"
 skip_docker="${SKIP_DOCKER:-0}"
 run_compose_up="${RUN_COMPOSE_UP:-0}"
 require_douyin_artifact="${REQUIRE_DOUYIN_ARTIFACT:-0}"
@@ -29,6 +30,12 @@ git rev-parse HEAD
 git tag --points-at HEAD
 printf 'PYTHON=%s\n' "$python_cmd"
 printf 'NODE=%s\n' "$node_cmd"
+printf 'DOCKER_CMD=%s\n' "$docker_cmd"
+
+read -r -a docker_cmd_parts <<<"$docker_cmd"
+if [[ "${#docker_cmd_parts[@]}" -eq 0 ]]; then
+  fail "DOCKER_CMD must not be empty."
+fi
 
 step "Python dependency gate"
 "$python_cmd" -B -c 'import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb'
@@ -214,11 +221,12 @@ if [[ "$skip_docker" == "1" ]]; then
 fi
 
 step "Docker availability"
-command -v docker >/dev/null 2>&1 || fail "docker command is unavailable. Phase 1.5 cannot exit and production Phase 2 remains NO-GO."
+command -v "${docker_cmd_parts[0]}" >/dev/null 2>&1 || fail "${docker_cmd_parts[0]} command is unavailable. Phase 1.5 cannot exit and production Phase 2 remains NO-GO."
+"${docker_cmd_parts[@]}" version --format 'Docker server={{.Server.Version}}' >/dev/null
 
 step "compose render"
 rendered="${TMPDIR:-/tmp}/openclaw-video-compose.phase1_5.rendered.yaml"
-docker compose -f "$compose_file" config >"$rendered"
+"${docker_cmd_parts[@]}" compose -f "$compose_file" config >"$rendered"
 if grep -E '0\.0\.0\.0:18789|0\.0\.0\.0:5432|/var/run/docker\.sock|internal: true|--token' "$rendered"; then
   fail "compose render exposes forbidden Gateway/Postgres/Docker socket/token surface"
 fi
@@ -226,24 +234,24 @@ grep -q '127.0.0.1:18181:3000' "$rendered"
 grep -q 'ws://openclaw-gateway:18789' "$rendered"
 
 step "compose build"
-docker compose -f "$compose_file" build --no-cache
+"${docker_cmd_parts[@]}" compose -f "$compose_file" build --no-cache
 
 step "worker image smoke"
-worker_image="$(docker compose -f "$compose_file" images -q video-analysis-worker)"
+worker_image="$("${docker_cmd_parts[@]}" compose -f "$compose_file" images -q video-analysis-worker)"
 if [[ -z "$worker_image" ]]; then
   fail "could not resolve built video-analysis-worker image id"
 fi
-docker run --rm "$worker_image" openclaw-douyin-adapter --help >/dev/null
-docker run --rm "$worker_image" python -c 'from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])'
+"${docker_cmd_parts[@]}" run --rm "$worker_image" openclaw-douyin-adapter --help >/dev/null
+"${docker_cmd_parts[@]}" run --rm "$worker_image" python -c 'from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])'
 
 if [[ "$run_compose_up" == "1" ]]; then
   step "compose up isolated sidecar"
   cleanup() {
-    docker compose -f "$compose_file" down --remove-orphans
+    "${docker_cmd_parts[@]}" compose -f "$compose_file" down --remove-orphans
   }
   trap cleanup EXIT
-  docker compose -f "$compose_file" up -d
-  docker compose -f "$compose_file" ps
+  "${docker_cmd_parts[@]}" compose -f "$compose_file" up -d
+  "${docker_cmd_parts[@]}" compose -f "$compose_file" ps
 
   step "localhost health"
   curl -fsS http://127.0.0.1:18181/healthz >/dev/null
@@ -262,6 +270,7 @@ if [[ "$run_compose_up" == "1" ]]; then
     --compose-file "$compose_file" \
     --python-cmd "$python_cmd" \
     --node-cmd "$node_cmd" \
+    --docker-cmd "$docker_cmd" \
     --worker-image "$worker_image"
 else
   printf 'Compose up skipped. Use RUN_COMPOSE_UP=1 only in an isolated Docker/Linux validation host.\n'

@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -57,6 +58,7 @@ class ProofContext:
     compose_file: str
     python_cmd: str
     node_cmd: str
+    docker_cmd: str
     worker_image: str
 
 
@@ -91,8 +93,12 @@ def collect_context(args: argparse.Namespace) -> ProofContext:
     if host_os != "Linux":
         raise RuntimeError("Phase 1.5 exit proof can only be generated on an isolated Linux Docker host")
 
-    docker_version = _run(["docker", "version", "--format", "Docker server={{.Server.Version}}"], cwd=repo)
-    docker_compose_version = _run(["docker", "compose", "version"], cwd=repo)
+    docker_cmd = shlex.split(args.docker_cmd)
+    if not docker_cmd:
+        raise RuntimeError("docker command prefix is required")
+
+    docker_version = _run([*docker_cmd, "version", "--format", "Docker server={{.Server.Version}}"], cwd=repo)
+    docker_compose_version = _run([*docker_cmd, "compose", "version"], cwd=repo)
     git_commit = _run(["git", "rev-parse", "HEAD"], cwd=repo)
     git_tags = _run(["git", "tag", "--points-at", "HEAD"], cwd=repo) or "none"
 
@@ -109,6 +115,7 @@ def collect_context(args: argparse.Namespace) -> ProofContext:
         compose_file=_clean_line(args.compose_file, "compose_file"),
         python_cmd=_clean_line(args.python_cmd, "python_cmd"),
         node_cmd=_clean_line(args.node_cmd, "node_cmd"),
+        docker_cmd=_clean_line(args.docker_cmd, "docker_cmd"),
         worker_image=_clean_line(args.worker_image, "worker_image"),
     )
 
@@ -137,6 +144,7 @@ host_name: {context.host_name}
 host_date: {context.host_date}
 docker version: {context.docker_version}
 docker compose version: {context.docker_compose_version}
+docker_command: {context.docker_cmd}
 git_commit: {context.git_commit}
 git_tags: {context.git_tags}
 operator: {context.operator}
@@ -152,6 +160,7 @@ RUN_COMPOSE_UP=1 \\
 SKIP_DOCKER=0 \\
 PYTHON={context.python_cmd} \\
 NODE={context.node_cmd} \\
+DOCKER_CMD={context.docker_cmd} \\
 scripts/verify_phase1_5_gates.sh
 ```
 
@@ -159,6 +168,8 @@ scripts/verify_phase1_5_gates.sh
 
 ```text
 compose_file: {context.compose_file}
+docker version command: {context.docker_cmd} version --format 'Docker server={{{{.Server.Version}}}}'
+docker compose version command: {context.docker_cmd} compose version
 Python dependency gate: PASS
 Python unittest: PASS
 Python compileall: PASS
@@ -215,6 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--compose-file", default="openclaw-video/docker-compose.openclaw-video.yaml")
     parser.add_argument("--python-cmd", default=os.environ.get("PYTHON", "python"))
     parser.add_argument("--node-cmd", default=os.environ.get("NODE", "node"))
+    parser.add_argument("--docker-cmd", default=os.environ.get("DOCKER_CMD", "docker"))
     parser.add_argument("--worker-image", required=True)
     parser.add_argument("--operator", default=os.environ.get("PHASE1_5_OPERATOR") or getpass.getuser())
     parser.add_argument(

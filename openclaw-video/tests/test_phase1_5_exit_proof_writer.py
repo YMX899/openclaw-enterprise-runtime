@@ -36,6 +36,7 @@ class Phase15ExitProofWriterTests(unittest.TestCase):
             compose_file="openclaw-video/docker-compose.openclaw-video.yaml",
             python_cmd="/opt/venv/bin/python",
             node_cmd="node",
+            docker_cmd="sudo -n docker",
             worker_image="sha256:" + "b" * 64,
         )
 
@@ -74,6 +75,8 @@ class Phase15ExitProofWriterTests(unittest.TestCase):
         self.assertIn("docker compose down --remove-orphans: PASS", proof)
         self.assertIn("port exposure check: PASS, no 0.0.0.0 listener", proof)
         self.assertIn("Bridge healthz at http://127.0.0.1:18181/healthz: PASS", proof)
+        self.assertIn("DOCKER_CMD=sudo -n docker", proof)
+        self.assertIn("docker version command: sudo -n docker version", proof)
 
 
 if __name__ == "__main__":
