@@ -16,6 +16,13 @@ class Phase15AcceptanceRunnerTests(unittest.TestCase):
         self.assertIn('target_label" == "root"', self.text)
         self.assertIn("/app/bin/dify/dify-1.11.2/docker/docker-compose.yaml", self.text)
 
+    def test_supports_archive_build_info_anchor(self):
+        self.assertIn("print_version_anchor", self.text)
+        self.assertIn("BUILD_INFO", self.text)
+        self.assertIn("git_commit=", self.text)
+        self.assertIn("git_tags=", self.text)
+        self.assertIn("rebuild the archive with git archive", self.text)
+
     def test_requires_non_production_secret_files_without_printing_contents(self):
         for path in [
             "openclaw-video/secrets/openclaw_gateway_token",

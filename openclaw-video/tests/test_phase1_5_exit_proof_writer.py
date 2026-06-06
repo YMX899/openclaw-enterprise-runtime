@@ -1,4 +1,5 @@
 import importlib.util
+from unittest import mock
 from pathlib import Path
 import sys
 import unittest
@@ -77,6 +78,63 @@ class Phase15ExitProofWriterTests(unittest.TestCase):
         self.assertIn("Bridge healthz at http://127.0.0.1:18181/healthz: PASS", proof)
         self.assertIn("DOCKER_CMD=sudo -n docker", proof)
         self.assertIn("docker version command: sudo -n docker version", proof)
+
+    def test_collect_context_can_use_archive_build_info_without_git_directory(self):
+        from argparse import Namespace
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            (repo / "BUILD_INFO").write_text(
+                """
+schema_version: openclaw-build-info.v1
+git_commit: cccccccccccccccccccccccccccccccccccccccc
+git_refs: HEAD, tag: phase1-5-archive-test, master
+""".lstrip(),
+                encoding="utf-8",
+            )
+            args = Namespace(
+                repo_root=str(repo),
+                docker_cmd="docker",
+                operator="codex",
+                reviewer="separate-production-go-no-go-review-required",
+                compose_file="openclaw-video/docker-compose.openclaw-video.yaml",
+                python_cmd="python3",
+                node_cmd="node",
+                worker_image="sha256:" + "d" * 64,
+            )
+
+            def fake_run(command, *, cwd):
+                if command[:2] == ["git", "rev-parse"]:
+                    raise RuntimeError("not a git repository")
+                if command[:2] == ["git", "tag"]:
+                    raise RuntimeError("not a git repository")
+                if command == ["docker", "version", "--format", "Docker server={{.Server.Version}}"]:
+                    return "Docker server=29.4.0"
+                if command == ["docker", "compose", "version"]:
+                    return "Docker Compose version v5.1.3"
+                raise AssertionError(command)
+
+            with mock.patch.object(writer.platform, "system", return_value="Linux"):
+                with mock.patch.object(writer.socket, "gethostname", return_value="isolated-linux-test"):
+                    with mock.patch.object(writer, "_run", side_effect=fake_run):
+                        context = writer.collect_context(args)
+
+        self.assertEqual(context.git_commit, "c" * 40)
+        self.assertEqual(context.git_tags, "phase1-5-archive-test")
+
+    def test_archive_build_info_requires_resolved_commit(self):
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            (repo / "BUILD_INFO").write_text(
+                "git_commit: $Format:%H$\ngit_refs: $Format:%D$\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "resolved git commit"):
+                writer._archive_identity(repo)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,29 @@ fail() {
   exit 1
 }
 
+print_version_anchor() {
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'git_commit=%s\n' "$(git rev-parse HEAD)"
+    tags="$(git tag --points-at HEAD | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    printf 'git_tags=%s\n' "${tags:-none}"
+    return
+  fi
+
+  if [[ ! -f BUILD_INFO ]]; then
+    fail "missing git checkout and BUILD_INFO; cannot establish rollback anchor."
+  fi
+
+  commit="$(awk -F': ' '/^git_commit:/ {print $2}' BUILD_INFO | head -n 1)"
+  refs="$(awk -F': ' '/^git_refs:/ {print $2}' BUILD_INFO | head -n 1)"
+  if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+    fail "BUILD_INFO does not contain a resolved git commit; rebuild the archive with git archive."
+  fi
+
+  tags="$(printf '%s\n' "$refs" | tr ',' '\n' | sed -n 's/^[[:space:]]*tag: //p' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  printf 'git_commit=%s\n' "$commit"
+  printf 'git_tags=%s\n' "${tags:-none}"
+}
+
 cd "$(dirname "$0")/.."
 
 host_name="$(hostname 2>/dev/null || true)"
@@ -32,8 +55,7 @@ printf 'host_name=%s\n' "$host_name"
 printf 'target_label=%s\n' "$target_label"
 printf 'PYTHON=%s\n' "$python_cmd"
 printf 'DOCKER_CMD=%s\n' "$docker_cmd"
-git rev-parse HEAD
-git tag --points-at HEAD
+print_version_anchor
 
 if [[ "$require_secrets" == "1" ]]; then
   step "secret file presence"

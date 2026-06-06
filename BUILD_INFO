@@ -1,0 +1,3 @@
+schema_version: openclaw-build-info.v1
+git_commit: $Format:%H$
+git_refs: $Format:%D$

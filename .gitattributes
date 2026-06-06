@@ -1,6 +1,7 @@
 * text=auto
 
 .gitattributes text eol=lf
+BUILD_INFO text eol=lf export-subst
 .gitignore text eol=lf
 *.md text eol=lf
 *.txt text eol=lf

@@ -20,14 +20,36 @@ fail() {
   exit 1
 }
 
+print_version_anchor() {
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if [[ "$allow_dirty" != "1" ]] && [[ -n "$(git status --short)" ]]; then
+      fail "git worktree is not clean; commit or discard unrelated changes before Phase 1.5 exit."
+    fi
+    printf 'git_commit=%s\n' "$(git rev-parse HEAD)"
+    tags="$(git tag --points-at HEAD | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    printf 'git_tags=%s\n' "${tags:-none}"
+    return
+  fi
+
+  if [[ ! -f BUILD_INFO ]]; then
+    fail "missing git checkout and BUILD_INFO; cannot establish rollback anchor."
+  fi
+
+  commit="$(awk -F': ' '/^git_commit:/ {print $2}' BUILD_INFO | head -n 1)"
+  refs="$(awk -F': ' '/^git_refs:/ {print $2}' BUILD_INFO | head -n 1)"
+  if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+    fail "BUILD_INFO does not contain a resolved git commit; rebuild the archive with git archive."
+  fi
+
+  tags="$(printf '%s\n' "$refs" | tr ',' '\n' | sed -n 's/^[[:space:]]*tag: //p' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+  printf 'git_commit=%s\n' "$commit"
+  printf 'git_tags=%s\n' "${tags:-none}"
+}
+
 cd "$(dirname "$0")/.."
 
 step "git rollback anchor"
-if [[ "$allow_dirty" != "1" ]] && [[ -n "$(git status --short)" ]]; then
-  fail "git worktree is not clean; commit or discard unrelated changes before Phase 1.5 exit."
-fi
-git rev-parse HEAD
-git tag --points-at HEAD
+print_version_anchor
 printf 'PYTHON=%s\n' "$python_cmd"
 printf 'NODE=%s\n' "$node_cmd"
 printf 'DOCKER_CMD=%s\n' "$docker_cmd"

@@ -78,6 +78,42 @@ def _run(command: Sequence[str], *, cwd: Path) -> str:
     return completed.stdout.strip()
 
 
+def _archive_identity(repo: Path) -> tuple[str, str]:
+    build_info = repo / "BUILD_INFO"
+    if not build_info.exists():
+        raise RuntimeError("missing .git metadata and BUILD_INFO")
+
+    values: dict[str, str] = {}
+    for line in build_info.read_text(encoding="utf-8").splitlines():
+        if ": " not in line:
+            continue
+        key, value = line.split(": ", 1)
+        values[key.strip()] = value.strip()
+
+    commit = values.get("git_commit", "")
+    refs = values.get("git_refs", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise RuntimeError("BUILD_INFO does not contain a resolved git commit")
+    if "$Format:" in refs:
+        raise RuntimeError("BUILD_INFO git_refs was not expanded by git archive")
+
+    tags = []
+    for ref in refs.split(","):
+        ref = ref.strip()
+        if ref.startswith("tag: "):
+            tags.append(ref.removeprefix("tag: ").strip())
+    return commit, ", ".join(tags) or "none"
+
+
+def _git_identity(repo: Path) -> tuple[str, str]:
+    try:
+        git_commit = _run(["git", "rev-parse", "HEAD"], cwd=repo)
+        git_tags = _run(["git", "tag", "--points-at", "HEAD"], cwd=repo) or "none"
+    except RuntimeError:
+        return _archive_identity(repo)
+    return git_commit, git_tags
+
+
 def _clean_line(value: str, field: str) -> str:
     cleaned = " ".join(str(value).strip().split())
     if not cleaned:
@@ -99,8 +135,7 @@ def collect_context(args: argparse.Namespace) -> ProofContext:
 
     docker_version = _run([*docker_cmd, "version", "--format", "Docker server={{.Server.Version}}"], cwd=repo)
     docker_compose_version = _run([*docker_cmd, "compose", "version"], cwd=repo)
-    git_commit = _run(["git", "rev-parse", "HEAD"], cwd=repo)
-    git_tags = _run(["git", "tag", "--points-at", "HEAD"], cwd=repo) or "none"
+    git_commit, git_tags = _git_identity(repo)
 
     return ProofContext(
         host_name=_clean_line(socket.gethostname(), "host_name"),
