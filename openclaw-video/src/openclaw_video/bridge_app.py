@@ -263,6 +263,7 @@ LAB_PAGE_HTML = """<!doctype html>
     const output = document.getElementById('output');
     const authStatus = document.getElementById('authStatus');
     let currentJobId = '';
+    const apiPrefix = window.location.pathname.startsWith('/ai/openclaw-lab') ? '/ai/openclaw-api' : '/openclaw-api';
     const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
 
     function show(value) {
@@ -274,7 +275,7 @@ LAB_PAGE_HTML = """<!doctype html>
       let lastJob = null;
       for (let attempt = 0; attempt < attempts; attempt += 1) {
         await delay(1000);
-        lastPoll = await api('/openclaw-api/jobs/' + encodeURIComponent(jobId));
+        lastPoll = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId));
         lastJob = lastPoll.body.job || null;
         if (lastJob && terminalStatuses.has(lastJob.status)) break;
       }
@@ -314,7 +315,7 @@ LAB_PAGE_HTML = """<!doctype html>
       return { status: response.status, body };
     }
     async function refreshMe() {
-      const result = await api('/openclaw-api/me');
+      const result = await api(apiPrefix + '/me');
       if (result.status === 200) {
         authStatus.textContent = 'Authenticated';
         authStatus.className = 'status ok';
@@ -325,7 +326,7 @@ LAB_PAGE_HTML = """<!doctype html>
       show(result);
     }
     async function createSession() {
-      const result = await api('/openclaw-api/sessions', {
+      const result = await api(apiPrefix + '/sessions', {
         method: 'POST',
         body: JSON.stringify({ title: document.getElementById('sessionTitle').value || 'Video analysis' })
       });
@@ -335,7 +336,7 @@ LAB_PAGE_HTML = """<!doctype html>
       show(result);
     }
     async function identityDiagnostics() {
-      show(await api('/openclaw-api/identity/diagnostics'));
+      show(await api(apiPrefix + '/identity/diagnostics'));
     }
     async function runSelfTest() {
       const steps = [];
@@ -343,19 +344,19 @@ LAB_PAGE_HTML = """<!doctype html>
         steps.push({ name, ...result });
         show({ self_test: steps });
       };
-      const diagnostics = await api('/openclaw-api/identity/diagnostics');
+      const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
       if (!diagnostics.body.authenticated) return;
 
-      const me = await api('/openclaw-api/me');
+      const me = await api(apiPrefix + '/me');
       add('me', { status: me.status, body: me.body });
       if (me.status !== 200) return;
 
       const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-      const missing = await api('/openclaw-api/sessions/' + encodeURIComponent(randomId) + '/messages');
+      const missing = await api(apiPrefix + '/sessions/' + encodeURIComponent(randomId) + '/messages');
       add('random_session_404', { status: missing.status, ok: missing.status === 404 });
 
-      const sessionResult = await api('/openclaw-api/sessions', {
+      const sessionResult = await api(apiPrefix + '/sessions', {
         method: 'POST',
         body: JSON.stringify({ title: 'OpenClaw self test ' + new Date().toISOString() })
       });
@@ -364,7 +365,7 @@ LAB_PAGE_HTML = """<!doctype html>
       if (!sessionId) return;
       document.getElementById('sessionId').value = sessionId;
 
-      const jobResult = await api('/openclaw-api/jobs', {
+      const jobResult = await api(apiPrefix + '/jobs', {
         method: 'POST',
         body: JSON.stringify({
           session_id: sessionId,
@@ -380,13 +381,13 @@ LAB_PAGE_HTML = """<!doctype html>
       let lastJob = null;
       for (let attempt = 0; attempt < 20; attempt += 1) {
         await delay(1000);
-        const poll = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId));
+        const poll = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId));
         lastJob = poll.body.job || null;
         if (lastJob && terminalStatuses.has(lastJob.status)) break;
       }
       add('poll_invalid_url_job', { body: lastJob });
 
-      const messages = await api('/openclaw-api/sessions/' + encodeURIComponent(sessionId) + '/messages');
+      const messages = await api(apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages');
       add('messages', {
         status: messages.status,
         count: messages.body.messages ? messages.body.messages.length : 0
@@ -398,23 +399,23 @@ LAB_PAGE_HTML = """<!doctype html>
         steps.push({ name, ...result });
         show({ security_test: steps });
       };
-      const diagnostics = await api('/openclaw-api/identity/diagnostics');
+      const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
       if (!diagnostics.body.authenticated) return;
 
-      const me = await api('/openclaw-api/me');
+      const me = await api(apiPrefix + '/me');
       add('me', { status: me.status, authenticated: me.body.authenticated === true });
       if (me.status !== 200) return;
 
       const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-      const randomMessages = await api('/openclaw-api/sessions/' + encodeURIComponent(randomId) + '/messages');
+      const randomMessages = await api(apiPrefix + '/sessions/' + encodeURIComponent(randomId) + '/messages');
       add('random_session_404', { status: randomMessages.status, ok: randomMessages.status === 404 });
-      const randomJob = await api('/openclaw-api/jobs/' + encodeURIComponent(randomId));
+      const randomJob = await api(apiPrefix + '/jobs/' + encodeURIComponent(randomId));
       add('random_job_404', { status: randomJob.status, ok: randomJob.status === 404 });
-      const randomResult = await api('/openclaw-api/jobs/' + encodeURIComponent(randomId) + '/result');
+      const randomResult = await api(apiPrefix + '/jobs/' + encodeURIComponent(randomId) + '/result');
       add('random_result_404', { status: randomResult.status, ok: randomResult.status === 404 });
 
-      const sessionResult = await api('/openclaw-api/sessions', {
+      const sessionResult = await api(apiPrefix + '/sessions', {
         method: 'POST',
         body: JSON.stringify({ title: 'OpenClaw security test ' + new Date().toISOString() })
       });
@@ -429,7 +430,7 @@ LAB_PAGE_HTML = """<!doctype html>
         ['cloud_metadata_blocked', 'http://169.254.169.254/latest/meta-data/']
       ];
       for (const [caseName, videoUrl] of negativeCases) {
-        const created = await api('/openclaw-api/jobs', {
+        const created = await api(apiPrefix + '/jobs', {
           method: 'POST',
           body: JSON.stringify({
             session_id: sessionId,
@@ -445,7 +446,7 @@ LAB_PAGE_HTML = """<!doctype html>
         let lastJob = null;
         for (let attempt = 0; attempt < 30; attempt += 1) {
           await delay(1000);
-          const poll = await api('/openclaw-api/jobs/' + encodeURIComponent(jobId));
+          const poll = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId));
           lastJob = poll.body.job || null;
           if (lastJob && terminalStatuses.has(lastJob.status)) break;
         }
@@ -457,7 +458,7 @@ LAB_PAGE_HTML = """<!doctype html>
         });
       }
 
-      const messages = await api('/openclaw-api/sessions/' + encodeURIComponent(sessionId) + '/messages');
+      const messages = await api(apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages');
       add('messages', {
         status: messages.status,
         count: messages.body.messages ? messages.body.messages.length : 0
@@ -475,7 +476,7 @@ LAB_PAGE_HTML = """<!doctype html>
         render(failed.length ? 'FAIL' : 'PASS');
       };
 
-      const diagnostics = await api('/openclaw-api/identity/diagnostics');
+      const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       const diagnosticsOk = diagnostics.status === 200
         && diagnostics.body.authenticated === true
         && diagnostics.body.profile_ok === true
@@ -495,7 +496,7 @@ LAB_PAGE_HTML = """<!doctype html>
         return;
       }
 
-      const me = await api('/openclaw-api/me');
+      const me = await api(apiPrefix + '/me');
       add('me', {
         status: me.status,
         ok: me.status === 200 && me.body.authenticated === true && typeof me.body.principal_id === 'string',
@@ -508,14 +509,14 @@ LAB_PAGE_HTML = """<!doctype html>
       }
 
       const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-      const randomMessages = await api('/openclaw-api/sessions/' + encodeURIComponent(randomId) + '/messages');
+      const randomMessages = await api(apiPrefix + '/sessions/' + encodeURIComponent(randomId) + '/messages');
       add('random_session_404', { status: randomMessages.status, ok: randomMessages.status === 404 });
-      const randomJob = await api('/openclaw-api/jobs/' + encodeURIComponent(randomId));
+      const randomJob = await api(apiPrefix + '/jobs/' + encodeURIComponent(randomId));
       add('random_job_404', { status: randomJob.status, ok: randomJob.status === 404 });
-      const randomResult = await api('/openclaw-api/jobs/' + encodeURIComponent(randomId) + '/result');
+      const randomResult = await api(apiPrefix + '/jobs/' + encodeURIComponent(randomId) + '/result');
       add('random_result_404', { status: randomResult.status, ok: randomResult.status === 404 });
 
-      const sessionResult = await api('/openclaw-api/sessions', {
+      const sessionResult = await api(apiPrefix + '/sessions', {
         method: 'POST',
         body: JSON.stringify({ title: 'OpenClaw post-login acceptance ' + new Date().toISOString() })
       });
@@ -533,7 +534,7 @@ LAB_PAGE_HTML = """<!doctype html>
         ['cloud_metadata_blocked', 'http://169.254.169.254/latest/meta-data/']
       ];
       for (const [caseName, videoUrl] of negativeCases) {
-        const created = await api('/openclaw-api/jobs', {
+        const created = await api(apiPrefix + '/jobs', {
           method: 'POST',
           body: JSON.stringify({
             session_id: sessionId,
@@ -564,7 +565,7 @@ LAB_PAGE_HTML = """<!doctype html>
       form.append('session_id', sessionId);
       form.append('content', 'Post-login acceptance uploaded video.');
       form.append('video', new File([fileBytes], 'post-login-acceptance.mp4', { type: 'video/mp4' }));
-      const uploadResponse = await fetch('/openclaw-api/uploads', {
+      const uploadResponse = await fetch(apiPrefix + '/uploads', {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
@@ -585,7 +586,7 @@ LAB_PAGE_HTML = """<!doctype html>
           ok: !!uploadJob && uploadJob.status === 'succeeded'
         });
         if (uploadJob && uploadJob.status === 'succeeded') {
-          const result = await api('/openclaw-api/jobs/' + encodeURIComponent(uploadJobId) + '/result');
+          const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(uploadJobId) + '/result');
           const platform = result.body.result && result.body.result.result && result.body.result.result.source
             ? result.body.result.result.source.platform
             : null;
@@ -597,7 +598,7 @@ LAB_PAGE_HTML = """<!doctype html>
         }
       }
 
-      const messages = await api('/openclaw-api/sessions/' + encodeURIComponent(sessionId) + '/messages');
+      const messages = await api(apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages');
       add('messages_visible_to_owner', {
         status: messages.status,
         count: messages.body.messages ? messages.body.messages.length : 0,
@@ -606,7 +607,7 @@ LAB_PAGE_HTML = """<!doctype html>
       finish();
     }
     async function submitJob() {
-      const result = await api('/openclaw-api/jobs', {
+      const result = await api(apiPrefix + '/jobs', {
         method: 'POST',
         body: JSON.stringify({
           session_id: document.getElementById('sessionId').value,
@@ -629,7 +630,7 @@ LAB_PAGE_HTML = """<!doctype html>
       form.append('session_id', sessionId);
       form.append('content', document.getElementById('prompt').value || 'Analyze uploaded video.');
       form.append('video', file);
-      const response = await fetch('/openclaw-api/uploads', {
+      const response = await fetch(apiPrefix + '/uploads', {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
@@ -649,7 +650,7 @@ LAB_PAGE_HTML = """<!doctype html>
         show({ upload_smoke: steps });
       };
       if (!sessionId) {
-        const sessionResult = await api('/openclaw-api/sessions', {
+        const sessionResult = await api(apiPrefix + '/sessions', {
           method: 'POST',
           body: JSON.stringify({ title: 'OpenClaw upload smoke ' + new Date().toISOString() })
         });
@@ -666,7 +667,7 @@ LAB_PAGE_HTML = """<!doctype html>
       form.append('session_id', sessionId);
       form.append('content', 'Smoke test uploaded video.');
       form.append('video', new File([fileBytes], 'tiny-smoke.mp4', { type: 'video/mp4' }));
-      const response = await fetch('/openclaw-api/uploads', {
+      const response = await fetch(apiPrefix + '/uploads', {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
@@ -681,13 +682,13 @@ LAB_PAGE_HTML = """<!doctype html>
       let lastJob = null;
       for (let attempt = 0; attempt < 40; attempt += 1) {
         await delay(1000);
-        const poll = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId));
+        const poll = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId));
         lastJob = poll.body.job || null;
         add('poll_job', { status: poll.status, body: poll.body });
         if (lastJob && terminalStatuses.has(lastJob.status)) break;
       }
       if (lastJob && lastJob.status === 'succeeded') {
-        add('job_result', await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId) + '/result'));
+        add('job_result', await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result'));
       }
     }
     async function pollJob() {
@@ -695,10 +696,10 @@ LAB_PAGE_HTML = """<!doctype html>
         show('No job_id is available yet.');
         return;
       }
-      const jobResult = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId));
+      const jobResult = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId));
       const job = jobResult.body.job;
       if (job && job.status === 'succeeded') {
-        const result = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId) + '/result');
+        const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result');
         show({ job: jobResult, result });
         return;
       }
@@ -828,6 +829,8 @@ def create_app(
 
     @app.get("/openclaw-lab", response_class=HTMLResponse)
     @app.get("/openclaw-lab/", response_class=HTMLResponse)
+    @app.get("/ai/openclaw-lab", response_class=HTMLResponse)
+    @app.get("/ai/openclaw-lab/", response_class=HTMLResponse)
     async def openclaw_lab() -> HTMLResponse:
         return HTMLResponse(
             LAB_PAGE_HTML,
@@ -862,11 +865,13 @@ def create_app(
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     @app.get("/openclaw-api/me")
+    @app.get("/ai/openclaw-api/me")
     async def me(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         return {"principal_id": principal.principal_id, "authenticated": True, **runtime_metadata()}
 
     @app.get("/openclaw-api/identity/diagnostics")
+    @app.get("/ai/openclaw-api/identity/diagnostics")
     async def identity_diagnostics(request: Request) -> dict[str, Any]:
         result: dict[str, Any] = {
             "authenticated": False,
@@ -929,11 +934,13 @@ def create_app(
             return result
 
     @app.get("/openclaw-api/sessions")
+    @app.get("/ai/openclaw-api/sessions")
     async def sessions(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         return {"sessions": [_serialize_session(item) for item in session_store.list_sessions(principal.principal_id)]}
 
     @app.post("/openclaw-api/sessions", status_code=201)
+    @app.post("/ai/openclaw-api/sessions", status_code=201)
     async def create_session(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         payload = await request.json()
@@ -950,6 +957,7 @@ def create_app(
         return {"session": _serialize_session(session)}
 
     @app.get("/openclaw-api/sessions/{session_id}/messages")
+    @app.get("/ai/openclaw-api/sessions/{session_id}/messages")
     async def messages(session_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
@@ -959,6 +967,7 @@ def create_app(
         return {"messages": [_serialize_message(item) for item in messages]}
 
     @app.post("/openclaw-api/jobs")
+    @app.post("/ai/openclaw-api/jobs")
     async def create_job(request: Request) -> JSONResponse:
         principal = await current_principal(request)
         payload = await request.json()
@@ -1002,6 +1011,7 @@ def create_app(
         return JSONResponse(status_code=202, content={"job": _serialize_job(job)})
 
     @app.post("/openclaw-api/uploads")
+    @app.post("/ai/openclaw-api/uploads")
     async def create_upload_job(request: Request) -> JSONResponse:
         principal = await current_principal(request)
         form = await request.form()
@@ -1048,6 +1058,7 @@ def create_app(
         )
 
     @app.get("/openclaw-api/jobs/{job_id}")
+    @app.get("/ai/openclaw-api/jobs/{job_id}")
     async def get_job(job_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
@@ -1057,6 +1068,7 @@ def create_app(
         return {"job": _serialize_job(job)}
 
     @app.get("/openclaw-api/jobs/{job_id}/result")
+    @app.get("/ai/openclaw-api/jobs/{job_id}/result")
     async def get_job_result(job_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
@@ -1066,6 +1078,7 @@ def create_app(
         return {"result": _serialize_result(result)}
 
     @app.get("/openclaw-api/jobs/{job_id}/events")
+    @app.get("/ai/openclaw-api/jobs/{job_id}/events")
     async def job_events(job_id: str, request: Request) -> StreamingResponse:
         principal = await current_principal(request)
         try:
@@ -1101,6 +1114,7 @@ def create_app(
         )
 
     @app.post("/openclaw-api/retention/cleanup")
+    @app.post("/ai/openclaw-api/retention/cleanup")
     async def cleanup_retention(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         retention_days = phase4_config.data_retention_days
@@ -1131,6 +1145,7 @@ def create_app(
         }
 
     @app.post("/openclaw-api/chat")
+    @app.post("/ai/openclaw-api/chat")
     async def chat(request: Request) -> JSONResponse:
         payload = await request.json()
         if not isinstance(payload, dict):

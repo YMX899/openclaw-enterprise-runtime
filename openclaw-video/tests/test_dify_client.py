@@ -7,8 +7,10 @@ from openclaw_video.dify_client import (
     HUAHUO_ACCESS_TOKEN_HEADER,
     HUAHUO_REFRESH_TOKEN_HEADER,
     HuahuoFrontClient,
+    huahuo_cookie_headers,
     huahuo_authorization_header,
     huahuo_identity_headers,
+    huahuo_identity_material_present,
     identity_headers,
 )
 
@@ -70,6 +72,19 @@ class DifyClientTests(unittest.TestCase):
     def test_huahuo_identity_headers_allows_signed_bearer_without_cookie(self):
         selected = huahuo_identity_headers({"Authorization": "Bearer signed"})
         self.assertEqual(selected, {"Authorization": "Bearer signed"})
+
+    def test_huahuo_cookie_headers_are_available_for_same_site_identity_only(self):
+        selected = huahuo_cookie_headers(
+            {
+                "Cookie": "huahuo_session=secret",
+                "OpenClaw-Gateway-Token": "gateway-secret",
+                "User-Agent": "browser",
+            }
+        )
+
+        self.assertEqual(selected, {"Cookie": "huahuo_session=secret"})
+        self.assertTrue(huahuo_identity_material_present({"Cookie": "huahuo_session=secret"}))
+        self.assertFalse(huahuo_identity_material_present({"User-Agent": "browser"}))
 
     @unittest.skipIf(httpx is None, "httpx is not installed")
     def test_huahuo_client_refreshes_expired_front_access_token(self):
@@ -205,6 +220,33 @@ class DifyClientTests(unittest.TestCase):
         self.assertNotIn("fresh-refresh", rendered)
         self.assertNotIn("safe-name", rendered)
         self.assertNotIn("hidden", rendered)
+
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_huahuo_client_can_use_cookie_only_identity_without_recording_cookie(self):
+        requests = []
+
+        def handler(request):
+            requests.append((request.method, str(request.url), request.headers.get("Cookie", "")))
+            if request.url.path == "/api/front/user/queryUserInfo":
+                return httpx.Response(200, json={"status": 1, "data": {"id": 21, "loginName": "cookie-user"}})
+            return httpx.Response(404)
+
+        client = HuahuoFrontClient(
+            "https://www.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+
+        import asyncio
+
+        profile = asyncio.run(client.profile({"Cookie": "huahuo_session=secret"}))
+        probe = asyncio.run(client.safe_identity_probe({"Cookie": "huahuo_session=secret"}))
+
+        self.assertEqual(profile, {"id": "huahuo:21"})
+        self.assertEqual(probe["identity_headers_present"], True)
+        self.assertEqual(probe["profile_data_keys"], ["id", "loginName"])
+        rendered = repr(probe)
+        self.assertNotIn("huahuo_session=secret", rendered)
+        self.assertTrue(all(cookie == "huahuo_session=secret" for _, _, cookie in requests))
 
 
 if __name__ == "__main__":

@@ -92,6 +92,17 @@ def huahuo_identity_headers(headers: Mapping[str, str], *, access_token: str | N
     return {}
 
 
+def huahuo_cookie_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Return Huahuo cookie material for same-site identity lookup only."""
+
+    cookie = _header_value(headers, "cookie").strip()
+    return {"Cookie": cookie} if cookie else {}
+
+
+def huahuo_identity_material_present(headers: Mapping[str, str]) -> bool:
+    return bool(huahuo_identity_headers(headers) or huahuo_cookie_headers(headers))
+
+
 def huahuo_front_request_headers(headers: Mapping[str, str], *, access_token: str | None = None) -> dict[str, str]:
     request_headers = {
         "Accept": "application/json, text/plain, */*",
@@ -104,6 +115,7 @@ def huahuo_front_request_headers(headers: Mapping[str, str], *, access_token: st
             "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
         ),
     }
+    request_headers.update(huahuo_cookie_headers(headers))
     request_headers.update(huahuo_identity_headers(headers, access_token=access_token))
     return request_headers
 
@@ -192,7 +204,7 @@ class HuahuoFrontClient:
     async def safe_identity_probe(self, headers: Mapping[str, str]) -> dict[str, object]:
         result: dict[str, object] = {
             "provider": "huahuo_front",
-            "identity_headers_present": bool(huahuo_identity_headers(headers)),
+            "identity_headers_present": huahuo_identity_material_present(headers),
             "profile_http_status": None,
             "profile_business_status": None,
             "profile_data_keys": [],

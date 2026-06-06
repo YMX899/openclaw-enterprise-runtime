@@ -40,7 +40,7 @@ class DenyingDifyClient:
 
 class FakeHuahuoClient:
     async def profile(self, headers):
-        token = headers.get("x-huahuo-access-token")
+        token = headers.get("x-huahuo-access-token") or headers.get("cookie")
         if not token:
             raise PermissionError("login required")
         return {"id": "huahuo:front-user-a"}
@@ -51,7 +51,7 @@ class FakeHuahuoClient:
     async def safe_identity_probe(self, headers):
         return {
             "provider": "huahuo_front",
-            "identity_headers_present": bool(headers.get("x-huahuo-access-token")),
+            "identity_headers_present": bool(headers.get("x-huahuo-access-token") or headers.get("cookie")),
             "profile_http_status": 200,
             "profile_business_status": 1,
             "profile_data_keys": ["id", "loginName"],
@@ -148,11 +148,14 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("X-Huahuo-Access-Token", response.text)
         self.assertIn("X-Huahuo-App-UUID", response.text)
         self.assertIn("X-Huahuo-Refresh-Token", response.text)
-        self.assertIn("/openclaw-api/me", response.text)
-        self.assertIn("/openclaw-api/identity/diagnostics", response.text)
-        self.assertIn("/openclaw-api/jobs", response.text)
-        self.assertIn("/openclaw-api/uploads", response.text)
-        self.assertIn("/openclaw-api/jobs/' + encodeURIComponent(currentJobId) + '/result", response.text)
+        self.assertIn("const apiPrefix", response.text)
+        self.assertIn("'/openclaw-api'", response.text)
+        self.assertIn("'/ai/openclaw-api'", response.text)
+        self.assertIn("apiPrefix + '/me'", response.text)
+        self.assertIn("apiPrefix + '/identity/diagnostics'", response.text)
+        self.assertIn("apiPrefix + '/jobs'", response.text)
+        self.assertIn("apiPrefix + '/uploads'", response.text)
+        self.assertIn("apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result", response.text)
         self.assertIn("Upload Video", response.text)
         self.assertIn("Tiny Upload", response.text)
         self.assertIn("FormData", response.text)
@@ -185,6 +188,16 @@ class BridgeAppTests(unittest.TestCase):
         response = self.client.get("/openclaw-lab")
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("OpenClaw Lab", response.text)
+
+    def test_ai_scoped_openclaw_lab_uses_ai_api_prefix_without_secret_surface(self):
+        response = self.client.get("/ai/openclaw-lab/")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("OpenClaw Lab", response.text)
+        self.assertIn("/ai/openclaw-api", response.text)
+        self.assertIn("/openclaw-api", response.text)
+        self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
+        self.assertNotIn("Authorization", response.text)
+        self.assertNotIn("Cookie", response.text)
 
     def test_me_does_not_expose_raw_dify_ids(self):
         response = self.client.get("/openclaw-api/me", headers=self.auth())
@@ -381,6 +394,36 @@ class BridgeAppTests(unittest.TestCase):
         self.assertNotIn("front-app-uuid", response.text)
         self.assertNotIn("accessToken", response.text)
         self.assertNotIn("refreshToken", response.text)
+
+    def test_huahuo_identity_diagnostics_accepts_cookie_only_without_echoing_cookie(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=FakeHuahuoClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.get("/openclaw-api/identity/diagnostics", headers={"Cookie": "huahuo_session=secret"})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(body["login_material_present"], True)
+        self.assertEqual(body["huahuo_access_token_present"], False)
+        self.assertEqual(body["provider_probe"]["identity_headers_present"], True)
+        self.assertNotIn("huahuo_session=secret", response.text)
+        self.assertNotIn("Cookie", response.text)
+
+    def test_ai_scoped_api_alias_uses_same_auth_and_response_shape(self):
+        response = self.client.get("/ai/openclaw-api/me", headers=self.auth())
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(len(body["principal_id"]), 64)
+        self.assertNotIn("account-a", response.text)
+        self.assertNotIn("tenant-a", response.text)
 
     def test_huahuo_identity_diagnostics_probe_is_safe_when_profile_fails(self):
         from openclaw_video.bridge_app import create_app
