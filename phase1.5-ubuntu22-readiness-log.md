@@ -268,3 +268,131 @@ compose-up and exit-proof generation.
 No sudo password, docker group change, Docker socket permission change, daemon
 restart, package install, image build, compose up, or production/root-server
 operation was performed.
+
+## Acceptance Runner Archive Probe
+
+Refresh time:
+
+```text
+2026-06-06T13:41:24+08:00
+```
+
+Final uploaded build:
+
+```text
+commit: 2ea96098c5623478c14fd2b2ab99a81773364582
+tag: phase1-5-sudo-docker-prefix-20260606
+archive: tmp/openclaw-dify-phase1.5-2ea9609.tar.gz
+remote_archive: /tmp/openclaw-dify-phase1.5-2ea9609.tar.gz
+remote_extract: /tmp/openclaw-dify-phase1.5-2ea9609
+```
+
+The uploaded `git archive` package now carries a resolved rollback anchor:
+
+```text
+BUILD_INFO schema: openclaw-build-info.v1
+git_commit: 2ea96098c5623478c14fd2b2ab99a81773364582
+git_refs: HEAD -> master, tag: phase1-5-sudo-docker-prefix-20260606
+```
+
+Archive execution checks on `ubuntu22.04`:
+
+```text
+script modes: 775 scripts/run_phase1_5_acceptance.sh; 775 scripts/verify_phase1_5_gates.sh
+bash -n scripts/run_phase1_5_acceptance.sh: PASS
+python3 -B -m unittest openclaw-video/tests/test_phase1_5_host_readiness.py openclaw-video/tests/test_phase1_5_acceptance_runner.py: PASS, 17 tests
+```
+
+The probe intentionally used `REQUIRE_SECRETS=0`, so it could only validate the
+runner, archive identity, and host readiness path. It could not and did not
+produce Phase 1.5 exit proof.
+
+Direct Docker acceptance runner:
+
+```text
+command: REQUIRE_SECRETS=0 TARGET_LABEL=ubuntu22.04 PYTHON=python3 scripts/run_phase1_5_acceptance.sh
+runner_exit: 1
+git_commit: 2ea96098c5623478c14fd2b2ab99a81773364582
+git_tags: phase1-5-sudo-docker-prefix-20260606
+overall: NO_GO
+host_os: PASS, Linux x86_64
+python3: PASS, Python 3.10.12
+node: PASS, v24.14.1
+docker_engine: NO_GO, permission denied while trying to connect to the docker API at unix:///var/run/docker.sock
+docker_compose: PASS, Docker Compose version v5.1.3
+disk_free: PASS, 50.5GiB free
+memory_total: PASS, 15.6GiB total
+```
+
+Non-interactive sudo Docker acceptance runner:
+
+```text
+command: REQUIRE_SECRETS=0 TARGET_LABEL=ubuntu22.04 DOCKER_CMD='sudo -n docker' PYTHON=python3 scripts/run_phase1_5_acceptance.sh
+runner_exit: 1
+git_commit: 2ea96098c5623478c14fd2b2ab99a81773364582
+git_tags: phase1-5-sudo-docker-prefix-20260606
+overall: NO_GO
+host_os: PASS, Linux x86_64
+python3: PASS, Python 3.10.12
+node: PASS, v24.14.1
+docker_engine: NO_GO, sudo: a password is required
+docker_compose: NO_GO, sudo: a password is required
+disk_free: PASS, 50.5GiB free
+memory_total: PASS, 15.6GiB total
+```
+
+Failure-closed proof check:
+
+```text
+phase1.5-exit-proof.md present after readiness NO_GO: NO
+proof_absent_after_readiness_no_go: PASS
+```
+
+During this probe, the runner defects found by a real archive deployment were
+fixed and versioned:
+
+```text
+a8d05a8 phase1-5-acceptance-runner-20260606: added one-command acceptance runner
+000bd51 phase1-5-archive-anchor-20260606: added BUILD_INFO archive rollback anchor
+d74d3e6 phase1-5-shell-execbits-20260606: preserved executable bits in archive
+38ebe9b phase1-5-archive-tag-anchor-20260606: preserved archive tag in runner output
+2ea9609 phase1-5-sudo-docker-prefix-20260606: passed sudo Docker prefix through readiness
+```
+
+Current interpretation:
+
+```text
+acceptance runner package: PASS for archive identity, executable entrypoint, syntax, and local unit tests
+ubuntu22.04 host readiness: NO_GO because current SSH user cannot access Docker Engine
+Phase 1.5 full isolated Docker proof: NO_GO
+Production/root deployment: NO_GO
+```
+
+Next allowed action after Docker access is fixed on a non-production host:
+
+```bash
+cd /tmp/openclaw-dify-phase1.5-2ea9609
+
+TARGET_LABEL=ubuntu22.04 \
+DOCKER_CMD='docker' \
+PYTHON=python3 \
+scripts/run_phase1_5_acceptance.sh
+```
+
+If Docker is intentionally granted only through passwordless sudo:
+
+```bash
+TARGET_LABEL=ubuntu22.04 \
+DOCKER_CMD='sudo -n docker' \
+PYTHON=python3 \
+scripts/run_phase1_5_acceptance.sh
+```
+
+The full acceptance run still requires the non-production secret files to exist
+locally under `openclaw-video/secrets/`, a verified `douyin_chong` artifact and
+real sample evidence, and an approved OpenClaw 2026.3.13 security decision.
+
+No sudo password, Docker group change, Docker socket permission change, daemon
+restart, package install, image build, compose up, production SSH operation, Dify
+container operation, OpenResty reload, `.env` read, Cookie read, token read, or
+root-server deployment was performed.
