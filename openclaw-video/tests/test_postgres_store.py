@@ -143,6 +143,26 @@ class PostgresJobStoreTests(unittest.TestCase):
         self.assertIn("lease_expires_at < now()", sql)
         self.assertEqual(recovered, 2)
 
+    def test_count_active_jobs_counts_only_queued_and_running_for_owner(self):
+        fake = FakeConnection([{"active_count": 2}])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        active = store.count_active_jobs("owner")
+        sql, params = fake.queries[0]
+        self.assertIn("status IN ('queued', 'running')", sql)
+        self.assertEqual(params, ("owner",))
+        self.assertEqual(active, 2)
+
+    def test_get_job_by_idempotency_uses_owner_session_and_key(self):
+        fake = FakeConnection([job_row(idempotency_key="same-request")])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        job = store.get_job_by_idempotency("owner", "session", "same-request")
+        sql, params = fake.queries[0]
+        self.assertIn("owner_principal_id = %s", sql)
+        self.assertIn("bridge_session_id = %s", sql)
+        self.assertIn("idempotency_key = %s", sql)
+        self.assertEqual(params, ("owner", "session", "same-request"))
+        self.assertEqual(job.idempotency_key, "same-request")
+
 
 if __name__ == "__main__":
     unittest.main()

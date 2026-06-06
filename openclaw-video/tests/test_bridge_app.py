@@ -10,6 +10,7 @@ except ImportError:  # pragma: no cover - exercised when optional deps are absen
     TestClient = None
 
 from openclaw_video.job_store import InMemoryJobStore
+from openclaw_video.identity import hmac_sha256_hex
 from openclaw_video.openclaw_gateway import GatewayChatResult
 from openclaw_video.session_store import InMemorySessionStore
 
@@ -113,8 +114,15 @@ class BridgeAppTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["authenticated"], True)
         self.assertIn("principal_id", body)
+        self.assertIn("versions", body)
+        self.assertEqual(body["versions"]["result_schema_version"], "openclaw-video-result.v1")
+        self.assertEqual(body["versions"]["openclaw_version"], "2026.3.13")
+        self.assertIn("limits", body)
+        self.assertIn("access", body)
         self.assertNotIn("tenant_id", body)
         self.assertNotIn("account_id", body)
+        self.assertNotIn("tenant-a", response.text)
+        self.assertNotIn("account-a", response.text)
 
     def test_login_required_for_me(self):
         response = self.client.get("/openclaw-api/me")
@@ -128,6 +136,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["login_material_present"], False)
         self.assertEqual(body["profile_ok"], False)
         self.assertEqual(body["workspace_ok"], False)
+        self.assertEqual(body["access_ok"], False)
         self.assertEqual(body["failure_stage"], "profile")
         self.assertIsNone(body["principal_id"])
         self.assertNotIn("cookie", response.text.lower())
@@ -144,6 +153,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["login_material_present"], True)
         self.assertEqual(body["profile_ok"], True)
         self.assertEqual(body["workspace_ok"], True)
+        self.assertEqual(body["access_ok"], True)
         self.assertEqual(body["current_workspace_count"], 1)
         self.assertEqual(len(body["principal_id"]), 64)
         self.assertIsNone(body["failure_stage"])
@@ -161,6 +171,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["authenticated"], False)
         self.assertEqual(body["profile_ok"], True)
         self.assertEqual(body["workspace_ok"], False)
+        self.assertEqual(body["access_ok"], False)
         self.assertEqual(body["current_workspace_count"], 2)
         self.assertEqual(body["failure_stage"], "workspace")
         self.assertIsNone(body["principal_id"])
@@ -233,6 +244,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["authenticated"], True)
         self.assertEqual(body["profile_ok"], True)
         self.assertEqual(body["workspace_ok"], True)
+        self.assertEqual(body["access_ok"], True)
         self.assertEqual(len(body["principal_id"]), 64)
         self.assertNotIn("account-a", response.text)
         self.assertNotIn("tenant-a", response.text)
@@ -335,6 +347,194 @@ class BridgeAppTests(unittest.TestCase):
             )
             self.assertEqual(too_big.status_code, 400, too_big.text)
             self.assertIn("uploaded video exceeds size limit", too_big.text)
+
+    def test_allowlist_uses_hashed_tenant_and_account_without_exposing_raw_ids(self):
+        from openclaw_video.bridge_app import create_app
+
+        tenant_hash = hmac_sha256_hex("test-secret", "tenant:tenant-a")
+        account_hash = hmac_sha256_hex("test-secret", "account:account-a")
+        with mock.patch.dict(
+            os.environ,
+            {
+                "OPENCLAW_TENANT_ALLOWLIST_HASHES": tenant_hash,
+                "OPENCLAW_ACCOUNT_ALLOWLIST_HASHES": account_hash,
+            },
+        ):
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
+            )
+
+        allowed = client.get("/openclaw-api/me", headers=self.auth("account-a", "tenant-a"))
+        self.assertEqual(allowed.status_code, 200, allowed.text)
+        self.assertEqual(allowed.json()["access"]["tenant_allowlist_enabled"], True)
+        self.assertEqual(allowed.json()["access"]["account_allowlist_enabled"], True)
+        self.assertNotIn("tenant-a", allowed.text)
+        self.assertNotIn("account-a", allowed.text)
+
+        wrong_tenant = client.get("/openclaw-api/me", headers=self.auth("account-a", "tenant-b"))
+        self.assertEqual(wrong_tenant.status_code, 403)
+        self.assertNotIn("tenant-b", wrong_tenant.text)
+        self.assertNotIn("account-a", wrong_tenant.text)
+
+        diagnostics = client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers=self.auth("account-a", "tenant-b"),
+        )
+        self.assertEqual(diagnostics.status_code, 200, diagnostics.text)
+        body = diagnostics.json()
+        self.assertEqual(body["profile_ok"], True)
+        self.assertEqual(body["workspace_ok"], True)
+        self.assertEqual(body["access_ok"], False)
+        self.assertEqual(body["failure_stage"], "access")
+        self.assertIsNone(body["principal_id"])
+        self.assertNotIn("tenant-b", diagnostics.text)
+        self.assertNotIn("account-a", diagnostics.text)
+
+    def test_job_submission_respects_active_job_limit(self):
+        from openclaw_video.bridge_app import create_app
+
+        with mock.patch.dict(os.environ, {"OPENCLAW_USER_ACTIVE_JOB_LIMIT": "1"}):
+            jobs = InMemoryJobStore()
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=jobs,
+                    identity_secret="test-secret",
+                )
+            )
+        session = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Video analysis"},
+            headers=self.auth("account-a"),
+        ).json()["session"]
+        first = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/one"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(first.status_code, 202, first.text)
+        second = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/two"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(second.status_code, 429)
+        self.assertIn("active job limit exceeded", second.text)
+
+        jobs.fail_job(first.json()["job"]["job_id"], "test_done")
+        after_terminal = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/three"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(after_terminal.status_code, 202, after_terminal.text)
+
+    def test_idempotent_job_retry_returns_existing_job_before_active_limit(self):
+        from openclaw_video.bridge_app import create_app
+
+        with mock.patch.dict(os.environ, {"OPENCLAW_USER_ACTIVE_JOB_LIMIT": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
+            )
+        session = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Video analysis"},
+            headers=self.auth("account-a"),
+        ).json()["session"]
+        payload = {
+            "session_id": session["id"],
+            "video_url": "https://v.douyin.com/one",
+            "idempotency_key": "retry-safe",
+        }
+        first = client.post("/openclaw-api/jobs", json=payload, headers=self.auth("account-a"))
+        self.assertEqual(first.status_code, 202, first.text)
+        retry = client.post("/openclaw-api/jobs", json=payload, headers=self.auth("account-a"))
+        self.assertEqual(retry.status_code, 202, retry.text)
+        self.assertEqual(first.json()["job"]["job_id"], retry.json()["job"]["job_id"])
+        messages = client.get(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(len(messages.json()["messages"]), 1)
+
+    def test_upload_job_limit_rejects_before_storing_file(self):
+        from openclaw_video.bridge_app import create_app
+
+        with TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {"OPENCLAW_USER_ACTIVE_JOB_LIMIT": "1", "BRIDGE_UPLOAD_DIR": tmp},
+        ):
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
+            )
+            session = client.post(
+                "/openclaw-api/sessions",
+                json={"title": "Video analysis"},
+                headers=self.auth("account-a"),
+            ).json()["session"]
+            first = client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"], "content": "upload"},
+                files={"video": ("first.mp4", b"video", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(first.status_code, 202, first.text)
+            second = client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"], "content": "upload"},
+                files={"video": ("second.mp4", b"video", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(second.status_code, 429, second.text)
+            stored_files = [item.name for item in Path(tmp).rglob("*.mp4")]
+            self.assertEqual(stored_files, ["first.mp4"])
+
+    def test_job_submission_respects_per_user_rate_limit(self):
+        from openclaw_video.bridge_app import create_app
+
+        with mock.patch.dict(os.environ, {"OPENCLAW_USER_RATE_LIMIT_PER_MINUTE": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FakeDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
+            )
+        session = client.post(
+            "/openclaw-api/sessions",
+            json={"title": "Video analysis"},
+            headers=self.auth("account-a"),
+        ).json()["session"]
+        first = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/one"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(first.status_code, 202, first.text)
+        second = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/two"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(second.status_code, 429)
+        self.assertIn("job submission rate limit exceeded", second.text)
 
     def test_owner_can_read_result_and_cross_user_gets_404(self):
         session = self.create_session("account-a")

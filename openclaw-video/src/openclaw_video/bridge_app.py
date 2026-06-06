@@ -32,6 +32,14 @@ from .openclaw_gateway import (
     GatewayNotConfigured,
     OpenClawGatewayWsClient,
 )
+from .phase4_controls import (
+    Phase4Config,
+    Phase4ConfigError,
+    SlidingWindowRateLimiter,
+    load_phase4_config,
+    positive_int_from_env,
+)
+from .result_schema import RESULT_SCHEMA_VERSION
 from .session_store import (
     BridgeMessage,
     BridgeSession,
@@ -118,6 +126,13 @@ def _test_identity_headers_allowed(request: Request, enabled: bool, secret: str)
         return False
     provided = request.headers.get("x-openclaw-test-identity-secret", "")
     return hmac.compare_digest(provided, secret) and bool(request.headers.get("x-test-account"))
+
+
+def _principal_hashes(identity_secret: str, principal: DifyPrincipal) -> tuple[str, str]:
+    return (
+        hmac_sha256_hex(identity_secret, f"tenant:{principal.tenant_id}"),
+        hmac_sha256_hex(identity_secret, f"account:{principal.account_id}"),
+    )
 
 
 LAB_PAGE_HTML = """<!doctype html>
@@ -431,6 +446,8 @@ def create_app(
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
     enable_test_identity_headers = os.environ.get("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", "").lower() in {"1", "true", "yes"}
     test_identity_secret = os.environ.get("BRIDGE_TEST_IDENTITY_SECRET", "")
+    phase4_config = load_phase4_config()
+    rate_limiter = SlidingWindowRateLimiter()
 
     @app.exception_handler(Exception)
     async def _exception_handler(_: Request, exc: Exception) -> JSONResponse:
@@ -442,6 +459,48 @@ def create_app(
             "component": "openclaw-bridge",
             "dify_api_base": os.environ.get("DIFY_API_BASE", "http://api:5001"),
         }
+
+    def runtime_metadata() -> dict[str, Any]:
+        max_upload_bytes = positive_int_from_env("MAX_UPLOAD_BYTES", phase4_config.max_upload_bytes)
+        return {
+            "versions": {
+                "result_schema_version": RESULT_SCHEMA_VERSION,
+                "knowledge_base_version": phase4_config.knowledge_base_version,
+                "bridge_version": phase4_config.bridge_version,
+                "openclaw_version": phase4_config.openclaw_version,
+            },
+            "limits": {
+                "max_upload_bytes": max_upload_bytes,
+                "user_active_job_limit": phase4_config.user_active_job_limit or None,
+                "user_rate_limit_per_minute": phase4_config.user_rate_limit_per_minute or None,
+                "data_retention_days": phase4_config.data_retention_days or None,
+            },
+            "access": {
+                "tenant_allowlist_enabled": bool(phase4_config.tenant_allowlist_hashes),
+                "account_allowlist_enabled": bool(phase4_config.account_allowlist_hashes),
+            },
+        }
+
+    def principal_allowed(tenant_hash: str, account_hash: str) -> bool:
+        if phase4_config.tenant_allowlist_hashes and tenant_hash not in phase4_config.tenant_allowlist_hashes:
+            return False
+        if phase4_config.account_allowlist_hashes and account_hash not in phase4_config.account_allowlist_hashes:
+            return False
+        return True
+
+    def enforce_principal_allowed(tenant_hash: str, account_hash: str) -> None:
+        if not principal_allowed(tenant_hash, account_hash):
+            raise HTTPException(status_code=403, detail="OpenClaw access is not allowed for this account")
+
+    def enforce_job_submission_controls(principal: DifyPrincipal) -> None:
+        active_limit = phase4_config.user_active_job_limit
+        if active_limit > 0 and hasattr(job_store, "count_active_jobs"):
+            active_count = int(job_store.count_active_jobs(principal.principal_id))
+            if active_count >= active_limit:
+                raise HTTPException(status_code=429, detail="active job limit exceeded")
+        rate_limit = phase4_config.user_rate_limit_per_minute
+        if not rate_limiter.allow(principal.principal_id, limit=rate_limit):
+            raise HTTPException(status_code=429, detail="job submission rate limit exceeded")
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
@@ -472,11 +531,13 @@ def create_app(
             else:
                 profile, workspaces = await dify.profile(request.headers), await dify.workspaces(request.headers)
             principal = derive_principal(identity_secret, profile, workspaces)
+            tenant_hash, account_hash = _principal_hashes(identity_secret, principal)
+            enforce_principal_allowed(tenant_hash, account_hash)
             if hasattr(session_store, "ensure_user"):
                 session_store.ensure_user(
                     principal.principal_id,
-                    hmac_sha256_hex(identity_secret, f"tenant:{principal.tenant_id}"),
-                    hmac_sha256_hex(identity_secret, f"account:{principal.account_id}"),
+                    tenant_hash,
+                    account_hash,
                 )
             return principal
         except PermissionError as exc:
@@ -487,7 +548,7 @@ def create_app(
     @app.get("/openclaw-api/me")
     async def me(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
-        return {"principal_id": principal.principal_id, "authenticated": True}
+        return {"principal_id": principal.principal_id, "authenticated": True, **runtime_metadata()}
 
     @app.get("/openclaw-api/identity/diagnostics")
     async def identity_diagnostics(request: Request) -> dict[str, Any]:
@@ -496,6 +557,7 @@ def create_app(
             "login_material_present": _has_dify_login_material(request.headers),
             "profile_ok": False,
             "workspace_ok": False,
+            "access_ok": False,
             "current_workspace_count": 0,
             "principal_id": None,
             "failure_stage": None,
@@ -509,6 +571,11 @@ def create_app(
                 result["current_workspace_count"] = current_workspace_count(workspaces)
                 principal = derive_principal(identity_secret, profile, workspaces)
                 result["workspace_ok"] = True
+                tenant_hash, account_hash = _principal_hashes(identity_secret, principal)
+                if not principal_allowed(tenant_hash, account_hash):
+                    result["failure_stage"] = "access"
+                    return result
+                result["access_ok"] = True
                 result["authenticated"] = True
                 result["principal_id"] = principal.principal_id
                 return result
@@ -525,6 +592,11 @@ def create_app(
             result["current_workspace_count"] = current_workspace_count(workspaces)
             principal = derive_principal(identity_secret, profile, workspaces)
             result["workspace_ok"] = True
+            tenant_hash, account_hash = _principal_hashes(identity_secret, principal)
+            if not principal_allowed(tenant_hash, account_hash):
+                result["failure_stage"] = "access"
+                return result
+            result["access_ok"] = True
             result["authenticated"] = True
             result["principal_id"] = principal.principal_id
             return result
@@ -577,11 +649,23 @@ def create_app(
         except (SessionNotFound, SessionOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="session not found") from exc
         idempotency_key = payload.get("idempotency_key")
+        normalized_idempotency_key = str(idempotency_key) if idempotency_key else None
+        if normalized_idempotency_key and hasattr(job_store, "get_job_by_idempotency"):
+            try:
+                existing_job = job_store.get_job_by_idempotency(
+                    principal.principal_id,
+                    session_id,
+                    normalized_idempotency_key,
+                )
+                return JSONResponse(status_code=202, content={"job": _serialize_job(existing_job)})
+            except JobNotFound:
+                pass
+        enforce_job_submission_controls(principal)
         job = job_store.create_job(
             principal.principal_id,
             session_id,
             video_url,
-            idempotency_key=str(idempotency_key) if idempotency_key else None,
+            idempotency_key=normalized_idempotency_key,
         )
         session_store.add_message(
             session_id,
@@ -604,16 +688,16 @@ def create_app(
             raise HTTPException(status_code=400, detail="session_id and video file are required")
         try:
             session_store.get_session(session_id, principal.principal_id)
-        except (SessionNotFound, SessionOwnershipError) as exc:
-            raise HTTPException(status_code=404, detail="session not found") from exc
-        max_upload_bytes = int(os.environ.get("MAX_UPLOAD_BYTES", str(512 * 1024 * 1024)))
-        try:
+            enforce_job_submission_controls(principal)
+            max_upload_bytes = positive_int_from_env("MAX_UPLOAD_BYTES", phase4_config.max_upload_bytes)
             await file.seek(0)
             stored = store_upload_fileobj(
                 file.file,
                 filename=str(file.filename or "video.mp4"),
                 max_bytes=max_upload_bytes,
             )
+        except (SessionNotFound, SessionOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="session not found") from exc
         except UploadStoreError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         finally:

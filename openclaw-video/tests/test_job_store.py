@@ -32,12 +32,33 @@ class JobStoreTests(unittest.TestCase):
             idempotency_key="same-request",
         )
         self.assertEqual(first.job_id, second.job_id)
+        self.assertEqual(
+            store.get_job_by_idempotency("owner", "session", "same-request").job_id,
+            first.job_id,
+        )
 
     def test_owner_isolation(self):
         store = InMemoryJobStore()
         job = store.create_job("owner-a", "session", "https://v.douyin.com/abc")
         with self.assertRaises(JobOwnershipError):
             store.get_job(job.job_id, "owner-b")
+
+    def test_count_active_jobs_excludes_terminal_statuses(self):
+        store = InMemoryJobStore()
+        running = store.create_job("owner", "session", "https://v.douyin.com/running")
+        claimed = store.claim_next("worker-a")
+        queued = store.create_job("owner", "session", "https://v.douyin.com/queued")
+        succeeded = store.create_job("owner", "session", "https://v.douyin.com/succeeded")
+        failed = store.create_job("owner", "session", "https://v.douyin.com/failed")
+        cancelled = store.create_job("owner", "session", "https://v.douyin.com/cancelled")
+        self.assertEqual(claimed.job_id, running.job_id)
+        self.assertEqual(running.status, JobStatus.RUNNING)
+        store.complete_job(succeeded.job_id, {"ok": True}, "schema")
+        store.fail_job(failed.job_id, "failed")
+        store.cancel_job(cancelled.job_id, "owner")
+        self.assertEqual(store.count_active_jobs("owner"), 2)
+        self.assertEqual(store.count_active_jobs("other-owner"), 0)
+        self.assertEqual(queued.status, JobStatus.QUEUED)
 
     def test_complete_stores_result(self):
         store = InMemoryJobStore()

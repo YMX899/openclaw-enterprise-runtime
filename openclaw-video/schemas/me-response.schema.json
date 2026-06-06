@@ -2,10 +2,66 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://huahuoai.local/schemas/openclaw-video/me-response.schema.json",
   "type": "object",
-  "required": ["principal_id", "authenticated"],
+  "required": ["principal_id", "authenticated", "versions", "limits", "access"],
   "additionalProperties": false,
   "properties": {
     "principal_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "authenticated": {"const": true}
+    "authenticated": {"const": true},
+    "versions": {
+      "type": "object",
+      "required": ["result_schema_version", "knowledge_base_version", "bridge_version", "openclaw_version"],
+      "additionalProperties": false,
+      "properties": {
+        "result_schema_version": {"const": "openclaw-video-result.v1"},
+        "knowledge_base_version": {
+          "oneOf": [
+            {"type": "string", "minLength": 1, "maxLength": 120},
+            {"type": "null"}
+          ]
+        },
+        "bridge_version": {"type": "string", "minLength": 1, "maxLength": 120},
+        "openclaw_version": {"type": "string", "minLength": 1, "maxLength": 120}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "max_upload_bytes",
+        "user_active_job_limit",
+        "user_rate_limit_per_minute",
+        "data_retention_days"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_upload_bytes": {"type": "integer", "minimum": 0},
+        "user_active_job_limit": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "null"}
+          ]
+        },
+        "user_rate_limit_per_minute": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "null"}
+          ]
+        },
+        "data_retention_days": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "required": ["tenant_allowlist_enabled", "account_allowlist_enabled"],
+      "additionalProperties": false,
+      "properties": {
+        "tenant_allowlist_enabled": {"type": "boolean"},
+        "account_allowlist_enabled": {"type": "boolean"}
+      }
+    }
   }
 }

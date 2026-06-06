@@ -26,8 +26,23 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn(expected_mount, compose)
         self.assertIn("KNOWLEDGE_BASE_DIR: /knowledge/short-video", compose)
         self.assertIn("KNOWLEDGE_BASE_VERSION_FILE: /knowledge/short-video/VERSION", compose)
+        self.assertIn('OPENCLAW_VERSION: "2026.3.13"', compose)
         self.assertNotIn(":/knowledge/short-video:rw", compose)
         self.assertNotIn(":/knowledge/short-video\n", compose)
+
+    def test_phase4_control_environment_is_declared_for_controlled_trials(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        bridge_block = compose.split("\n  bridge-postgres:", 1)[0]
+        for required in [
+            "OPENCLAW_VIDEO_RELEASE: ${OPENCLAW_VIDEO_RELEASE:-unknown}",
+            "OPENCLAW_TENANT_ALLOWLIST_HASHES: ${OPENCLAW_TENANT_ALLOWLIST_HASHES:-}",
+            "OPENCLAW_ACCOUNT_ALLOWLIST_HASHES: ${OPENCLAW_ACCOUNT_ALLOWLIST_HASHES:-}",
+            "OPENCLAW_USER_ACTIVE_JOB_LIMIT: ${OPENCLAW_USER_ACTIVE_JOB_LIMIT:-2}",
+            "OPENCLAW_USER_RATE_LIMIT_PER_MINUTE: ${OPENCLAW_USER_RATE_LIMIT_PER_MINUTE:-12}",
+            "OPENCLAW_DATA_RETENTION_DAYS: ${OPENCLAW_DATA_RETENTION_DAYS:-30}",
+        ]:
+            with self.subTest(required=required):
+                self.assertIn(required, bridge_block)
 
     def test_sidecar_forbidden_public_surfaces_are_not_declared(self):
         compose = COMPOSE.read_text(encoding="utf-8")

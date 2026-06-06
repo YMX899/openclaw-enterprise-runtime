@@ -282,6 +282,46 @@ class PostgresJobStore(_BasePostgresStore):
             raise JobOwnershipError(job_id)
         return job
 
+    def get_job_by_idempotency(
+        self,
+        owner_principal_id: str,
+        bridge_session_id: str,
+        idempotency_key: str,
+    ) -> VideoJob:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM video_jobs
+                    WHERE owner_principal_id = %s
+                      AND bridge_session_id = %s
+                      AND idempotency_key = %s
+                    """,
+                    (owner_principal_id, bridge_session_id, idempotency_key),
+                )
+                row = cur.fetchone()
+        if not row:
+            raise JobNotFound(idempotency_key)
+        return _row_to_job(row)
+
+    def count_active_jobs(self, owner_principal_id: str) -> int:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT count(*) AS active_count
+                    FROM video_jobs
+                    WHERE owner_principal_id = %s
+                      AND status IN ('queued', 'running')
+                    """,
+                    (owner_principal_id,),
+                )
+                row = cur.fetchone()
+        if not row:
+            return 0
+        return int(row["active_count"])
+
     def claim_next(self, worker_id: str = "worker", lease_seconds: int = 900) -> VideoJob | None:
         with self._connect() as conn:
             with conn.cursor() as cur:

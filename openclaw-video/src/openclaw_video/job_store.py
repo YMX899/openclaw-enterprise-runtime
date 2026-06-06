@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from threading import Lock
 
-from .job_state import JobStatus
+from .job_state import JobStatus, TERMINAL_STATUSES
 
 
 class JobOwnershipError(PermissionError):
@@ -98,6 +98,30 @@ class InMemoryJobStore:
             if owner_principal_id is not None and job.owner_principal_id != owner_principal_id:
                 raise JobOwnershipError(job_id)
             return job
+
+    def get_job_by_idempotency(
+        self,
+        owner_principal_id: str,
+        bridge_session_id: str,
+        idempotency_key: str,
+    ) -> VideoJob:
+        with self._lock:
+            for job in self._jobs.values():
+                if (
+                    job.owner_principal_id == owner_principal_id
+                    and job.bridge_session_id == bridge_session_id
+                    and job.idempotency_key == idempotency_key
+                ):
+                    return job
+        raise JobNotFound(idempotency_key)
+
+    def count_active_jobs(self, owner_principal_id: str) -> int:
+        with self._lock:
+            return sum(
+                1
+                for job in self._jobs.values()
+                if job.owner_principal_id == owner_principal_id and job.status not in TERMINAL_STATUSES
+            )
 
     def claim_next(self, worker_id: str = "worker", lease_seconds: int = 900) -> VideoJob | None:
         with self._lock:
