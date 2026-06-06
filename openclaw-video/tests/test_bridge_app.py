@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest import mock
 
 try:
     from fastapi.testclient import TestClient
@@ -22,6 +24,14 @@ class FakeDifyClient:
         if headers.get("x-test-multiple-current") == "1":
             return {"data": [{"id": tenant_id, "current": True}, {"id": "tenant-b", "current": True}]}
         return {"data": [{"id": tenant_id, "current": True}]}
+
+
+class DenyingDifyClient:
+    async def profile(self, headers):
+        raise PermissionError("login required")
+
+    async def workspaces(self, headers):
+        return {"data": []}
 
 
 class FakeGateway:
@@ -78,6 +88,9 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("/openclaw-api/me", response.text)
         self.assertIn("/openclaw-api/identity/diagnostics", response.text)
         self.assertIn("/openclaw-api/jobs", response.text)
+        self.assertIn("Self Test", response.text)
+        self.assertIn("https://example.com/not-douyin", response.text)
+        self.assertIn("random_session_404", response.text)
         self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
         self.assertNotIn("openclaw-gateway:18789", response.text)
         self.assertNotIn("Authorization", response.text)
@@ -145,6 +158,79 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["current_workspace_count"], 2)
         self.assertEqual(body["failure_stage"], "workspace")
         self.assertIsNone(body["principal_id"])
+
+    def test_runtime_test_identity_headers_are_disabled_by_default(self):
+        from openclaw_video.bridge_app import create_app
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            client = TestClient(
+                create_app(
+                    dify=DenyingDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
+            )
+        response = client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={
+                "x-test-account": "account-a",
+                "x-test-tenant": "tenant-a",
+                "x-openclaw-test-identity-secret": "test-mode-secret",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["authenticated"], False)
+        self.assertEqual(body["failure_stage"], "profile")
+
+    def test_runtime_test_identity_headers_require_matching_secret(self):
+        from openclaw_video.bridge_app import create_app
+
+        with mock.patch.dict(
+            os.environ,
+            {"BRIDGE_ENABLE_TEST_IDENTITY_HEADERS": "1", "BRIDGE_TEST_IDENTITY_SECRET": "test-mode-secret"},
+        ):
+            client = TestClient(
+                create_app(
+                    dify=DenyingDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
+            )
+        response = client.get("/openclaw-api/identity/diagnostics", headers={"x-test-account": "account-a"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["authenticated"], False)
+
+        response = client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={
+                "x-test-account": "account-a",
+                "x-test-tenant": "tenant-a",
+                "x-openclaw-test-identity-secret": "wrong-secret",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["authenticated"], False)
+
+        response = client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={
+                "x-test-account": "account-a",
+                "x-test-tenant": "tenant-a",
+                "x-openclaw-test-identity-secret": "test-mode-secret",
+            },
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(body["profile_ok"], True)
+        self.assertEqual(body["workspace_ok"], True)
+        self.assertEqual(len(body["principal_id"]), 64)
+        self.assertNotIn("account-a", response.text)
+        self.assertNotIn("tenant-a", response.text)
+        self.assertNotIn("test-mode-secret", response.text)
 
     def test_create_and_list_sessions_for_owner_only(self):
         session_a = self.create_session("account-a")

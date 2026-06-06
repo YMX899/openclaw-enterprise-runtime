@@ -7,6 +7,8 @@ ENV_FILE="${OPENCLAW_ENV_FILE:-/app/bin/openclaw-video/shared/openclaw-video.env
 BASE_IMAGE="${OPENCLAW_BRIDGE_BASE_IMAGE:-openclaw-video-openclaw-bridge}"
 FAST_IMAGE="${OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast}"
 TMP_DOCKERFILE="${ROOT}/.bridge-fast.Dockerfile"
+TEST_IDENTITY_HEADERS="${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}"
+TEST_IDENTITY_SECRET="${BRIDGE_TEST_IDENTITY_SECRET:-}"
 
 cd "$ROOT"
 
@@ -33,7 +35,7 @@ docker build \
   -t "$FAST_IMAGE" \
   .
 
-OPENCLAW_BRIDGE_IMAGE="$FAST_IMAGE" docker compose \
+OPENCLAW_BRIDGE_IMAGE="$FAST_IMAGE" BRIDGE_ENABLE_TEST_IDENTITY_HEADERS="$TEST_IDENTITY_HEADERS" BRIDGE_TEST_IDENTITY_SECRET="$TEST_IDENTITY_SECRET" docker compose \
   --env-file "$ENV_FILE" \
   -p "$PROJECT" \
   -f docker-compose.openclaw-video.yaml \

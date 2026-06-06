@@ -14,6 +14,8 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("OPENCLAW_BRIDGE_BASE_IMAGE:-openclaw-video-openclaw-bridge", text)
         self.assertIn("OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast", text)
         self.assertIn("pip install --no-cache-dir --no-deps /app", text)
+        self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", text)
+        self.assertIn("BRIDGE_TEST_IDENTITY_SECRET", text)
         self.assertIn("up -d --no-deps --force-recreate openclaw-bridge", text)
         self.assertIn("bridge_fast_rebuild=PASS", text)
         self.assertNotIn("video-analysis-worker", text)
@@ -23,6 +25,8 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         text = COMPOSE.read_text(encoding="utf-8")
 
         self.assertIn("image: ${OPENCLAW_BRIDGE_IMAGE:-openclaw-video-openclaw-bridge}", text)
+        self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: ${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}", text)
+        self.assertIn("BRIDGE_TEST_IDENTITY_SECRET: ${BRIDGE_TEST_IDENTITY_SECRET:-}", text)
         self.assertIn("openclaw-bridge:", text)
 
 

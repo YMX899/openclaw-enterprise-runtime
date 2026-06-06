@@ -18,6 +18,8 @@ services:
       OPENCLAW_GATEWAY_DEVICE_KEY_FILE: /run/secrets/openclaw_bridge_device_key.pem
       KNOWLEDGE_BASE_DIR: /knowledge/short-video
       KNOWLEDGE_BASE_VERSION_FILE: /knowledge/short-video/VERSION
+      BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: ${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}
+      BRIDGE_TEST_IDENTITY_SECRET: ${BRIDGE_TEST_IDENTITY_SECRET:-}
     ports:
       - "127.0.0.1:18181:3000"
     volumes:

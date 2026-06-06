@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 import uuid
@@ -92,6 +93,13 @@ def _has_dify_login_material(headers: Any) -> bool:
     return bool(names & {"authorization", "cookie", "x-csrf-token", "x-xsrf-token"})
 
 
+def _test_identity_headers_allowed(request: Request, enabled: bool, secret: str) -> bool:
+    if not enabled or not secret:
+        return False
+    provided = request.headers.get("x-openclaw-test-identity-secret", "")
+    return hmac.compare_digest(provided, secret) and bool(request.headers.get("x-test-account"))
+
+
 LAB_PAGE_HTML = """<!doctype html>
 <html lang="en">
 <head>
@@ -178,6 +186,7 @@ LAB_PAGE_HTML = """<!doctype html>
         <button id="createSession">Create Session</button>
         <button id="refreshMe" class="secondary">Refresh Login</button>
         <button id="identityDiagnostics" class="secondary">Identity Check</button>
+        <button id="runSelfTest" class="secondary">Self Test</button>
       </div>
     </section>
     <section class="grid">
@@ -204,10 +213,12 @@ LAB_PAGE_HTML = """<!doctype html>
     const output = document.getElementById('output');
     const authStatus = document.getElementById('authStatus');
     let currentJobId = '';
+    const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
 
     function show(value) {
       output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     }
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     async function api(path, options = {}) {
       const response = await fetch(path, {
         credentials: 'include',
@@ -243,6 +254,61 @@ LAB_PAGE_HTML = """<!doctype html>
     async function identityDiagnostics() {
       show(await api('/openclaw-api/identity/diagnostics'));
     }
+    async function runSelfTest() {
+      const steps = [];
+      const add = (name, result) => {
+        steps.push({ name, ...result });
+        show({ self_test: steps });
+      };
+      const diagnostics = await api('/openclaw-api/identity/diagnostics');
+      add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
+      if (!diagnostics.body.authenticated) return;
+
+      const me = await api('/openclaw-api/me');
+      add('me', { status: me.status, body: me.body });
+      if (me.status !== 200) return;
+
+      const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      const missing = await api('/openclaw-api/sessions/' + encodeURIComponent(randomId) + '/messages');
+      add('random_session_404', { status: missing.status, ok: missing.status === 404 });
+
+      const sessionResult = await api('/openclaw-api/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'OpenClaw self test ' + new Date().toISOString() })
+      });
+      add('create_session', { status: sessionResult.status, body: sessionResult.body });
+      const sessionId = sessionResult.body.session && sessionResult.body.session.id;
+      if (!sessionId) return;
+      document.getElementById('sessionId').value = sessionId;
+
+      const jobResult = await api('/openclaw-api/jobs', {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: sessionId,
+          video_url: 'https://example.com/not-douyin',
+          content: 'Self-test invalid URL should be rejected by the worker.',
+          idempotency_key: 'self-test-' + sessionId
+        })
+      });
+      add('submit_invalid_url_job', { status: jobResult.status, body: jobResult.body });
+      currentJobId = jobResult.body.job && jobResult.body.job.job_id || '';
+      if (!currentJobId) return;
+
+      let lastJob = null;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await delay(1000);
+        const poll = await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId));
+        lastJob = poll.body.job || null;
+        if (lastJob && terminalStatuses.has(lastJob.status)) break;
+      }
+      add('poll_invalid_url_job', { body: lastJob });
+
+      const messages = await api('/openclaw-api/sessions/' + encodeURIComponent(sessionId) + '/messages');
+      add('messages', {
+        status: messages.status,
+        count: messages.body.messages ? messages.body.messages.length : 0
+      });
+    }
     async function submitJob() {
       const result = await api('/openclaw-api/jobs', {
         method: 'POST',
@@ -264,6 +330,7 @@ LAB_PAGE_HTML = """<!doctype html>
     }
     document.getElementById('refreshMe').addEventListener('click', refreshMe);
     document.getElementById('identityDiagnostics').addEventListener('click', identityDiagnostics);
+    document.getElementById('runSelfTest').addEventListener('click', runSelfTest);
     document.getElementById('createSession').addEventListener('click', createSession);
     document.getElementById('submitJob').addEventListener('click', submitJob);
     document.getElementById('pollJob').addEventListener('click', pollJob);
@@ -305,6 +372,8 @@ def create_app(
     job_store = job_store or _default_job_store()
     gateway = gateway or OpenClawGatewayWsClient.from_environment()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
+    enable_test_identity_headers = os.environ.get("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", "").lower() in {"1", "true", "yes"}
+    test_identity_secret = os.environ.get("BRIDGE_TEST_IDENTITY_SECRET", "")
 
     @app.exception_handler(Exception)
     async def _exception_handler(_: Request, exc: Exception) -> JSONResponse:
@@ -339,7 +408,12 @@ def create_app(
 
     async def current_principal(request: Request) -> DifyPrincipal:
         try:
-            profile, workspaces = await dify.profile(request.headers), await dify.workspaces(request.headers)
+            if _test_identity_headers_allowed(request, enable_test_identity_headers, test_identity_secret):
+                profile = {"id": request.headers["x-test-account"]}
+                tenant_id = request.headers.get("x-test-tenant", "test-tenant")
+                workspaces = {"data": [{"id": tenant_id, "current": True}]}
+            else:
+                profile, workspaces = await dify.profile(request.headers), await dify.workspaces(request.headers)
             principal = derive_principal(identity_secret, profile, workspaces)
             if hasattr(session_store, "ensure_user"):
                 session_store.ensure_user(
@@ -370,6 +444,17 @@ def create_app(
             "failure_stage": None,
         }
         try:
+            if _test_identity_headers_allowed(request, enable_test_identity_headers, test_identity_secret):
+                profile = {"id": request.headers["x-test-account"]}
+                result["profile_ok"] = True
+                tenant_id = request.headers.get("x-test-tenant", "test-tenant")
+                workspaces = {"data": [{"id": tenant_id, "current": True}]}
+                result["current_workspace_count"] = current_workspace_count(workspaces)
+                principal = derive_principal(identity_secret, profile, workspaces)
+                result["workspace_ok"] = True
+                result["authenticated"] = True
+                result["principal_id"] = principal.principal_id
+                return result
             profile = await dify.profile(request.headers)
             result["profile_ok"] = True
         except PermissionError:
