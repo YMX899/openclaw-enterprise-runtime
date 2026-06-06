@@ -56,11 +56,12 @@
     },
     "access": {
       "type": "object",
-      "required": ["tenant_allowlist_enabled", "account_allowlist_enabled"],
+      "required": ["tenant_allowlist_enabled", "account_allowlist_enabled", "identity_provider"],
       "additionalProperties": false,
       "properties": {
         "tenant_allowlist_enabled": {"type": "boolean"},
-        "account_allowlist_enabled": {"type": "boolean"}
+        "account_allowlist_enabled": {"type": "boolean"},
+        "identity_provider": {"enum": ["dify", "huahuo_front"]}
       }
     }
   }

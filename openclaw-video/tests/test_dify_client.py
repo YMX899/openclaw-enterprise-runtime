@@ -1,6 +1,13 @@
+import base64
+from urllib.parse import parse_qs
 import unittest
 
-from openclaw_video.dify_client import identity_headers
+from openclaw_video.dify_client import (
+    HUAHUO_ACCESS_TOKEN_HEADER,
+    huahuo_authorization_header,
+    huahuo_identity_headers,
+    identity_headers,
+)
 
 
 class DifyClientTests(unittest.TestCase):
@@ -20,7 +27,38 @@ class DifyClientTests(unittest.TestCase):
         self.assertNotIn("User-Agent", selected)
         self.assertNotIn("OpenClaw-Gateway-Token", selected)
 
+    def test_huahuo_authorization_header_matches_frontend_signing_shape(self):
+        header = huahuo_authorization_header("HUAHUO-access", app_uuid="abc123", app_time_ms=123456)
+
+        self.assertTrue(header.startswith("Bearer "))
+        payload = base64.b64decode(header.removeprefix("Bearer ")).decode("utf-8")
+        parsed = parse_qs(payload)
+        self.assertEqual(parsed["appVersion"], ["1.0.1"])
+        self.assertEqual(parsed["appType"], ["WEB"])
+        self.assertEqual(parsed["appUuid"], ["abc123"])
+        self.assertEqual(parsed["appTime"], ["123456"])
+        self.assertEqual(parsed["token"], ["HUAHUO-access"])
+        self.assertEqual(len(parsed["appSign"][0]), 32)
+
+    def test_huahuo_identity_headers_accept_explicit_front_token_only(self):
+        selected = huahuo_identity_headers(
+            {
+                HUAHUO_ACCESS_TOKEN_HEADER: "HUAHUO-access",
+                "Cookie": "session=1",
+                "OpenClaw-Gateway-Token": "gateway-secret",
+            }
+        )
+
+        self.assertEqual(set(selected), {"Authorization"})
+        self.assertTrue(selected["Authorization"].startswith("Bearer "))
+        self.assertNotIn("HUAHUO-access", selected["Authorization"])
+        self.assertNotIn("Cookie", selected)
+        self.assertNotIn("OpenClaw-Gateway-Token", selected)
+
+    def test_huahuo_identity_headers_allows_signed_bearer_without_cookie(self):
+        selected = huahuo_identity_headers({"Authorization": "Bearer signed"})
+        self.assertEqual(selected, {"Authorization": "Bearer signed"})
+
 
 if __name__ == "__main__":
     unittest.main()
-

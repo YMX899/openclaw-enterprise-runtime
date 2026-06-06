@@ -38,6 +38,17 @@ class DenyingDifyClient:
         return {"data": []}
 
 
+class FakeHuahuoClient:
+    async def profile(self, headers):
+        token = headers.get("x-huahuo-access-token")
+        if not token:
+            raise PermissionError("login required")
+        return {"id": "huahuo:front-user-a"}
+
+    async def workspaces(self, headers):
+        return {"data": [{"id": "huahuo-front", "current": True}]}
+
+
 class FakeGateway:
     def __init__(self):
         self.requests = []
@@ -89,6 +100,8 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("text/html", response.headers["content-type"])
         self.assertIn("OpenClaw Lab", response.text)
+        self.assertIn("Access-Token", response.text)
+        self.assertIn("X-Huahuo-Access-Token", response.text)
         self.assertIn("/openclaw-api/me", response.text)
         self.assertIn("/openclaw-api/identity/diagnostics", response.text)
         self.assertIn("/openclaw-api/jobs", response.text)
@@ -103,6 +116,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertNotIn("openclaw-gateway:18789", response.text)
         self.assertNotIn("Authorization", response.text)
         self.assertNotIn("Cookie", response.text)
+        self.assertNotIn("HUAHUO-access", response.text)
 
     def test_openclaw_lab_without_trailing_slash_is_served(self):
         response = self.client.get("/openclaw-lab")
@@ -250,6 +264,26 @@ class BridgeAppTests(unittest.TestCase):
         self.assertNotIn("account-a", response.text)
         self.assertNotIn("tenant-a", response.text)
         self.assertNotIn("test-mode-secret", response.text)
+
+    def test_huahuo_front_identity_provider_accepts_frontend_token_without_raw_ids(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=FakeHuahuoClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.get("/openclaw-api/me", headers={"X-Huahuo-Access-Token": "HUAHUO-access"})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(len(body["principal_id"]), 64)
+        self.assertNotIn("front-user-a", response.text)
+        self.assertNotIn("huahuo-front", response.text)
+        self.assertNotIn("HUAHUO-access", response.text)
 
     def test_create_and_list_sessions_for_owner_only(self):
         session_a = self.create_session("account-a")

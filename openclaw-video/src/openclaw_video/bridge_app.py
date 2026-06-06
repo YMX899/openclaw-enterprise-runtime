@@ -15,7 +15,7 @@ except ImportError as exc:  # pragma: no cover - import checked in container ima
     raise RuntimeError("fastapi is required for openclaw-bridge") from exc
 
 from .redaction import safe_error_message
-from .dify_client import DifyClient
+from .dify_client import DifyClient, HuahuoFrontClient
 from .identity import (
     DifyPrincipal,
     IdentityError,
@@ -119,7 +119,7 @@ def _sse_event(event: str, data: dict[str, Any]) -> str:
 
 def _has_dify_login_material(headers: Any) -> bool:
     names = {key.lower() for key in headers.keys()}
-    return bool(names & {"authorization", "cookie", "x-csrf-token", "x-xsrf-token"})
+    return bool(names & {"authorization", "cookie", "x-csrf-token", "x-xsrf-token", "x-huahuo-access-token"})
 
 
 def _test_identity_headers_allowed(request: Request, enabled: bool, secret: str) -> bool:
@@ -261,10 +261,18 @@ LAB_PAGE_HTML = """<!doctype html>
       output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
     }
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    function huahuoAccessToken() {
+      try { return window.localStorage && window.localStorage.getItem('Access-Token') || ''; }
+      catch { return ''; }
+    }
+    function authHeaders() {
+      const token = huahuoAccessToken();
+      return token ? { 'X-Huahuo-Access-Token': token } : {};
+    }
     async function api(path, options = {}) {
       const response = await fetch(path, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
         ...options
       });
       const text = await response.text();
@@ -378,6 +386,7 @@ LAB_PAGE_HTML = """<!doctype html>
       const response = await fetch('/openclaw-api/uploads', {
         method: 'POST',
         credentials: 'include',
+        headers: authHeaders(),
         body: form
       });
       const text = await response.text();
@@ -440,6 +449,12 @@ def create_app(
     identity_secret: str | None = None,
 ) -> FastAPI:
     app = FastAPI(title="OpenClaw Dify Bridge", version="0.1.0")
+    identity_provider = os.environ.get("BRIDGE_IDENTITY_PROVIDER", "dify").strip().lower()
+    if dify is None and identity_provider == "huahuo_front":
+        dify = HuahuoFrontClient(
+            os.environ.get("HUAHUO_FRONT_BASE", "https://www.huahuoai.com"),
+            tenant_id=os.environ.get("HUAHUO_FRONT_TENANT_ID", "huahuo-front"),
+        )
     dify = dify or DifyClient(os.environ.get("DIFY_API_BASE", "http://api:5001"))
     session_store = session_store or _default_session_store()
     job_store = job_store or _default_job_store()
@@ -459,6 +474,7 @@ def create_app(
             "status": "ok",
             "component": "openclaw-bridge",
             "dify_api_base": os.environ.get("DIFY_API_BASE", "http://api:5001"),
+            "identity_provider": identity_provider,
         }
 
     def runtime_metadata() -> dict[str, Any]:
@@ -479,6 +495,7 @@ def create_app(
             "access": {
                 "tenant_allowlist_enabled": bool(phase4_config.tenant_allowlist_hashes),
                 "account_allowlist_enabled": bool(phase4_config.account_allowlist_hashes),
+                "identity_provider": identity_provider,
             },
         }
 

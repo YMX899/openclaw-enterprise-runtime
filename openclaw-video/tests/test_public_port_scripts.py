@@ -5,6 +5,8 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_openclaw_lab_public_port.sh"
 ROLLBACK_SCRIPT = REPO_ROOT / "scripts" / "rollback_openclaw_lab_public_port.sh"
+SAME_ORIGIN_INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_openclaw_lab_same_origin.sh"
+SAME_ORIGIN_ROLLBACK_SCRIPT = REPO_ROOT / "scripts" / "rollback_openclaw_lab_same_origin.sh"
 RUNBOOK = REPO_ROOT / "openclaw-lab-public-port-runbook.md"
 
 
@@ -55,6 +57,34 @@ class PublicPortScriptTests(unittest.TestCase):
         self.assertIn("18443/tcp ALLOW", text)
         self.assertIn("rollback", text.lower())
         self.assertIn("does not change Dify compose", text)
+
+    def test_same_origin_install_adds_only_precise_openclaw_prefixes(self):
+        text = SAME_ORIGIN_INSTALL_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("OPENCLAW_SAME_ORIGIN_SERVER_NAME:-www.huahuoai.com", text)
+        self.assertIn("install_openclaw_lab_same_origin.sh begin", text)
+        self.assertIn("location = /openclaw-lab", text)
+        self.assertIn("location = /openclaw-api", text)
+        self.assertIn("location ^~ /openclaw-lab/", text)
+        self.assertIn("location ^~ /openclaw-api/", text)
+        self.assertIn("proxy_pass {backend};", text)
+        self.assertIn("openresty -t", text)
+        self.assertIn("openresty -s reload", text)
+        self.assertIn("same_origin_me=401", text)
+        self.assertNotIn("location / {", text)
+        self.assertNotIn("docker compose -p docker", text)
+        self.assertNotIn(":18789", text)
+        self.assertNotIn(":5432", text)
+
+    def test_same_origin_rollback_removes_only_marked_block(self):
+        text = SAME_ORIGIN_ROLLBACK_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("install_openclaw_lab_same_origin.sh begin", text)
+        self.assertIn("install_openclaw_lab_same_origin.sh end", text)
+        self.assertIn("same_origin_block=removed", text)
+        self.assertIn("openresty -t", text)
+        self.assertIn("openresty -s reload", text)
+        self.assertNotIn("docker compose -p docker", text)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,9 @@ services:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     environment:
       DIFY_API_BASE: http://api:5001
+      BRIDGE_IDENTITY_PROVIDER: ${BRIDGE_IDENTITY_PROVIDER:-dify}
+      HUAHUO_FRONT_BASE: ${HUAHUO_FRONT_BASE:-https://www.huahuoai.com}
+      HUAHUO_FRONT_TENANT_ID: ${HUAHUO_FRONT_TENANT_ID:-huahuo-front}
       DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
       BRIDGE_IDENTITY_SECRET: ${BRIDGE_IDENTITY_SECRET:?}
       OPENCLAW_GATEWAY_URL: ws://openclaw-gateway:18789
