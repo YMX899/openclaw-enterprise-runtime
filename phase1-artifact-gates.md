@@ -31,6 +31,33 @@ doctor does not expose: --lint or --json in this fixed-version help output
 config supports: file/get/set/unset/validate
 ```
 
+Observed local Gateway WebSocket contract:
+
+```text
+temporary Gateway: ws://127.0.0.1:18190
+version: OpenClaw 2026.3.13 (61d171a)
+client id/mode: gateway-client / backend
+protocol: WebSocket v3
+chat methods: chat.history, chat.send
+minimum Bridge scopes: operator.read, operator.write
+admin scope: not required and not allowed for V1 Bridge
+session key format: agent:main:<openclaw_routing_user>
+wrong token: fails closed with AUTH_TOKEN_MISMATCH
+unsigned backend client: connects but loses scopes; chat.history fails with missing operator.read
+signed backend client: status and chat.history pass with read/write scopes
+chat.send: ack/event shape verified; real model reply blocked locally by missing provider key
+```
+
+Required production implication:
+
+- Bridge must hold a read-only Ed25519 device private key file for Gateway
+  signing.
+- Bridge must hold the Gateway token via a read-only file, not browser state.
+- Bridge must not send Gateway token, device key, device id, public key or
+  signatures to the browser.
+- Gateway token must not be passed as a process command-line argument.
+- `POST /channels/dify-web/chat` is rejected for V1.
+
 Security gate from local `npm audit`:
 
 ```text
@@ -76,8 +103,11 @@ Gateway regression gate for fixed `2026.3.13 (61d171a)`:
 - Gateway entrypoint and service command must match the fixed package layout.
 - wrong or rotated tokens must fail closed with no browser exposure.
 - Bridge contract tests must prove the exact Gateway RPC/adapter path used by
-  the sidecar. The placeholder HTTP path `/channels/dify-web/chat` is not
-  approved until it is proven against the fixed artifact.
+  the sidecar. The placeholder HTTP path `/channels/dify-web/chat` is rejected
+  for V1.
+- `scripts/verify_openclaw_gateway_ws_contract.mjs` must pass in the isolated
+  build environment and later against the server-side private Gateway before
+  any public route is added.
 - public reports of `2026.3.13` token mismatch, missing `operator.read`,
   port-conflict and probe/ACP failures must be explicitly excluded in an
   isolated environment before production.
@@ -99,9 +129,9 @@ in-memory job claiming, Postgres durable queue adapter, worker lease/heartbeat
 flow, worker status transitions, redirect target revalidation, fixed-argument
 video resource-limit wrapper contract, Gateway token isolation, database
 migration draft, rollback SQL, versioned read-only short-video knowledge-base
-artifact, Bridge API JSON Schema request/response contracts, rollback runbook
-and baseline test script. These are offline implementation progress, not
-production deployment evidence.
+artifact, Bridge API JSON Schema request/response contracts, OpenClaw Gateway
+WS v3 contract tests, rollback runbook and baseline test script. These are
+offline implementation progress, not production deployment evidence.
 
 Because of these missing artifacts:
 
@@ -198,6 +228,20 @@ logical_user = "dify:" + tenant_id + ":" + account_id
 principal_id = HMAC-SHA256(bridge_identity_secret, logical_user)
 openclaw_routing_user = HMAC-SHA256(secret, principal_id + ":" + bridge_session_id)
 ```
+
+Required OpenClaw Gateway behavior:
+
+- Bridge uses `OPENCLAW_GATEWAY_URL=ws://openclaw-gateway:18789`.
+- Bridge reads Gateway token from `OPENCLAW_GATEWAY_TOKEN_FILE`.
+- Bridge reads an Ed25519 device private key from
+  `OPENCLAW_GATEWAY_DEVICE_KEY_FILE`.
+- Bridge sends `connect` with `client.id="gateway-client"`,
+  `client.mode="backend"`, protocol v3, and scopes
+  `operator.read,operator.write`.
+- Bridge sends non-video chat to `chat.send` with
+  `sessionKey="agent:main:<openclaw_routing_user>"`.
+- Bridge treats OpenClaw internal agent failure text as a Gateway error, not as
+  normal assistant content.
 
 ## Minimum Worker Contract
 

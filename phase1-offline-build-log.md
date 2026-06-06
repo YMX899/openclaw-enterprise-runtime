@@ -259,6 +259,69 @@ OpenClaw 2026.3.13 contract:
   Passed against .phase1-sandbox\openclaw-3.13\node_modules\.bin\openclaw.cmd.
 ```
 
+Updated local test result after OpenClaw Gateway WS v3 adapter contract:
+
+```text
+ChatGPT web review status:
+  Chrome tab rechecked on 2026-06-06. An existing ChatGPT conversation was
+  readable, but the new-chat/root page still showed "your session has expired"
+  and the login page. No new web-GPT review output was collected. No cookies,
+  tokens, local storage or browser secrets were read. The tab was released for
+  user login handoff.
+
+OpenClaw temporary Gateway:
+  started locally on ws://127.0.0.1:18190 with synthetic test token only.
+  stopped after verification; 18190/18192 had no remaining listeners.
+
+OpenClaw 2026.3.13 WS findings:
+  - Gateway protocol is WebSocket v3.
+  - Backend client must use client.id=gateway-client and mode=backend.
+  - Custom client ids are rejected.
+  - Token-only backend connects but loses requested scopes; chat.history fails
+    with missing operator.read.
+  - Ed25519 signed device identity plus shared token preserves scopes.
+  - operator.read + operator.write are enough for status, chat.history and
+    chat.send; operator.admin is not required and is intentionally not used.
+  - chat.send ack and terminal chat event shape were verified. Local model reply
+    failed because the sandbox has no provider API key; Bridge now treats that
+    internal failure text as GatewayError instead of normal assistant text.
+
+New/updated artifacts:
+  - openclaw-video/src/openclaw_video/openclaw_gateway.py now implements the
+    OpenClaw Gateway WS v3 adapter contract and default-disabled env factory.
+  - scripts/verify_openclaw_gateway_ws_contract.mjs verifies wrong-token,
+    unsigned-scope fail-closed, and signed read/write Gateway access.
+  - compose draft uses ws://openclaw-gateway:18789 and read-only secret files
+    for the Bridge Gateway token and Ed25519 device key.
+  - Gateway Dockerfile reads the token from /run/secrets/openclaw_gateway_token
+    and does not pass it as --token command-line argument.
+  - openclaw-internal is a private named network, not Docker internal:true,
+    because Gateway/model and worker/video downloads require egress.
+
+Verification:
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m pip install -e .\openclaw-video
+  OK; installed cryptography 45.0.7 and existing websockets 16.0.
+
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests -v
+  Ran 78 tests, OK.
+
+  python -m unittest discover openclaw-video\tests -v
+  Ran 78 tests, OK, skipped=17.
+
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m compileall -q openclaw-video\src openclaw-video\tests
+  OK.
+
+  git diff --check
+  OK.
+
+  scripts/verify_openclaw_contract.ps1 with OPENCLAW_GATEWAY_URL/TOKEN
+  OK: CLI surface, gateway status/probe/health/status, wrong-token fail-closed.
+
+  node scripts/verify_openclaw_gateway_ws_contract.mjs
+  OK: wrong-token fail-closed, unsigned scope gate, signed read/write
+  status/chat.history.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
@@ -270,7 +333,8 @@ Covered:
 - safe error message redaction.
 - in-memory job store ownership isolation and queued-to-running claim semantics.
 - worker success, URL rejection, invalid result and timeout status transitions.
-- OpenClaw Gateway token header is kept inside the private Gateway client.
+- OpenClaw Gateway token is kept inside the private Gateway client and never
+  returned to browser-facing API responses.
 - in-memory session/message store ownership isolation.
 - Bridge API draft does not expose raw Dify tenant/account IDs.
 - Bridge API draft returns 202 for video jobs and 404 for cross-user
@@ -284,8 +348,13 @@ Covered:
 - fixed-argument `douyin_chong` wrapper passes max download bytes, max video
   duration and max frame-count controls without shell invocation.
 - OpenClaw 2026.3.13 Gateway contract documentation now treats
-  `/channels/dify-web/chat` as an unapproved placeholder and records the
+  `/channels/dify-web/chat` as a rejected V1 placeholder and records the
   observed WebSocket/RPC Gateway CLI surface.
+- OpenClaw Gateway WS v3 adapter contract now requires backend client
+  `gateway-client`, Ed25519 device signing, `operator.read/write` only, and
+  `chat.send` session keys of `agent:main:<openclaw_routing_user>`.
+- Gateway token and Bridge device private key are modeled as read-only files;
+  Gateway token is not passed as an OpenClaw `--token` process argument.
 - Bridge non-video chat now has a default-disabled Gateway adapter contract:
   production still returns `501` unless an adapter is explicitly supplied, while
   offline tests prove the Bridge passes only scoped routing/session/message
@@ -336,14 +405,16 @@ Verified statically:
 - Actual `douyin_chong` artifact is still missing.
 - `douyin_chong` must still prove that it accepts and enforces the wrapper's
   max download bytes, max video duration and max frame-count arguments.
-- OpenClaw Gateway API contract for Bridge is only mock-tested locally; the real
-  fixed-version Gateway RPC/adapter path is not locked.
+- OpenClaw Gateway API contract for Bridge is partially locked by local
+  fixed-version WS v3 tests, but not yet proven in a Docker/Linux isolated host
+  with production model credentials.
 - OpenClaw 2026.3.13 security exception or patch strategy is not decided.
 - OpenClaw 2026.3.13 Gateway regression risks must be excluded in an isolated
   fixed-version environment before production.
 - Docker build and compose render are not verified in an isolated Docker host.
-- ChatGPT final Go/No-Go review is captured in
-  `chatgpt-final-go-nogo-review.md`.
+- ChatGPT final Go/No-Go review is still pending. On 2026-06-06 an existing
+  conversation was readable, but new-chat/root still redirected to the login
+  page with an expired-session prompt.
 - Authenticated public Dify browser baseline is still incomplete; real Chrome
   retry on 2026-06-06 reached `/signin` from `/apps`, indicating no active Dify
   login session in the current browser profile.

@@ -70,8 +70,16 @@ Important corrections:
   output and must not be used as a production gate.
 - `openclaw gateway` is a WebSocket Gateway surface with RPC-style
   `gateway call <method>` helpers, not an HTTP REST contract by default.
-- The local Bridge placeholder path `POST /channels/dify-web/chat` remains
-  unproven and must not be treated as an OpenClaw standard API.
+- The local Bridge placeholder path `POST /channels/dify-web/chat` is rejected
+  for V1 and must not be treated as an OpenClaw standard API.
+- Bridge V1 uses Gateway WebSocket v3 methods `chat.history` and `chat.send`.
+- The Gateway `connect` request must use `client.id="gateway-client"`,
+  `client.mode="backend"`, a matching shared token, and signed Ed25519 device
+  identity. Shared token without device signing connects but loses scopes.
+- Bridge V1 uses `operator.read` and `operator.write` only; `operator.admin`
+  is intentionally not granted.
+- Bridge OpenClaw session keys are `agent:main:<openclaw_routing_user>`, where
+  `openclaw_routing_user` is HMAC-derived and contains no raw Dify ids.
 - `gateway run --force`, `gateway start`, `gateway restart`, `gateway stop`,
   `gateway install` and `doctor --repair/--fix` are operational commands and
   must not run during read-only checks.
@@ -90,6 +98,13 @@ Ubuntu 24.04 environment:
 - `openclaw gateway call status --json --url <ws-url>`.
 - wrong-token and rotated-token checks when token auth is enabled.
 - Bridge contract tests against the exact Gateway RPC/adapter path.
+- `scripts/verify_openclaw_gateway_ws_contract.mjs` against the exact Gateway
+  URL/token in an isolated environment.
+- unsigned backend clients fail closed with missing scope.
+- signed backend clients with `operator.read/write` can call `status` and
+  `chat.history`.
+- optional `chat.send` ack + terminal event check passes with configured model
+  credentials.
 - Wrong-token request fails closed.
 - Rotated-token request fails closed.
 - Gateway token never appears in browser-facing responses.

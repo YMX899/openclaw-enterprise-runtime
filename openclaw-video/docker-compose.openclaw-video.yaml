@@ -9,14 +9,17 @@ services:
       DIFY_API_BASE: http://api:5001
       DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
       BRIDGE_IDENTITY_SECRET: ${BRIDGE_IDENTITY_SECRET:?}
-      OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?}
+      OPENCLAW_GATEWAY_URL: ws://openclaw-gateway:18789
+      OPENCLAW_GATEWAY_TOKEN_FILE: /run/secrets/openclaw_gateway_token
+      OPENCLAW_GATEWAY_DEVICE_KEY_FILE: /run/secrets/openclaw_bridge_device_key.pem
       KNOWLEDGE_BASE_DIR: /knowledge/short-video
       KNOWLEDGE_BASE_VERSION_FILE: /knowledge/short-video/VERSION
     ports:
       - "127.0.0.1:18181:3000"
     volumes:
       - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
+      - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
+      - ./secrets/openclaw_bridge_device_key.pem:/run/secrets/openclaw_bridge_device_key.pem:ro
     networks:
       - openclaw-internal
       - dify-default
@@ -55,9 +58,8 @@ services:
       dockerfile: docker/openclaw-gateway/Dockerfile
       args:
         OPENCLAW_VERSION: "2026.3.13"
-    environment:
-      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?}
     volumes:
+      - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
       - openclaw-gateway-state:/var/lib/openclaw
       - ./openclaw/config:/etc/openclaw:ro
       - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro
@@ -107,7 +109,7 @@ volumes:
 
 networks:
   openclaw-internal:
-    internal: true
+    name: openclaw_video_internal
   dify-default:
     external: true
     name: docker_default

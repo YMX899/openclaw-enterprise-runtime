@@ -25,7 +25,8 @@ The source here is not production-ready until these external artifacts are
 supplied and verified:
 
 - actual `douyin_chong` binary/source/image.
-- exact OpenClaw Gateway API contract for version `2026.3.13`.
+- OpenClaw Gateway API contract in a Docker/Linux isolated host with real model
+  credentials.
 - explicit security decision for npm audit findings affecting
   `openclaw@2026.3.13`.
 - real Postgres container integration test for the durable queue migration and
@@ -40,6 +41,32 @@ The unit tests cover the pure safety logic and do not require server access:
 ```powershell
 $env:PYTHONPATH='openclaw-video\src'
 python -m unittest discover openclaw-video\tests
+```
+
+## OpenClaw Gateway Contract
+
+Bridge V1 uses OpenClaw `2026.3.13` Gateway WebSocket v3, not the rejected
+HTTP placeholder `/channels/dify-web/chat`.
+
+Required Bridge inputs:
+
+```text
+OPENCLAW_GATEWAY_URL=ws://openclaw-gateway:18789
+OPENCLAW_GATEWAY_TOKEN_FILE=/run/secrets/openclaw_gateway_token
+OPENCLAW_GATEWAY_DEVICE_KEY_FILE=/run/secrets/openclaw_bridge_device_key.pem
+```
+
+The Bridge connects as `gateway-client` / `backend`, signs the v3 device auth
+payload with an Ed25519 private key, and requests only `operator.read` plus
+`operator.write`. Without the token file or device key file, non-video chat
+stays disabled and returns `501`.
+
+Run the fixed-version Gateway WS contract in an isolated environment:
+
+```bash
+OPENCLAW_GATEWAY_URL='ws://127.0.0.1:<port>' \
+OPENCLAW_GATEWAY_TOKEN='<redacted-token>' \
+node scripts/verify_openclaw_gateway_ws_contract.mjs
 ```
 
 ## Production Principle

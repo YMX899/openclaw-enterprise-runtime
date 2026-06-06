@@ -23,7 +23,13 @@ from .identity import (
 )
 from .job_state import TERMINAL_STATUSES
 from .job_store import InMemoryJobStore, JobNotFound, JobOwnershipError, VideoJob
-from .openclaw_gateway import DisabledGatewayClient, GatewayChatRequest, GatewayError, GatewayNotConfigured
+from .openclaw_gateway import (
+    DisabledGatewayClient,
+    GatewayChatRequest,
+    GatewayError,
+    GatewayNotConfigured,
+    OpenClawGatewayWsClient,
+)
 from .session_store import (
     BridgeMessage,
     BridgeSession,
@@ -110,7 +116,7 @@ def create_app(
     dify = dify or DifyClient(os.environ.get("DIFY_API_BASE", "http://api:5001"))
     session_store = session_store or _default_session_store()
     job_store = job_store or _default_job_store()
-    gateway = gateway or DisabledGatewayClient()
+    gateway = gateway or OpenClawGatewayWsClient.from_environment()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
 
     @app.exception_handler(Exception)

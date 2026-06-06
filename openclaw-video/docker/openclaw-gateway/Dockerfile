@@ -12,5 +12,4 @@ RUN mkdir -p /var/lib/openclaw /etc/openclaw \
 
 USER node
 EXPOSE 18789
-CMD ["sh", "-lc", "openclaw gateway run --bind custom --port 18789 --auth token --token \"$OPENCLAW_GATEWAY_TOKEN\""]
-
+CMD ["sh", "-lc", "OPENCLAW_GATEWAY_TOKEN=\"$(cat /run/secrets/openclaw_gateway_token)\" exec openclaw gateway run --bind custom --port 18789 --auth token"]
