@@ -151,6 +151,8 @@ class BridgeAppTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["authenticated"], False)
         self.assertEqual(body["login_material_present"], False)
+        self.assertEqual(body["huahuo_access_token_present"], False)
+        self.assertEqual(body["huahuo_app_uuid_present"], False)
         self.assertEqual(body["profile_ok"], False)
         self.assertEqual(body["workspace_ok"], False)
         self.assertEqual(body["access_ok"], False)
@@ -168,6 +170,8 @@ class BridgeAppTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["authenticated"], True)
         self.assertEqual(body["login_material_present"], True)
+        self.assertEqual(body["huahuo_access_token_present"], False)
+        self.assertEqual(body["huahuo_app_uuid_present"], False)
         self.assertEqual(body["profile_ok"], True)
         self.assertEqual(body["workspace_ok"], True)
         self.assertEqual(body["access_ok"], True)
@@ -286,6 +290,32 @@ class BridgeAppTests(unittest.TestCase):
         self.assertNotIn("front-user-a", response.text)
         self.assertNotIn("huahuo-front", response.text)
         self.assertNotIn("HUAHUO-access", response.text)
+
+    def test_huahuo_identity_diagnostics_reports_presence_without_values(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=FakeHuahuoClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={
+                "X-Huahuo-Access-Token": "HUAHUO-access",
+                "X-Huahuo-App-UUID": "front-app-uuid",
+            },
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(body["huahuo_access_token_present"], True)
+        self.assertEqual(body["huahuo_app_uuid_present"], True)
+        self.assertNotIn("HUAHUO-access", response.text)
+        self.assertNotIn("front-app-uuid", response.text)
 
     def test_create_and_list_sessions_for_owner_only(self):
         session_a = self.create_session("account-a")

@@ -122,6 +122,11 @@ def _has_dify_login_material(headers: Any) -> bool:
     return bool(names & {"authorization", "cookie", "x-csrf-token", "x-xsrf-token", "x-huahuo-access-token"})
 
 
+def _has_header(headers: Any, name: str) -> bool:
+    lowered = name.lower()
+    return any(key.lower() == lowered and bool(value) for key, value in headers.items())
+
+
 def _test_identity_headers_allowed(request: Request, enabled: bool, secret: str) -> bool:
     if not enabled or not secret:
         return False
@@ -581,6 +586,8 @@ def create_app(
         result: dict[str, Any] = {
             "authenticated": False,
             "login_material_present": _has_dify_login_material(request.headers),
+            "huahuo_access_token_present": _has_header(request.headers, "x-huahuo-access-token"),
+            "huahuo_app_uuid_present": _has_header(request.headers, "x-huahuo-app-uuid"),
             "profile_ok": False,
             "workspace_ok": False,
             "access_ok": False,
