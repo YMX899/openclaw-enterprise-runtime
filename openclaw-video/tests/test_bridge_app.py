@@ -19,6 +19,8 @@ class FakeDifyClient:
 
     async def workspaces(self, headers):
         tenant_id = headers.get("x-test-tenant", "tenant-a")
+        if headers.get("x-test-multiple-current") == "1":
+            return {"data": [{"id": tenant_id, "current": True}, {"id": "tenant-b", "current": True}]}
         return {"data": [{"id": tenant_id, "current": True}]}
 
 
@@ -74,6 +76,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("text/html", response.headers["content-type"])
         self.assertIn("OpenClaw Lab", response.text)
         self.assertIn("/openclaw-api/me", response.text)
+        self.assertIn("/openclaw-api/identity/diagnostics", response.text)
         self.assertIn("/openclaw-api/jobs", response.text)
         self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
         self.assertNotIn("openclaw-gateway:18789", response.text)
@@ -97,6 +100,51 @@ class BridgeAppTests(unittest.TestCase):
     def test_login_required_for_me(self):
         response = self.client.get("/openclaw-api/me")
         self.assertEqual(response.status_code, 401)
+
+    def test_identity_diagnostics_reports_missing_login_without_secrets(self):
+        response = self.client.get("/openclaw-api/identity/diagnostics")
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], False)
+        self.assertEqual(body["login_material_present"], False)
+        self.assertEqual(body["profile_ok"], False)
+        self.assertEqual(body["workspace_ok"], False)
+        self.assertEqual(body["failure_stage"], "profile")
+        self.assertIsNone(body["principal_id"])
+        self.assertNotIn("cookie", response.text.lower())
+        self.assertNotIn("authorization", response.text.lower())
+
+    def test_identity_diagnostics_returns_hashed_principal_only(self):
+        response = self.client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={**self.auth("account-a", "tenant-a"), "Cookie": "dify=secret"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(body["login_material_present"], True)
+        self.assertEqual(body["profile_ok"], True)
+        self.assertEqual(body["workspace_ok"], True)
+        self.assertEqual(body["current_workspace_count"], 1)
+        self.assertEqual(len(body["principal_id"]), 64)
+        self.assertIsNone(body["failure_stage"])
+        self.assertNotIn("account-a", response.text)
+        self.assertNotIn("tenant-a", response.text)
+        self.assertNotIn("secret", response.text)
+
+    def test_identity_diagnostics_fails_closed_for_multiple_current_workspaces(self):
+        response = self.client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={**self.auth("account-a", "tenant-a"), "x-test-multiple-current": "1"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], False)
+        self.assertEqual(body["profile_ok"], True)
+        self.assertEqual(body["workspace_ok"], False)
+        self.assertEqual(body["current_workspace_count"], 2)
+        self.assertEqual(body["failure_stage"], "workspace")
+        self.assertIsNone(body["principal_id"])
 
     def test_create_and_list_sessions_for_owner_only(self):
         session_a = self.create_session("account-a")

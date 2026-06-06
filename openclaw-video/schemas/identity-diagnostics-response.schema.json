@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/identity-diagnostics-response.schema.json",
+  "type": "object",
+  "required": [
+    "authenticated",
+    "login_material_present",
+    "profile_ok",
+    "workspace_ok",
+    "current_workspace_count",
+    "principal_id",
+    "failure_stage"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "authenticated": {"type": "boolean"},
+    "login_material_present": {"type": "boolean"},
+    "profile_ok": {"type": "boolean"},
+    "workspace_ok": {"type": "boolean"},
+    "current_workspace_count": {"type": "integer", "minimum": 0},
+    "principal_id": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "failure_stage": {
+      "oneOf": [
+        {"enum": ["profile", "workspace"]},
+        {"type": "null"}
+      ]
+    }
+  }
+}

@@ -17,6 +17,7 @@ from .dify_client import DifyClient
 from .identity import (
     DifyPrincipal,
     IdentityError,
+    current_workspace_count,
     derive_openclaw_routing_user,
     derive_principal,
     hmac_sha256_hex,
@@ -84,6 +85,11 @@ def _serialize_job(job: VideoJob) -> dict[str, Any]:
 def _sse_event(event: str, data: dict[str, Any]) -> str:
     payload = json.dumps(data, separators=(",", ":"), ensure_ascii=True)
     return f"event: {event}\ndata: {payload}\n\n"
+
+
+def _has_dify_login_material(headers: Any) -> bool:
+    names = {key.lower() for key in headers.keys()}
+    return bool(names & {"authorization", "cookie", "x-csrf-token", "x-xsrf-token"})
 
 
 LAB_PAGE_HTML = """<!doctype html>
@@ -171,6 +177,7 @@ LAB_PAGE_HTML = """<!doctype html>
       <div class="actions">
         <button id="createSession">Create Session</button>
         <button id="refreshMe" class="secondary">Refresh Login</button>
+        <button id="identityDiagnostics" class="secondary">Identity Check</button>
       </div>
     </section>
     <section class="grid">
@@ -233,6 +240,9 @@ LAB_PAGE_HTML = """<!doctype html>
       }
       show(result);
     }
+    async function identityDiagnostics() {
+      show(await api('/openclaw-api/identity/diagnostics'));
+    }
     async function submitJob() {
       const result = await api('/openclaw-api/jobs', {
         method: 'POST',
@@ -253,6 +263,7 @@ LAB_PAGE_HTML = """<!doctype html>
       show(await api('/openclaw-api/jobs/' + encodeURIComponent(currentJobId)));
     }
     document.getElementById('refreshMe').addEventListener('click', refreshMe);
+    document.getElementById('identityDiagnostics').addEventListener('click', identityDiagnostics);
     document.getElementById('createSession').addEventListener('click', createSession);
     document.getElementById('submitJob').addEventListener('click', submitJob);
     document.getElementById('pollJob').addEventListener('click', pollJob);
@@ -346,6 +357,38 @@ def create_app(
     async def me(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         return {"principal_id": principal.principal_id, "authenticated": True}
+
+    @app.get("/openclaw-api/identity/diagnostics")
+    async def identity_diagnostics(request: Request) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "authenticated": False,
+            "login_material_present": _has_dify_login_material(request.headers),
+            "profile_ok": False,
+            "workspace_ok": False,
+            "current_workspace_count": 0,
+            "principal_id": None,
+            "failure_stage": None,
+        }
+        try:
+            profile = await dify.profile(request.headers)
+            result["profile_ok"] = True
+        except PermissionError:
+            result["failure_stage"] = "profile"
+            return result
+        except Exception:
+            result["failure_stage"] = "profile"
+            return result
+        try:
+            workspaces = await dify.workspaces(request.headers)
+            result["current_workspace_count"] = current_workspace_count(workspaces)
+            principal = derive_principal(identity_secret, profile, workspaces)
+            result["workspace_ok"] = True
+            result["authenticated"] = True
+            result["principal_id"] = principal.principal_id
+            return result
+        except Exception:
+            result["failure_stage"] = "workspace"
+            return result
 
     @app.get("/openclaw-api/sessions")
     async def sessions(request: Request) -> dict[str, Any]:

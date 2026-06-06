@@ -45,7 +45,15 @@ def _workspace_items(workspaces: Any) -> list[dict[str, Any]]:
 
 def select_current_workspace(workspaces: Any) -> dict[str, Any]:
     items = _workspace_items(workspaces)
-    current = [
+    current = current_workspace_candidates(items)
+    if len(current) != 1:
+        raise IdentityError(f"expected exactly one current workspace, got {len(current)}")
+    return current[0]
+
+
+def current_workspace_candidates(workspaces: Any) -> list[dict[str, Any]]:
+    items = _workspace_items(workspaces)
+    return [
         item
         for item in items
         if item.get("current") is True
@@ -53,9 +61,10 @@ def select_current_workspace(workspaces: Any) -> dict[str, Any]:
         or item.get("isCurrent") is True
         or item.get("role") == "current"
     ]
-    if len(current) != 1:
-        raise IdentityError(f"expected exactly one current workspace, got {len(current)}")
-    return current[0]
+
+
+def current_workspace_count(workspaces: Any) -> int:
+    return len(current_workspace_candidates(workspaces))
 
 
 def extract_tenant_id(workspaces: Any) -> str:
@@ -84,4 +93,3 @@ def derive_openclaw_routing_user(secret: str, principal_id: str, bridge_session_
     if not principal_id or not bridge_session_id:
         raise IdentityError("principal_id and bridge_session_id are required")
     return hmac_sha256_hex(secret, f"{principal_id}:{bridge_session_id}")
-

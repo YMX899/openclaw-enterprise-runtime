@@ -140,6 +140,16 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
         self.assertNotIn("tenant_id", me_response.json())
         self.assertNotIn("account_id", me_response.json())
 
+        diagnostics_response = self.client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={**self.auth(), "Cookie": "dify=secret"},
+        )
+        self.assertEqual(diagnostics_response.status_code, 200, diagnostics_response.text)
+        validate_schema(diagnostics_response.json(), "identity-diagnostics-response.schema.json")
+        self.assertNotIn("tenant-a", diagnostics_response.text)
+        self.assertNotIn("account-a", diagnostics_response.text)
+        self.assertNotIn("secret", diagnostics_response.text)
+
         session = self.create_session()
 
         sessions_response = self.client.get("/openclaw-api/sessions", headers=self.auth())
