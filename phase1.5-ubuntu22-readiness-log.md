@@ -201,3 +201,70 @@ is produced.
 No sudo password, docker group change, daemon restart, package install,
 container start, compose build, compose up, or production server operation was
 performed.
+
+## Docker Command Prefix Gate Probe
+
+Refresh time:
+
+```text
+2026-06-06T13:15:34+08:00
+```
+
+Uploaded build:
+
+```text
+commit: 136cfb3
+tag: phase1-5-docker-cmd-prefix-gate-20260606
+archive: tmp/openclaw-dify-phase1.5-136cfb3.tar.gz
+remote_archive: /tmp/openclaw-dify-phase1.5-136cfb3.tar.gz
+remote_extract: /tmp/openclaw-dify-phase1.5-136cfb3
+```
+
+Non-Docker validation on `ubuntu22.04`:
+
+```text
+python3 -m py_compile scripts/write_phase1_5_exit_proof.py scripts/check_phase1_5_host_readiness.py scripts/audit_production_readiness.py: PASS
+bash -n scripts/verify_phase1_5_gates.sh: PASS
+```
+
+Direct Docker readiness:
+
+```text
+overall: NO_GO
+docker_engine: NO_GO
+evidence: permission denied while trying to connect to the docker API at unix:///var/run/docker.sock
+docker_compose: PASS
+```
+
+Non-interactive sudo Docker readiness:
+
+```text
+overall: NO_GO
+docker_engine: NO_GO
+evidence: sudo: a password is required
+docker_compose: NO_GO
+evidence: sudo: a password is required
+```
+
+Exit proof failure-closed check with explicit Docker command prefix:
+
+```text
+command: python3 scripts/write_phase1_5_exit_proof.py --docker-cmd 'sudo -n docker' --worker-image sha256:<dummy>
+result: failed before writing proof because sudo required a password
+phase1.5-exit-proof.md present after failed command: NO
+failure_closed: PASS
+```
+
+Interpretation:
+
+```text
+The Phase 1.5 Linux gate now supports an explicit DOCKER_CMD prefix such as
+DOCKER_CMD='sudo -n docker'. On ubuntu22.04 that path is not yet usable because
+the current SSH user has neither direct Docker socket access nor passwordless
+non-interactive Docker sudo. The host remains blocked for full Docker build,
+compose-up and exit-proof generation.
+```
+
+No sudo password, docker group change, Docker socket permission change, daemon
+restart, package install, image build, compose up, or production/root-server
+operation was performed.
