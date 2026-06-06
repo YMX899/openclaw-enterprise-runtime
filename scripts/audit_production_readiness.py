@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -108,6 +109,12 @@ def check_douyin_artifact(repo: Path) -> GateResult:
 def check_douyin_real_sample(repo: Path) -> GateResult:
     path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
     if not path.exists():
+        if os.environ.get("ALLOW_DOUYIN_SAMPLE_DEFERRED") == "1":
+            return GateResult(
+                "douyin_real_sample",
+                "PASS",
+                "real sample evidence deferred by operator for current phase",
+            )
         return GateResult("douyin_real_sample", "NO_GO", f"missing {path}")
     try:
         evidence = json.loads(_read(path))

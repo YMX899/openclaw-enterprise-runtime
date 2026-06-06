@@ -9,6 +9,7 @@ skip_docker="${SKIP_DOCKER:-0}"
 run_compose_up="${RUN_COMPOSE_UP:-0}"
 require_douyin_artifact="${REQUIRE_DOUYIN_ARTIFACT:-0}"
 require_openclaw_security_approval="${REQUIRE_OPENCLAW_SECURITY_APPROVAL:-0}"
+allow_douyin_sample_deferred="${ALLOW_DOUYIN_SAMPLE_DEFERRED:-0}"
 allow_dirty="${ALLOW_DIRTY:-0}"
 
 step() {
@@ -221,8 +222,12 @@ if [[ "$require_douyin_artifact" == "1" ]] && ! grep -q 'Status: verified' artif
   fail "REQUIRE_DOUYIN_ARTIFACT=1 but douyin_chong artifact is not verified."
 fi
 
-if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json ]]; then
+if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json && "$allow_douyin_sample_deferred" != "1" ]]; then
   fail "REQUIRE_DOUYIN_ARTIFACT=1 but REAL_SAMPLE_EVIDENCE.json is missing."
+fi
+
+if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json && "$allow_douyin_sample_deferred" == "1" ]]; then
+  printf 'REAL_SAMPLE_EVIDENCE.json deferred by operator. This is not final production evidence.\n'
 fi
 
 if [[ "$require_openclaw_security_approval" == "1" ]] && ! grep -Eq 'decision: (approve_exception|vendor_patch|upgrade_strategy)' artifacts/openclaw-2026.3.13/SECURITY_DECISION.md; then

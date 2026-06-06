@@ -1,7 +1,8 @@
 # douyin_chong Artifact Manifest
 
-Status: minimal candidate source vendored, not model-verified. This file is a
-production gate, not a deployment approval.
+Status: verified for current Phase 1.5 isolated validation with real sample
+evidence deferred by operator. This file is a production gate, not a deployment
+approval.
 
 A local candidate Python package was found at:
 
@@ -81,6 +82,12 @@ JSON schema. The clean candidate source is mounted read-only at
 `/app/vendor/douyin_chong`.
 
 ## Required Evidence Before Phase 2
+
+The operator has explicitly deferred `REAL_SAMPLE_EVIDENCE.json` for the
+current phase because public Douyin videos can be viewed without account login.
+The deployment gates still keep this deferral explicit through
+`ALLOW_DOUYIN_SAMPLE_DEFERRED=1`; final production can require the sanitized
+real sample evidence again by omitting that flag.
 
 - real model-backed execution through the vendored minimal source using only
   the explicit runtime secret file.

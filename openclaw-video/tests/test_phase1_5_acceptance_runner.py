@@ -45,6 +45,7 @@ class Phase15AcceptanceRunnerTests(unittest.TestCase):
     def test_full_gate_requires_hard_gates_and_compose_up(self):
         self.assertIn("REQUIRE_OPENCLAW_SECURITY_APPROVAL=1", self.text)
         self.assertIn("REQUIRE_DOUYIN_ARTIFACT=1", self.text)
+        self.assertIn('ALLOW_DOUYIN_SAMPLE_DEFERRED="${ALLOW_DOUYIN_SAMPLE_DEFERRED:-0}"', self.text)
         self.assertIn("RUN_COMPOSE_UP=1", self.text)
         self.assertIn("DOCKER_CMD=\"$docker_cmd\"", self.text)
 

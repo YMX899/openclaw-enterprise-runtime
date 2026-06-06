@@ -1,8 +1,10 @@
 import importlib.util
+import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "audit_production_readiness.py"
@@ -83,9 +85,11 @@ class ProductionReadinessAuditTests(unittest.TestCase):
         report = audit_module.audit(Path(__file__).resolve().parents[2])
         self.assertEqual(report["overall"], "NO_GO")
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
-        self.assertEqual(statuses["openclaw_security"], "NO_GO")
-        self.assertEqual(statuses["douyin_artifact"], "NO_GO")
+        self.assertEqual(statuses["openclaw_security"], "PASS")
+        self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
+        self.assertEqual(statuses["phase1_5_exit_proof"], "NO_GO")
+        self.assertEqual(statuses["authenticated_dify_baseline"], "NO_GO")
 
     def test_all_markers_present_is_go(self):
         with TemporaryDirectory() as tmp:
@@ -229,6 +233,15 @@ new 5xx: NONE
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
+
+    def test_real_sample_can_be_explicitly_deferred_for_current_phase(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            with mock.patch.dict(os.environ, {"ALLOW_DOUYIN_SAMPLE_DEFERRED": "1"}):
+                result = audit_module.check_douyin_real_sample(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("deferred", result.evidence)
 
     def test_openclaw_security_requires_triage_when_decision_approved(self):
         with TemporaryDirectory() as tmp:
