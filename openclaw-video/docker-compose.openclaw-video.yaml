@@ -117,4 +117,4 @@ networks:
     name: openclaw_video_internal
   dify-default:
     external: true
-    name: docker_default
+    name: ${DIFY_DOCKER_NETWORK:-docker_default}

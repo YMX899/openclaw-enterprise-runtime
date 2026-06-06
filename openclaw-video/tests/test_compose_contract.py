@@ -59,6 +59,22 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("name: openclaw_video_internal", compose)
         self.assertNotIn("internal: true", compose)
 
+    def test_dify_network_defaults_to_production_and_can_be_overridden_for_isolated_tests(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+
+        self.assertIn("name: ${DIFY_DOCKER_NETWORK:-docker_default}", compose)
+        self.assertNotIn("name: docker_default\n", compose)
+
+    def test_compose_render_checks_avoid_writing_interpolated_secret_values(self):
+        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
+        helper_script = (ROOT.parents[0] / "scripts" / "verify_compose_render.sh").read_text(encoding="utf-8")
+
+        for script in [gate_script, helper_script]:
+            with self.subTest(script=script[:40]):
+                self.assertIn("mktemp", script)
+                self.assertIn("config --no-interpolate", script)
+                self.assertIn("rm -f", script)
+
     def test_worker_resource_and_filesystem_limits_are_declared(self):
         compose = COMPOSE.read_text(encoding="utf-8")
         for required in [

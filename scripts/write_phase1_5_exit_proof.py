@@ -60,6 +60,7 @@ class ProofContext:
     node_cmd: str
     docker_cmd: str
     worker_image: str
+    douyin_real_sample_status: str
 
 
 def _run(command: Sequence[str], *, cwd: Path) -> str:
@@ -152,6 +153,7 @@ def collect_context(args: argparse.Namespace) -> ProofContext:
         node_cmd=_clean_line(args.node_cmd, "node_cmd"),
         docker_cmd=_clean_line(args.docker_cmd, "docker_cmd"),
         worker_image=_clean_line(args.worker_image, "worker_image"),
+        douyin_real_sample_status=_clean_line(args.douyin_real_sample_status, "douyin_real_sample_status"),
     )
 
 
@@ -210,7 +212,7 @@ Python unittest: PASS
 Python compileall: PASS
 vendored douyin_chong source gate: PASS
 douyin_chong artifact gate: VERIFIED
-douyin real sample gate: VERIFIED
+douyin real sample gate: {context.douyin_real_sample_status}
 OpenClaw 2026.3.13 security gate: APPROVED
 docker compose config: PASS
 docker compose build --no-cache: PASS
@@ -263,6 +265,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--node-cmd", default=os.environ.get("NODE", "node"))
     parser.add_argument("--docker-cmd", default=os.environ.get("DOCKER_CMD", "docker"))
     parser.add_argument("--worker-image", required=True)
+    parser.add_argument("--douyin-real-sample-status", default=os.environ.get("DOUYIN_REAL_SAMPLE_STATUS", "VERIFIED"))
     parser.add_argument("--operator", default=os.environ.get("PHASE1_5_OPERATOR") or getpass.getuser())
     parser.add_argument(
         "--reviewer",

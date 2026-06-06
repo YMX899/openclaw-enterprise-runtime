@@ -145,6 +145,7 @@ required = [
     "mem_limit: 1024M",
     "mem_reservation: 256M",
     "pids_limit: 128",
+    "name: ${DIFY_DOCKER_NETWORK:-docker_default}",
 ]
 for needle in required:
     if needle not in compose:
@@ -229,8 +230,10 @@ if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMP
   fail "REQUIRE_DOUYIN_ARTIFACT=1 but REAL_SAMPLE_EVIDENCE.json is missing."
 fi
 
+douyin_real_sample_status="VERIFIED"
 if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json && "$allow_douyin_sample_deferred" == "1" ]]; then
   printf 'REAL_SAMPLE_EVIDENCE.json deferred by operator. This is not final production evidence.\n'
+  douyin_real_sample_status="DEFERRED_BY_OPERATOR_FOR_CURRENT_PHASE"
 fi
 
 if [[ "$require_openclaw_security_approval" == "1" ]] && ! grep -Eq 'decision: (approve_exception|vendor_patch|upgrade_strategy)' artifacts/openclaw-2026.3.13/SECURITY_DECISION.md; then
@@ -255,13 +258,19 @@ command -v "${docker_cmd_parts[0]}" >/dev/null 2>&1 || fail "${docker_cmd_parts[
 "${docker_cmd_parts[@]}" version --format 'Docker server={{.Server.Version}}' >/dev/null
 
 step "compose render"
-rendered="${TMPDIR:-/tmp}/openclaw-video-compose.phase1_5.rendered.yaml"
-"${docker_cmd_parts[@]}" compose -f "$compose_file" config >"$rendered"
-if grep -E '0\.0\.0\.0:18789|0\.0\.0\.0:5432|/var/run/docker\.sock|internal: true|--token' "$rendered"; then
-  fail "compose render exposes forbidden Gateway/Postgres/Docker socket/token surface"
+rendered="$(mktemp "${TMPDIR:-/tmp}/openclaw-video-compose.phase1_5.XXXXXX.yaml")"
+cleanup_rendered() {
+  rm -f "$rendered"
+}
+trap cleanup_rendered EXIT
+"${docker_cmd_parts[@]}" compose -f "$compose_file" config --no-interpolate >"$rendered"
+if grep -E '0\.0\.0\.0:18789|0\.0\.0\.0:5432|/var/run/docker\.sock|internal: true|--token|phase15-|secret-32bytes|sk-[[:alnum:]_-]+' "$rendered"; then
+  fail "compose render exposes forbidden Gateway/Postgres/Docker socket/token/secret surface"
 fi
 grep -q '127.0.0.1:18181:3000' "$rendered"
 grep -q 'ws://openclaw-gateway:18789' "$rendered"
+cleanup_rendered
+trap - EXIT
 
 step "compose build"
 "${docker_cmd_parts[@]}" compose -f "$compose_file" build --no-cache
@@ -301,7 +310,8 @@ if [[ "$run_compose_up" == "1" ]]; then
     --python-cmd "$python_cmd" \
     --node-cmd "$node_cmd" \
     --docker-cmd "$docker_cmd" \
-    --worker-image "$worker_image"
+    --worker-image "$worker_image" \
+    --douyin-real-sample-status "$douyin_real_sample_status"
 else
   printf 'Compose up skipped. Use RUN_COMPOSE_UP=1 only in an isolated Docker/Linux validation host.\n'
 fi
