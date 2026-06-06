@@ -548,6 +548,25 @@ Local workstation still has no Docker CLI, so this remains script readiness, not
 Phase 1.5 exit proof.
 ```
 
+Updated isolated host availability probe:
+
+```text
+Non-production SSH aliases probed read-only on 2026-06-06:
+
+ubuntu22.04: connection timeout
+myproj: connection timeout
+ubuntu: invalid alias, missing password/key_file
+prod-web-01: invalid alias, missing password/key_file
+
+Decision:
+  No usable non-production Linux Docker host was available from the configured
+  SSH aliases. Production Dify host root/AI-01 must not be used as a substitute
+  for Phase 1.5 isolated Docker validation.
+
+New handoff:
+  phase1.5-isolated-host-handoff.md
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
