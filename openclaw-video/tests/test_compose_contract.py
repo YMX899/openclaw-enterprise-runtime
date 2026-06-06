@@ -161,6 +161,10 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("apt-get install -y --no-install-recommends ca-certificates git openssh-client", gateway)
         self.assertIn('npm config set registry "$NPM_CONFIG_REGISTRY"', gateway)
         self.assertIn('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', gateway)
+        self.assertIn(
+            'npm install -g "openclaw@${OPENCLAW_VERSION}" --omit=optional --ignore-scripts',
+            gateway,
+        )
         self.assertIn("rm -rf /var/lib/apt/lists/*", gateway)
         self.assertIn("PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}", compose)
         self.assertIn("PIP_INDEX_URL: ${PIP_INDEX_URL:-}", compose)
