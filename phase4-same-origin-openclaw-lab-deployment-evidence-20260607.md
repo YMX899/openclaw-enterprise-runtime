@@ -151,6 +151,92 @@ GET  /openclaw-api/jobs/{job_id} -> 200
 GET  /openclaw-api/jobs/{job_id}/result -> 200
 ```
 
+## Parallel Regression Evidence
+
+After the initial same-origin deployment evidence, a parallel browser regression
+was executed with two live Chrome tabs:
+
+```text
+Tab A: https://www.huahuoai.com/openclaw-lab/
+Tab B: https://www.huahuoai.com/ai/?id=4
+```
+
+Preconditions:
+
+```text
+OpenClaw Lab showed Authenticated.
+OpenClaw Lab showed Tiny Upload.
+Huahuo user web loaded the chat UI.
+```
+
+Parallel actions:
+
+```text
+OpenClaw: clicked Tiny Upload.
+Huahuo user web: sent "并行回归测试 1780773016416：请回复收到".
+```
+
+OpenClaw result:
+
+```text
+create_session -> 201
+upload_job     -> 202
+poll_job       -> queued, then succeeded
+job_result     -> 200
+job_id=138be9c6-c1b0-4bf7-a27b-be537cc97e98
+session_id=58d26134-d1a4-4ee3-91a4-cf2335d0052b
+video_url_canonical=upload://7f81bf99-162e-4720-b719-3f4414c7d7e4/tiny-smoke.mp4
+result_schema_version=openclaw-video-result.v1
+result_location=postgres://video_results/138be9c6-c1b0-4bf7-a27b-be537cc97e98
+```
+
+Huahuo user web result:
+
+```text
+The message appeared in the real user chat.
+The page stopped showing "思考中...".
+The AI produced a visible reply beginning with "我是安老师的AI分身。".
+```
+
+Post-parallel server baseline:
+
+```text
+https://www.huahuoai.com/openclaw-lab/   -> 200
+https://www.huahuoai.com/openclaw-api/me -> 401 without login material
+https://www.huahuoai.com/ai/?id=4        -> 200
+```
+
+Dify core containers were still not rebuilt or restarted:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z
+```
+
+Resource snapshot after the parallel run:
+
+```text
+openclaw-bridge         0.11% CPU, 52.67 MiB, 5 PIDs
+video-analysis-worker   0.00% CPU, 33.33 MiB, 1 PID
+openclaw-gateway        0.00% CPU, 438.9 MiB, 18 PIDs
+bridge-postgres         3.09% CPU, 36.75 MiB, 6 PIDs
+docker-nginx-1          0.00% CPU, 11.74 MiB, 10 PIDs
+docker-api-1            0.68% CPU, 4.273 GiB, 61 PIDs
+docker-web-1            0.42% CPU, 359.5 MiB, 34 PIDs
+```
+
+Log notes:
+
+```text
+OpenClaw Bridge showed the expected 201 -> 202 -> 200 -> result 200 sequence.
+OpenClaw worker logs did not show new errors.
+Dify API logs showed existing plugin/model credential or balance errors around
+conversation-name generation, but the Huahuo user-web reply itself succeeded.
+This is tracked as an existing Dify/model-configuration risk rather than an
+OpenClaw sidecar regression.
+```
+
 ## Known Limitation
 
 Chrome automation could not complete native local file selection for `D:\DESK\Dify\tmp\sample-videos\mdn-flower.mp4` because the Codex Chrome extension rejected setting local files:
