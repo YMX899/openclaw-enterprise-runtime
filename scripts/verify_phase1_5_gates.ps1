@@ -18,6 +18,12 @@ function Fail($Message) {
     exit 1
 }
 
+function Assert-LastExitCode($Message) {
+    if ($LASTEXITCODE -ne 0) {
+        Fail "$Message failed with exit code $LASTEXITCODE"
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
@@ -34,12 +40,15 @@ Write-Host "PYTHON=$PythonCmd"
 
 Step "Python dependency gate"
 & $PythonCmd -c "import cryptography, fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime; from psycopg.types.json import Jsonb"
+Assert-LastExitCode "Python dependency gate"
 
 Step "Python tests"
 $env:PYTHONDONTWRITEBYTECODE = "1"
 $env:PYTHONPATH = "openclaw-video/src"
 & $PythonCmd -m unittest discover openclaw-video/tests -v
+Assert-LastExitCode "Python unittest"
 & $PythonCmd -m compileall openclaw-video/src openclaw-video/tests
+Assert-LastExitCode "Python compileall"
 
 Step "vendored douyin_chong source gate"
 $vendorGate = @'
@@ -79,9 +88,11 @@ for path in vendor.rglob("*"):
 print("vendor source gate: OK")
 '@
 $vendorGate | & $PythonCmd -
+Assert-LastExitCode "vendored douyin_chong source gate"
 
 Step "Node syntax"
 node --check scripts/verify_openclaw_gateway_ws_contract.mjs
+Assert-LastExitCode "Node syntax"
 
 Step "static phase gates"
 $staticGate = @'
@@ -130,6 +141,7 @@ else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 '@
 $staticGate | & $PythonCmd -
+Assert-LastExitCode "static phase gates"
 
 if ($RequireDouyinArtifact) {
     $manifest = Get-Content -Path "artifacts/douyin_chong/ARTIFACT_MANIFEST.md" -Raw
@@ -151,6 +163,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 Step "compose render"
 $renderedPath = Join-Path $env:TEMP "openclaw-video-compose.phase1_5.rendered.yaml"
 docker compose -f $ComposeFile config | Out-File -Encoding utf8 $renderedPath
+Assert-LastExitCode "docker compose config"
 $rendered = Get-Content -Path $renderedPath -Raw
 foreach ($forbidden in @("0.0.0.0:18789", "0.0.0.0:5432", "/var/run/docker.sock", "--token", "internal: true")) {
     if ($rendered.Contains($forbidden)) {
@@ -160,20 +173,26 @@ foreach ($forbidden in @("0.0.0.0:18789", "0.0.0.0:5432", "/var/run/docker.sock"
 
 Step "compose build"
 docker compose -f $ComposeFile build --no-cache
+Assert-LastExitCode "docker compose build"
 
 Step "worker image smoke"
 $workerImage = docker compose -f $ComposeFile images -q video-analysis-worker
+Assert-LastExitCode "docker compose images"
 if (-not $workerImage) {
     Fail "could not resolve built video-analysis-worker image id"
 }
 docker run --rm $workerImage openclaw-douyin-adapter --help | Out-Null
+Assert-LastExitCode "worker image adapter help smoke"
 docker run --rm $workerImage python -c "from openclaw_video.douyin_legacy_adapter import _load_legacy_components; print([component.__name__ for component in _load_legacy_components()])"
+Assert-LastExitCode "worker image adapter loader smoke"
 
 if ($RunComposeUp) {
     Step "compose up isolated sidecar"
     try {
         docker compose -f $ComposeFile up -d
+        Assert-LastExitCode "docker compose up"
         docker compose -f $ComposeFile ps
+        Assert-LastExitCode "docker compose ps"
 
         Step "localhost health"
         Invoke-WebRequest -Uri "http://127.0.0.1:18181/healthz" -UseBasicParsing -TimeoutSec 10 | Out-Null
@@ -186,6 +205,7 @@ if ($RunComposeUp) {
     }
     finally {
         docker compose -f $ComposeFile down --remove-orphans
+        Assert-LastExitCode "docker compose down"
     }
 } else {
     Write-Host "Compose up skipped. Use -RunComposeUp only in an isolated Docker/Linux validation host."

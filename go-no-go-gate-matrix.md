@@ -1,7 +1,7 @@
 # OpenClaw x Dify Go/No-Go Gate Matrix
 
 Generated: 2026-06-06  
-Current commit: `cd1233f` / tag `phase0-real-chrome-dify-baseline-20260606`
+Current commit: `52ec0ea` / tag `go-no-go-gate-matrix-20260606`
 
 ## Current Decision
 
@@ -12,6 +12,7 @@ Phase 1.5 isolated Linux Docker validation: NOT PASSED
 Phase 2 production sidecar deployment: NO-GO
 OpenResty public route change: NO-GO
 Dify Web / Dify compose modification: NO-GO
+OpenClaw 2026.3.13 production security: NO-GO
 ```
 
 ## Evidence Passed
@@ -51,6 +52,13 @@ Local source/test gates:
   openclaw-video tests: 92 tests pass
   vendored douyin_chong SOURCE_SHA256SUMS gate passes locally
   Phase 1.5 scripts pass only with Docker skipped
+
+OpenClaw 2026.3.13 audit:
+  artifacts/openclaw-2026.3.13/SECURITY_DECISION.md
+  npm audit --omit=dev reports 7 vulnerability groups:
+    critical=1, high=4, moderate=2
+  direct package openclaw@2026.3.13 is affected
+  current production decision: reject fixed version as currently pinned
 ```
 
 ## Hard No-Go Items
@@ -73,7 +81,9 @@ These are required before production Phase 2 can start:
 5. Worker timeout, cleanup and resource profile evidence must be captured:
    CPU, memory, disk, duration, temp path and failure behavior.
 
-6. OpenClaw 2026.3.13 security/audit decision must be recorded.
+6. OpenClaw 2026.3.13 security/audit decision must move from current
+   reject/No-Go to approved vendor patch, approved exception, or approved
+   upgrade strategy.
 
 7. Authenticated real-browser Dify baseline must pass:
    /apps, existing app open, existing app message send, response, refresh,
