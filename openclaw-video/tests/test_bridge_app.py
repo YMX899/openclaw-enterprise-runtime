@@ -59,6 +59,15 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()["session"]
 
+    def test_healthz_does_not_require_login(self):
+        response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["component"], "openclaw-bridge")
+        self.assertNotIn("token", response.text.lower())
+        self.assertNotIn("cookie", response.text.lower())
+
     def test_me_does_not_expose_raw_dify_ids(self):
         response = self.client.get("/openclaw-api/me", headers=self.auth())
         self.assertEqual(response.status_code, 200, response.text)

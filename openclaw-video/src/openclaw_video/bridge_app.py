@@ -123,13 +123,20 @@ def create_app(
     async def _exception_handler(_: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(status_code=500, content={"error": safe_error_message(exc)})
 
-    @app.get("/health")
-    async def health() -> dict[str, Any]:
+    def health_payload() -> dict[str, Any]:
         return {
             "status": "ok",
             "component": "openclaw-bridge",
             "dify_api_base": os.environ.get("DIFY_API_BASE", "http://api:5001"),
         }
+
+    @app.get("/health")
+    async def health() -> dict[str, Any]:
+        return health_payload()
+
+    @app.get("/healthz")
+    async def healthz() -> dict[str, Any]:
+        return health_payload()
 
     async def current_principal(request: Request) -> DifyPrincipal:
         try:
