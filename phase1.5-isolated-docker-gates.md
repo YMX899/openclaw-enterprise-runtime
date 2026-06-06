@@ -29,9 +29,9 @@ The Bridge and OpenClaw Gateway WebSocket v3 direction is acceptable, but the
 project still lacks the evidence needed to claim a 100% deployable system that
 does not affect Dify:
 
-- real `douyin_chong` or equivalent video-analysis artifact is missing.
-- a local `douyin_chong` candidate has since been located, but it is not yet
-  verified and must not be treated as production-ready.
+- a local `douyin_chong` candidate has been located and a minimal V1 source
+  subset has been vendored, but it is not yet model-verified and must not be
+  treated as production-ready.
 - the real video tool has not proven input/output schema, error codes,
   duration, resource use, temp cleanup, or failure behavior.
 - Docker build, compose render, entrypoints, networks, volumes, health checks
@@ -58,7 +58,7 @@ server deployment:
 - timeout and cleanup behavior.
 - at least one successful sample and negative samples for SSRF, timeout and
   oversize rejection.
-- clean source export that excludes `.env`, `.env.local`,
+- proof that the vendored minimal source excludes `.env`, `.env.local`,
   `.douyin_storage_state*`, generated outputs, logs, caches and cookies.
 
 The worker may call the video tool only through a fixed wrapper. User input must
@@ -70,8 +70,9 @@ The current adapter entry point for the located candidate is:
 openclaw-douyin-adapter
 ```
 
-It is still blocked until the real candidate source is exported into the vendor
-slot and tested with a runtime secret file in an isolated Linux Docker host.
+It is still blocked until the vendored minimal source is tested with a runtime
+secret file in an isolated Linux Docker host and proves the real model-backed
+V1 single-video path.
 
 ### P0: Isolated Docker/Linux Validation
 

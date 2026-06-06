@@ -1,7 +1,7 @@
 # douyin_chong Artifact Manifest
 
-Status: candidate located, not verified. This file is a production gate, not a
-deployment approval.
+Status: minimal candidate source vendored, not model-verified. This file is a
+production gate, not a deployment approval.
 
 A local candidate Python package was found at:
 
@@ -10,7 +10,7 @@ D:\DESK\视频解析\tik\douyin_chong
 ```
 
 The candidate is not yet production verified. It depends on explicit Ark model
-credentials and its default commands read a project `.env`; Codex must not read,
+credentials and its default commands read a project `.env`; Codex did not read,
 copy, commit or deploy that `.env`, `.env.local`, `.douyin_storage_state*`, or
 any browser/session state files. The production worker must use only a runtime
 secret file mounted at `/run/secrets/douyin_chong_env`.
@@ -23,6 +23,27 @@ python -m douyin_chong.video_action_extract --help         OK
 python -m douyin_chong.video_fashion_extract --help        OK
 python -m compileall -q douyin_chong                       OK
 dependency imports: httpx, requests, volcenginesdkarkruntime, PIL, cv2, playwright OK
+```
+
+Clean source intake:
+
+```text
+vendored path: openclaw-video/vendor/douyin_chong
+source scope:
+  douyin_chong/__init__.py
+  douyin_chong/config.py
+  douyin_chong/models.py
+  douyin_chong/clients/__init__.py
+  douyin_chong/clients/ark_video.py
+  douyin_chong/clients/douyin.py
+  douyin_chong/clients/resolver.py
+  douyin_chong/clients/tiktok.py
+excluded:
+  .env, .env.local, .douyin_storage_state*.json, __pycache__, *.pyc, *.log,
+  JSON/HTML capture outputs, Playwright login-state utilities, batch profile
+  exporters, cover/image workflows, generated exports and history stores.
+adapter import check: OK through DOUYIN_CHONG_PYTHONPATH=/app/vendor
+source hash manifest: openclaw-video/vendor/douyin_chong/SOURCE_SHA256SUMS
 ```
 
 Candidate git state:
@@ -61,9 +82,13 @@ JSON schema. The clean candidate source is mounted read-only at
 
 ## Required Evidence Before Phase 2
 
-- clean source export or repository commit that excludes `.env`,
-  `.douyin_storage_state*`, runtime outputs and caches.
-- SHA256 archive or image digest for the exported candidate.
+- real model-backed execution through the vendored minimal source using only
+  the explicit runtime secret file.
+- verification that the vendored minimal source is sufficient for the V1
+  single-video path under Linux Docker.
+- archive or image digest for the exported candidate after Linux Docker
+  validation. The vendored source subset already has
+  `SOURCE_SHA256SUMS`, but that is not a deployable image digest.
 - license and production-use permission.
 - runtime language and version.
 - dependency lockfile or pinned requirements.

@@ -1,4 +1,5 @@
 from pathlib import Path
+from hashlib import sha256
 import unittest
 
 
@@ -8,6 +9,7 @@ GATEWAY_DOCKERFILE = ROOT / "docker" / "openclaw-gateway" / "Dockerfile"
 WORKER_DOCKERFILE = ROOT / "docker" / "worker" / "Dockerfile"
 DOCKERIGNORE = ROOT / ".dockerignore"
 VENDOR_GITIGNORE = ROOT / "vendor" / "douyin_chong" / ".gitignore"
+VENDOR_HASHES = ROOT / "vendor" / "douyin_chong" / "SOURCE_SHA256SUMS"
 
 
 class ComposeContractTests(unittest.TestCase):
@@ -113,8 +115,38 @@ class ComposeContractTests(unittest.TestCase):
         ]:
             with self.subTest(forbidden=forbidden):
                 self.assertIn(forbidden, dockerignore)
-        self.assertIn("*", vendor_gitignore)
-        self.assertIn("!README.md", vendor_gitignore)
+        self.assertIn(".env.*", vendor_gitignore)
+        self.assertIn("*storage*", vendor_gitignore)
+        self.assertIn("**/__pycache__/", vendor_gitignore)
+        self.assertIn("cover_exports/", vendor_gitignore)
+        self.assertTrue((ROOT / "vendor" / "douyin_chong" / "config.py").is_file())
+        self.assertTrue((ROOT / "vendor" / "douyin_chong" / "clients" / "ark_video.py").is_file())
+        self.assertFalse((ROOT / "vendor" / "douyin_chong" / "douyin_login_state.py").exists())
+        self.assertFalse((ROOT / "vendor" / "douyin_chong" / "profile_batch_fashion.py").exists())
+
+    def test_vendor_source_hash_manifest_matches_current_files(self):
+        vendor_root = ROOT / "vendor" / "douyin_chong"
+        entries = {}
+        for raw_line in VENDOR_HASHES.read_text(encoding="utf-8").splitlines():
+            digest, relative = raw_line.split("  ", 1)
+            entries[relative] = digest
+        expected_files = {
+            "__init__.py",
+            "clients/__init__.py",
+            "clients/ark_video.py",
+            "clients/douyin.py",
+            "clients/resolver.py",
+            "clients/tiktok.py",
+            "config.py",
+            "models.py",
+            "README.md",
+        }
+        self.assertEqual(set(entries), expected_files)
+        for relative, expected_digest in entries.items():
+            path = vendor_root / Path(relative)
+            actual_digest = sha256(path.read_bytes()).hexdigest()
+            with self.subTest(relative=relative):
+                self.assertEqual(actual_digest, expected_digest)
 
 
 if __name__ == "__main__":

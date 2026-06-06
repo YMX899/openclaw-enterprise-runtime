@@ -1,4 +1,13 @@
-*
-!.gitignore
-!.gitkeep
-!README.md
+.env
+.env.*
+*storage*
+**/*.json
+**/*.log
+**/__pycache__/
+**/*.pyc
+cover_exports/
+knowledge_exports/
+profile_batch_exports/
+task_pools/
+video_fashion_exports/
+_*/

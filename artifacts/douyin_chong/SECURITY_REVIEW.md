@@ -1,6 +1,6 @@
 # douyin_chong Security Review
 
-Status: candidate located, not verified.
+Status: minimal candidate source vendored, not model-verified.
 
 ## Candidate Location
 
@@ -11,6 +11,12 @@ D:\DESK\视频解析\tik\douyin_chong
 The sibling project contains `.env`, `.env.local` and `.douyin_storage_state*`
 files. These are treated as sensitive runtime material and must not be read,
 copied, committed, uploaded, logged or deployed by Codex.
+
+A minimal V1 source subset has been vendored under
+`openclaw-video/vendor/douyin_chong`, limited to config/models and
+`clients/{ark_video,douyin,tiktok,resolver}`. Browser login-state utilities,
+batch profile exporters, generated exports, caches and runtime outputs are not
+included.
 
 ## Current Safety Decisions
 
@@ -28,8 +34,8 @@ copied, committed, uploaded, logged or deployed by Codex.
 
 ## Remaining Security Gates
 
-- Export a clean candidate source artifact excluding secrets, browser state,
-  generated outputs and caches.
+- Prove the vendored minimal candidate source with a real model-backed
+  single-video run under Linux Docker.
 - Pin dependencies and produce an archive SHA256 or image digest.
 - Prove the adapter works with real runtime credentials without logging secrets.
 - Prove SSRF, redirect, duration, size, frame, timeout and temp cleanup gates in

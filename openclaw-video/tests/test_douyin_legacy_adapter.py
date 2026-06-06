@@ -5,7 +5,8 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from openclaw_video.douyin_legacy_adapter import LegacyAdapterError, run_adapter
+import openclaw_video.douyin_legacy_adapter as adapter_module
+from openclaw_video.douyin_legacy_adapter import LegacyAdapterError, _load_legacy_components, run_adapter
 
 
 @dataclass(frozen=True)
@@ -34,10 +35,17 @@ class FakeCompletion:
 
 class FakeConfig:
     calls = []
+    env_snapshots = []
 
     @classmethod
     def from_env(cls, **kwargs):
         cls.calls.append(kwargs)
+        cls.env_snapshots.append(
+            {
+                key: adapter_module.os.environ.get(key)
+                for key in ("ARK_API_KEY", "MEDIAKIT_API_KEY", "MODEL", "ARK_MODEL", "ARK_BASE_URL", "MEDIAKIT_BASE_URL")
+            }
+        )
         return {"config": kwargs}
 
 
@@ -67,9 +75,18 @@ def fake_components():
 class DouyinLegacyAdapterTests(unittest.TestCase):
     def setUp(self):
         FakeConfig.calls = []
+        FakeConfig.env_snapshots = []
         FakeArkClient.calls = []
         FakeResolver.video = FakeVideo()
         FakeArkClient.completion = FakeCompletion()
+
+    def test_vendored_candidate_components_are_importable(self):
+        vendor_root = Path(__file__).resolve().parents[1] / "vendor"
+        with patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"DOUYIN_CHONG_PYTHONPATH": str(vendor_root)}):
+            AppConfig, UniversalVideoResolver, ArkVideoClient = _load_legacy_components()
+        self.assertEqual(AppConfig.__name__, "AppConfig")
+        self.assertEqual(UniversalVideoResolver.__name__, "UniversalVideoResolver")
+        self.assertEqual(ArkVideoClient.__name__, "ArkVideoClient")
 
     def test_writes_committed_result_schema_without_default_env(self):
         with TemporaryDirectory() as tmp:
@@ -77,24 +94,35 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
             output_json = Path(tmp) / "result.json"
 
-            payload = run_adapter(
-                [
-                    "--input-url", "https://www.douyin.com/video/1",
-                    "--output-json", str(output_json),
-                    "--max-bytes", "2000000",
-                    "--max-duration-seconds", "60",
-                    "--max-frames", "1200",
-                    "--env-file", str(env_file),
-                    "--no-shell",
-                ],
-                component_loader=fake_components,
-            )
+            with patch.dict(
+                "openclaw_video.douyin_legacy_adapter.os.environ",
+                {
+                    "ARK_API_KEY": "ambient-should-not-leak",
+                    "MODEL": "ambient-model",
+                },
+                clear=False,
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(output_json),
+                        "--max-bytes", "2000000",
+                        "--max-duration-seconds", "60",
+                        "--max-frames", "1200",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+                self.assertEqual(adapter_module.os.environ["ARK_API_KEY"], "ambient-should-not-leak")
             written_payload = json.loads(output_json.read_text(encoding="utf-8"))
 
         self.assertEqual(payload["schema_version"], "openclaw-video-result.v1")
         self.assertEqual(payload["source"]["platform"], "douyin")
         self.assertEqual(payload["summary"], "分析结果")
         self.assertEqual(written_payload, payload)
+        self.assertEqual(FakeConfig.env_snapshots[0]["ARK_API_KEY"], None)
+        self.assertEqual(FakeConfig.env_snapshots[0]["MODEL"], None)
         config_call = FakeConfig.calls[0]
         self.assertEqual(config_call["env_path"], env_file.resolve())
         self.assertEqual(config_call["max_workers"], 1)

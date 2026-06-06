@@ -16,6 +16,16 @@ class LegacyAdapterError(RuntimeError):
     pass
 
 
+LEGACY_CONFIG_ENV_KEYS = (
+    "ARK_API_KEY",
+    "MEDIAKIT_API_KEY",
+    "MODEL",
+    "ARK_MODEL",
+    "ARK_BASE_URL",
+    "MEDIAKIT_BASE_URL",
+)
+
+
 @dataclass(frozen=True)
 class LegacyVideoLimits:
     max_download_bytes: int
@@ -91,6 +101,38 @@ def _default_prompt() -> str:
         "Cover topic, opening hook, structure, visuals, actions, audience, risks, and improvement suggestions. "
         "Do not include links, secrets, request headers, cookies, or internal paths."
     )
+
+
+def _load_config_from_explicit_env_file(
+    AppConfig: type,
+    *,
+    env_file: Path,
+    limits: LegacyVideoLimits,
+    max_tokens: int,
+    connect_timeout: float,
+    read_timeout: float,
+    retries: int,
+) -> Any:
+    previous = {key: os.environ.get(key) for key in LEGACY_CONFIG_ENV_KEYS}
+    for key in LEGACY_CONFIG_ENV_KEYS:
+        os.environ.pop(key, None)
+    try:
+        return AppConfig.from_env(
+            env_path=env_file,
+            mode="ark",
+            max_workers=1,
+            fps=limits.fps,
+            max_tokens=_positive_int(max_tokens, "max_tokens"),
+            connect_timeout=_positive_float(connect_timeout, "connect_timeout"),
+            read_timeout=_positive_float(read_timeout, "read_timeout"),
+            max_retries=max(0, int(retries)),
+        )
+    finally:
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def _safe_text(value: Any, *, limit: int = 12000) -> str:
@@ -194,15 +236,14 @@ def run_adapter(
         fps=_positive_float(args.fps, "fps"),
     )
     AppConfig, UniversalVideoResolver, ArkVideoClient = component_loader()
-    config = AppConfig.from_env(
-        env_path=env_file.resolve(),
-        mode="ark",
-        max_workers=1,
-        fps=limits.fps,
-        max_tokens=_positive_int(args.max_tokens, "max_tokens"),
-        connect_timeout=_positive_float(args.connect_timeout, "connect_timeout"),
-        read_timeout=_positive_float(args.read_timeout, "read_timeout"),
-        max_retries=max(0, int(args.retries)),
+    config = _load_config_from_explicit_env_file(
+        AppConfig,
+        env_file=env_file.resolve(),
+        limits=limits,
+        max_tokens=args.max_tokens,
+        connect_timeout=args.connect_timeout,
+        read_timeout=args.read_timeout,
+        retries=args.retries,
     )
     video = UniversalVideoResolver().resolve(args.input_url)
     _enforce_limits(video, limits)

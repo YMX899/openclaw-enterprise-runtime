@@ -46,13 +46,13 @@ D:\DESK\视频解析\tik\douyin_chong
 
 It is not production verified. The sibling project contains `.env`,
 `.env.local` and `.douyin_storage_state*` files; these must not be read, copied,
-committed or deployed. The worker image has a guarded vendor slot at
-`openclaw-video/vendor/douyin_chong`, and runtime model credentials must be
-mounted separately as `./secrets/douyin_chong.env`.
+committed or deployed. A minimal V1 source subset is vendored at
+`openclaw-video/vendor/douyin_chong`; runtime model credentials must be mounted
+separately as `./secrets/douyin_chong.env`.
 
 The worker calls the candidate through `openclaw-douyin-adapter`, not through
-the candidate's default CLI. Production remains blocked until a clean source
-export, pinned dependencies, real sample run, schema validation, resource
+the candidate's default CLI. Production remains blocked until pinned
+dependencies, real model-backed sample runs, schema validation, resource
 profile and isolated Docker validation are complete.
 
 ## Local Unit Tests

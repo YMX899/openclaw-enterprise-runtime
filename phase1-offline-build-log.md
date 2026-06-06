@@ -487,6 +487,47 @@ Static checks:
   bash -n scripts/verify_douyin_chong_contract.sh OK.
 ```
 
+Updated local evidence after minimal `douyin_chong` source vendoring:
+
+```text
+Vendored source:
+  openclaw-video/vendor/douyin_chong/__init__.py
+  openclaw-video/vendor/douyin_chong/config.py
+  openclaw-video/vendor/douyin_chong/models.py
+  openclaw-video/vendor/douyin_chong/clients/__init__.py
+  openclaw-video/vendor/douyin_chong/clients/ark_video.py
+  openclaw-video/vendor/douyin_chong/clients/douyin.py
+  openclaw-video/vendor/douyin_chong/clients/resolver.py
+  openclaw-video/vendor/douyin_chong/clients/tiktok.py
+
+Explicitly excluded:
+  .env, .env.local, .douyin_storage_state*.json, __pycache__, *.pyc, *.log,
+  Playwright login-state utilities, profile/batch exporters, cover/image
+  workflows, generated JSON/HTML captures, export directories and history
+  stores.
+
+Source pinning:
+  openclaw-video/vendor/douyin_chong/SOURCE_SHA256SUMS
+  Added test coverage that the manifest matches the current vendored files.
+
+Adapter hardening:
+  openclaw-douyin-adapter now temporarily clears candidate config environment
+  keys such as ARK_API_KEY, MEDIAKIT_API_KEY, MODEL, ARK_MODEL and base URLs
+  while loading AppConfig from the explicit runtime env file, then restores the
+  original environment after the call.
+
+Tests:
+  PYTHONPATH=openclaw-video/src
+  .phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests -v
+  Ran 92 tests; OK.
+
+Status:
+  This advances the artifact gate from candidate-located to minimal-source-
+  vendored, but it is still not a production approval. Phase 2 remains NO-GO
+  until real model-backed Linux Docker execution, resource profile, cleanup
+  proof, image digest and security decision are complete.
+```
+
 Covered:
 
 - Dify profile/workspace identity fail-closed behavior.
