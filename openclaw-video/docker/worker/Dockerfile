@@ -12,9 +12,9 @@ COPY src /app/src
 COPY vendor/douyin_chong /app/vendor/douyin_chong
 COPY docker/worker/entrypoint.sh /usr/local/bin/openclaw-worker-entrypoint.sh
 RUN if [ -n "$PIP_INDEX_URL" ]; then \
-        pip install --no-cache-dir -i "$PIP_INDEX_URL" /app; \
+        pip install --no-cache-dir --timeout 60 --retries 3 -i "$PIP_INDEX_URL" /app; \
     else \
-        pip install --no-cache-dir /app; \
+        pip install --no-cache-dir --timeout 60 --retries 3 /app; \
     fi
 
 ENTRYPOINT ["sh", "/usr/local/bin/openclaw-worker-entrypoint.sh"]
