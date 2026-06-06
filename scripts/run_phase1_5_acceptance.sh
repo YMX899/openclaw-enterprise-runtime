@@ -5,6 +5,7 @@ python_cmd="${PYTHON:-python3}"
 docker_cmd="${DOCKER_CMD:-docker}"
 target_label="${TARGET_LABEL:-ubuntu22.04}"
 require_secrets="${REQUIRE_SECRETS:-1}"
+acceptance_venv="${ACCEPTANCE_VENV:-.phase1.5-venv}"
 
 step() {
   printf '==> %s\n' "$1"
@@ -84,13 +85,22 @@ if [[ "$require_secrets" != "1" ]]; then
   fail "REQUIRE_SECRETS=0 cannot continue to full Phase 1.5 acceptance."
 fi
 
+step "Python acceptance venv"
+if [[ ! -x "$acceptance_venv/bin/python" ]]; then
+  "$python_cmd" -m venv "$acceptance_venv"
+fi
+acceptance_python="$PWD/$acceptance_venv/bin/python"
+"$acceptance_python" -m pip install --upgrade pip
+"$acceptance_python" -m pip install ./openclaw-video
+"$acceptance_python" -B -c 'import fastapi, httpx, jsonschema, psycopg, pydantic, requests, websockets; import volcenginesdkarkruntime'
+
 step "full Phase 1.5 gate"
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
 REQUIRE_DOUYIN_ARTIFACT=1 \
 ALLOW_DOUYIN_SAMPLE_DEFERRED="${ALLOW_DOUYIN_SAMPLE_DEFERRED:-0}" \
 RUN_COMPOSE_UP=1 \
 DOCKER_CMD="$docker_cmd" \
-PYTHON="$python_cmd" \
+PYTHON="$acceptance_python" \
 scripts/verify_phase1_5_gates.sh
 
 step "exit proof present"

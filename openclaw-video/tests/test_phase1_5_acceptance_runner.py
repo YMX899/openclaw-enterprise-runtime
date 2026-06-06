@@ -42,6 +42,16 @@ class Phase15AcceptanceRunnerTests(unittest.TestCase):
         self.assertIn("--fail-on-no-go", self.text)
         self.assertIn('--docker-cmd "$docker_cmd"', self.text)
 
+    def test_bootstraps_local_acceptance_venv_before_full_gate(self):
+        venv_index = self.text.index("Python acceptance venv")
+        full_gate_index = self.text.index("scripts/verify_phase1_5_gates.sh")
+
+        self.assertLess(venv_index, full_gate_index)
+        self.assertIn('acceptance_venv="${ACCEPTANCE_VENV:-.phase1.5-venv}"', self.text)
+        self.assertIn('"$python_cmd" -m venv "$acceptance_venv"', self.text)
+        self.assertIn('"$acceptance_python" -m pip install ./openclaw-video', self.text)
+        self.assertIn('PYTHON="$acceptance_python"', self.text)
+
     def test_full_gate_requires_hard_gates_and_compose_up(self):
         self.assertIn("REQUIRE_OPENCLAW_SECURITY_APPROVAL=1", self.text)
         self.assertIn("REQUIRE_DOUYIN_ARTIFACT=1", self.text)
