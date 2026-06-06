@@ -7,6 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "docker-compose.openclaw-video.yaml"
 GATEWAY_DOCKERFILE = ROOT / "docker" / "openclaw-gateway" / "Dockerfile"
+BRIDGE_DOCKERFILE = ROOT / "docker" / "bridge" / "Dockerfile"
 WORKER_DOCKERFILE = ROOT / "docker" / "worker" / "Dockerfile"
 DOCKERIGNORE = ROOT / ".dockerignore"
 VENDOR_GITIGNORE = ROOT / "vendor" / "douyin_chong" / ".gitignore"
@@ -131,6 +132,22 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("DOUYIN_CHONG_PYTHONPATH=/app/vendor", dockerfile)
         self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
         self.assertIn("openclaw-douyin-adapter", (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    def test_base_images_default_to_official_and_can_be_overridden_for_isolated_hosts(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        bridge = BRIDGE_DOCKERFILE.read_text(encoding="utf-8")
+        worker = WORKER_DOCKERFILE.read_text(encoding="utf-8")
+        gateway = GATEWAY_DOCKERFILE.read_text(encoding="utf-8")
+
+        self.assertIn("ARG PYTHON_BASE_IMAGE=python:3.12-slim", bridge)
+        self.assertIn("FROM ${PYTHON_BASE_IMAGE}", bridge)
+        self.assertIn("ARG PYTHON_BASE_IMAGE=python:3.12-slim", worker)
+        self.assertIn("FROM ${PYTHON_BASE_IMAGE}", worker)
+        self.assertIn("ARG NODE_BASE_IMAGE=node:22.18-slim", gateway)
+        self.assertIn("FROM ${NODE_BASE_IMAGE}", gateway)
+        self.assertIn("PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}", compose)
+        self.assertIn("NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22.18-slim}", compose)
+        self.assertNotIn("public.ecr.aws", compose)
 
     def test_vendor_slot_keeps_secrets_and_runtime_outputs_out(self):
         dockerignore = DOCKERIGNORE.read_text(encoding="utf-8")

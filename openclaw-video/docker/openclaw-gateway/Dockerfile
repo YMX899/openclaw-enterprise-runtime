@@ -1,4 +1,5 @@
-FROM node:22.18-slim
+ARG NODE_BASE_IMAGE=node:22.18-slim
+FROM ${NODE_BASE_IMAGE}
 
 ARG OPENCLAW_VERSION=2026.3.13
 RUN npm install -g "openclaw@${OPENCLAW_VERSION}" --ignore-scripts \

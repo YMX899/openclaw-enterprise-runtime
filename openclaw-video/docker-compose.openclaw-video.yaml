@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: docker/bridge/Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}
     environment:
       DIFY_API_BASE: http://api:5001
       DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
@@ -60,6 +62,7 @@ services:
       dockerfile: docker/openclaw-gateway/Dockerfile
       args:
         OPENCLAW_VERSION: "2026.3.13"
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-node:22.18-slim}
     volumes:
       - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
       - openclaw-gateway-state:/var/lib/openclaw
@@ -78,6 +81,8 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.12-slim}
     environment:
       DATABASE_URL: postgresql://bridge:${BRIDGE_POSTGRES_PASSWORD:?}@bridge-postgres:5432/bridge
       DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter
