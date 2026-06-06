@@ -274,12 +274,18 @@ LAB_PAGE_HTML = """<!doctype html>
       try { return window.localStorage && window.localStorage.getItem('APP-UUID') || ''; }
       catch { return ''; }
     }
+    function huahuoRefreshToken() {
+      try { return window.localStorage && window.localStorage.getItem('Refresh-Token') || ''; }
+      catch { return ''; }
+    }
     function authHeaders() {
       const token = huahuoAccessToken();
       const appUuid = huahuoAppUuid();
+      const refreshToken = huahuoRefreshToken();
       if (!token) return {};
       const headers = { 'X-Huahuo-Access-Token': token };
       if (appUuid) headers['X-Huahuo-App-UUID'] = appUuid;
+      if (refreshToken) headers['X-Huahuo-Refresh-Token'] = refreshToken;
       return headers;
     }
     async function api(path, options = {}) {
