@@ -387,3 +387,134 @@ ln -sfn /app/bin/openclaw-video/releases/833262eb6e4a /app/bin/openclaw-video/cu
 OPENCLAW_VIDEO_ROOT=/app/bin/openclaw-video/current/openclaw-video \
 bash /app/bin/openclaw-video/current/scripts/root_rebuild_bridge_fast.sh
 ```
+
+## Public Smoke Target Refresh
+
+Date: 2026-06-07T03:45-03:47+08:00.
+
+The public smoke script was updated to use the current Huahuo/Dify entry points:
+
+```text
+OpenClaw Lab:             https://www.huahuoai.com/openclaw-lab/
+OpenClaw unauth API:      https://www.huahuoai.com/openclaw-api/me
+Huahuo user web:          https://www.huahuoai.com/ai/?id=4
+Dify admin configuration: https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration
+```
+
+Local tests:
+
+```text
+PYTHONPATH=openclaw-video\src .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
+Ran 229 tests
+Result: OK
+Only warning: StarletteDeprecationWarning from the local FastAPI TestClient dependency.
+```
+
+Public Playwright smoke:
+
+```text
+Command: python scripts\run_public_browser_smoke.py --timeout-seconds 90
+Run dir: tmp\playwright-public-browser\20260606T194526Z
+Overall: PASS
+Secrets recorded in summary: false
+Headers recorded in summary: false
+Bodies recorded in summary: false
+```
+
+Smoke targets:
+
+```text
+https://www.huahuoai.com/openclaw-lab/                                      -> 200, passed
+https://www.huahuoai.com/openclaw-api/me                                    -> 401, passed
+https://www.huahuoai.com/ai/?id=4                                           -> 200, passed
+https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration -> 200, passed
+```
+
+Smoke safety checks:
+
+```text
+http_5xx_count: 0
+gateway_direct_request_count: 0
+token_url_leak_count: 0
+```
+
+Root server read-only baseline:
+
+```text
+time=2026-06-07T03:46:54+08:00
+current=/app/bin/openclaw-video/releases/84e13d007d33
+same_origin_lab=200
+same_origin_me_unauth=401
+huahuo_user_ai=200
+huahuo_admin_config=403
+```
+
+Dify core containers were still not rebuilt or restarted:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Root resource snapshot:
+
+```text
+openclaw-video-openclaw-bridge-1         0.10% CPU  51.51 MiB  5 PIDs
+openclaw-video-video-analysis-worker-1   0.00% CPU  33.33 MiB  1 PID
+openclaw-video-openclaw-gateway-1        0.00% CPU  439.3 MiB  18 PIDs
+openclaw-video-bridge-postgres-1         0.00% CPU  36.75 MiB  6 PIDs
+docker-nginx-1                           0.00% CPU  11.74 MiB  10 PIDs
+docker-api-1                             0.68% CPU  4.273 GiB  61 PIDs
+docker-web-1                             0.39% CPU  366 MiB   34 PIDs
+```
+
+The raw server `curl` to the admin configuration URL returned `403`, while the real-browser Playwright public smoke reached the route with a `200` top-level document. This is recorded as an access-policy difference between browser navigation and bare server-side `curl`; the browser route remains the acceptance reference for the admin page.
+
+Chrome status:
+
+```text
+OpenClaw Lab URL: https://www.huahuoai.com/openclaw-lab/
+Lab visible state: Login Required
+Huahuo user URL after navigation: https://www.huahuoai.com/home/
+Huahuo user visible state: landing page with login action, not authenticated chat
+Dify admin URL: https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration
+Dify admin visible state: authenticated configuration UI, title "模型测试 - Dify"
+```
+
+Chrome Identity Check:
+
+```text
+authenticated=false
+login_material_present=false
+huahuo_access_token_present=false
+huahuo_app_uuid_present=false
+profile_ok=false
+workspace_ok=false
+access_ok=false
+failure_stage=profile
+provider_probe.provider=huahuo_front
+provider_probe.identity_headers_present=false
+provider_probe.profile_http_status=401
+provider_probe.refresh_attempted=true
+provider_probe.error_stage=refresh_missing
+```
+
+Interpretation:
+
+```text
+The Dify admin session at ai001.huahuoai.com is currently valid in Chrome.
+The Huahuo user-web session at www.huahuoai.com is currently not valid in Chrome.
+The same-origin OpenClaw Lab intentionally fails closed when the Huahuo user-web login material is absent.
+No Cookie, Authorization header, access token, refresh token, full request header, or localStorage value was inspected or recorded.
+```
+
+Pending authenticated browser gate:
+
+```text
+After the Huahuo user web is logged in again at https://www.huahuoai.com/ai/?id=4:
+1. Identity Check must return authenticated=true.
+2. Security Test must pass random resource isolation and negative URL rejection.
+3. Tiny Upload must return a succeeded async job.
+4. A Huahuo user-web chat message must still reply normally while OpenClaw is available.
+```

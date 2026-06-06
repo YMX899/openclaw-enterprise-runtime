@@ -17,19 +17,31 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "tmp" / "playwright-public-browser"
 
 TARGETS = {
     "openclaw-lab": {
-        "url": "https://ai001.huahuoai.com:18443/openclaw-lab/",
+        "url": "https://www.huahuoai.com/openclaw-lab/",
         "wait_ms": "1500",
         "expected_statuses": {
-            "GET https://ai001.huahuoai.com:18443/openclaw-lab/": 200,
-            "GET https://ai001.huahuoai.com:18443/openclaw-api/me": 401,
+            "GET https://www.huahuoai.com/openclaw-lab/": 200,
         },
     },
-    "dify-signin": {
-        "url": "https://ai001.huahuoai.com/signin",
+    "openclaw-api-me-unauthenticated": {
+        "url": "https://www.huahuoai.com/openclaw-api/me",
+        "wait_ms": "500",
+        "expected_statuses": {
+            "GET https://www.huahuoai.com/openclaw-api/me": 401,
+        },
+    },
+    "huahuo-user-web": {
+        "url": "https://www.huahuoai.com/ai/?id=4",
         "wait_ms": "1000",
         "expected_statuses": {
-            "GET https://ai001.huahuoai.com/signin": 200,
-            "GET https://ai001.huahuoai.com/console/api/account/profile": 401,
+            "GET https://www.huahuoai.com/ai/": 200,
+        },
+    },
+    "huahuo-admin-configuration": {
+        "url": "https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration",
+        "wait_ms": "1000",
+        "expected_statuses": {
+            "GET https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration": 200,
         },
     },
 }

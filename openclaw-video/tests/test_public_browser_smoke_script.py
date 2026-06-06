@@ -23,10 +23,13 @@ class PublicBrowserSmokeScriptTests(unittest.TestCase):
     def test_script_checks_openclaw_and_dify_public_baselines(self):
         text = SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn("https://ai001.huahuoai.com:18443/openclaw-lab/", text)
-        self.assertIn("https://ai001.huahuoai.com:18443/openclaw-api/me", text)
-        self.assertIn("https://ai001.huahuoai.com/signin", text)
-        self.assertIn("https://ai001.huahuoai.com/console/api/account/profile", text)
+        self.assertIn("https://www.huahuoai.com/openclaw-lab/", text)
+        self.assertIn("https://www.huahuoai.com/openclaw-api/me", text)
+        self.assertIn("https://www.huahuoai.com/ai/?id=4", text)
+        self.assertIn(
+            "https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration",
+            text,
+        )
         self.assertIn("gateway_direct_request_count", text)
         self.assertIn("token_url_leak_count", text)
 
