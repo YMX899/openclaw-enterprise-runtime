@@ -1,5 +1,6 @@
 from pathlib import Path
 from hashlib import sha256
+import subprocess
 import unittest
 
 
@@ -144,7 +145,14 @@ class ComposeContractTests(unittest.TestCase):
         self.assertEqual(set(entries), expected_files)
         for relative, expected_digest in entries.items():
             path = vendor_root / Path(relative)
-            actual_digest = sha256(path.read_bytes()).hexdigest()
+            try:
+                data = subprocess.check_output(
+                    ["git", "show", f"HEAD:openclaw-video/vendor/douyin_chong/{relative}"],
+                    cwd=Path(__file__).resolve().parents[2],
+                )
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                data = path.read_bytes()
+            actual_digest = sha256(data).hexdigest()
             with self.subTest(relative=relative):
                 self.assertEqual(actual_digest, expected_digest)
 

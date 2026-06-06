@@ -12,6 +12,7 @@ BUILD_INFO text eol=lf export-subst
 *.py text eol=lf
 *.sql text eol=lf
 *.sh text eol=lf
+openclaw-video/vendor/douyin_chong/SOURCE_SHA256SUMS text eol=lf
 *.ps1 text eol=crlf
 Dockerfile text eol=lf
 

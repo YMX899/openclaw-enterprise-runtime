@@ -66,7 +66,7 @@ step "Python dependency gate"
 step "Python tests"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="openclaw-video/src"
-"$python_cmd" -B -m unittest discover openclaw-video/tests -v
+env -u ALLOW_DOUYIN_SAMPLE_DEFERRED "$python_cmd" -B -m unittest discover openclaw-video/tests -v
 "$python_cmd" -B -m compileall openclaw-video/src openclaw-video/tests
 
 step "vendored douyin_chong source gate"
