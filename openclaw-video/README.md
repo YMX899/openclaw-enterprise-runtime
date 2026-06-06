@@ -130,3 +130,14 @@ a non-production or no-op mode.
 The production Dify server must not be the first environment used to test
 Docker build, compose render, sidecar startup, Gateway WS v3 runtime behavior,
 or worker resource limits.
+
+Before any future root-server deployment attempt, the local evidence gate must
+return `GO`:
+
+```bash
+python scripts/preflight_root_deploy.py --target-host root --fail-on-no-go
+```
+
+This preflight intentionally fails closed until the ubuntu22.04 or another
+non-production Linux Docker host has produced a valid `phase1.5-exit-proof.md`
+and the production readiness audit is fully `GO`.
