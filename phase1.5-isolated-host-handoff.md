@@ -38,6 +38,29 @@ xiaojianping: reachable, Darwin 25.2.0 arm64, no Docker Engine evidence returned
 Result: no eligible non-production Linux Docker host is currently available
 through the configured SSH aliases.
 
+SSH readiness refresh on 2026-06-06 for user-selected host `ubuntu22.04`:
+
+```text
+host: xiejuyang-virtual-machine
+os: Linux 6.8.0-111-generic x86_64
+python3: Python 3.10.12
+node: v24.14.1
+docker client: Docker Engine - Community 29.4.0
+docker compose: Docker Compose version v5.1.3
+disk: 50.6GiB free
+memory: 15.6GiB total
+docker service: active and enabled
+current ssh user: xiejuyang
+current user docker socket access: NO_GO, permission denied for /var/run/docker.sock
+sudo docker: NO_GO, sudo requires password / terminal
+```
+
+Result: `ubuntu22.04` is a good non-production Linux x86_64 candidate, but it
+cannot run Phase 1.5 Docker gates until Docker access is configured for the SSH
+operator, for example by using a docker-group user or non-interactive sudo. No
+Docker group change, sudo password entry, service restart, package install or
+compose command was performed by Codex.
+
 Production Dify host `root` / `AI-01` is intentionally excluded from this gate
 because Phase 1.5 must be isolated from Dify.
 
@@ -59,6 +82,15 @@ Run the read-only readiness check before copying secrets or running any build:
 
 ```bash
 python scripts/check_phase1_5_host_readiness.py --fail-on-no-go
+```
+
+If the isolated test operator is allowed to use passwordless sudo for Docker,
+use an explicit Docker command prefix:
+
+```bash
+python scripts/check_phase1_5_host_readiness.py \
+  --use-sudo-docker \
+  --fail-on-no-go
 ```
 
 The readiness check must report:

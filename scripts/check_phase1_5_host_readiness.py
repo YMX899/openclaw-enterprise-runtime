@@ -53,21 +53,37 @@ def check_command(name: str, command: list[str], runner: CommandRunner = _run) -
     return CheckResult(name, "PASS", stdout.splitlines()[0] if stdout else f"{command[0]} OK")
 
 
-def check_docker(runner: CommandRunner = _run) -> CheckResult:
-    if shutil.which("docker") is None:
-        return CheckResult("docker_engine", "NO_GO", "docker is not in PATH")
-    code, stdout, stderr = runner(["docker", "version", "--format", "Docker server={{.Server.Version}}"])
+def _command_exists(command: list[str]) -> bool:
+    return bool(command) and shutil.which(command[0]) is not None
+
+
+def _run_no_throw(command: list[str], runner: CommandRunner) -> tuple[int, str, str]:
+    try:
+        return runner(command)
+    except subprocess.TimeoutExpired:
+        return 124, "", "command timed out"
+
+
+def check_docker(docker_cmd: list[str] | None = None, runner: CommandRunner = _run) -> CheckResult:
+    docker_cmd = docker_cmd or ["docker"]
+    if not _command_exists(docker_cmd):
+        return CheckResult("docker_engine", "NO_GO", f"{docker_cmd[0]} is not in PATH")
+    code, stdout, stderr = _run_no_throw(
+        [*docker_cmd, "version", "--format", "Docker server={{.Server.Version}}"],
+        runner,
+    )
     if code != 0:
         return CheckResult("docker_engine", "NO_GO", stderr or stdout or "docker server unavailable")
-    if "{{.Server.Version}}" in stdout:
+    if "{{.Server.Version}}" in stdout or stdout.endswith("server="):
         return CheckResult("docker_engine", "NO_GO", "docker format output was not evaluated")
     return CheckResult("docker_engine", "PASS", stdout)
 
 
-def check_compose(runner: CommandRunner = _run) -> CheckResult:
-    if shutil.which("docker") is None:
-        return CheckResult("docker_compose", "NO_GO", "docker is not in PATH")
-    code, stdout, stderr = runner(["docker", "compose", "version"])
+def check_compose(docker_cmd: list[str] | None = None, runner: CommandRunner = _run) -> CheckResult:
+    docker_cmd = docker_cmd or ["docker"]
+    if not _command_exists(docker_cmd):
+        return CheckResult("docker_compose", "NO_GO", f"{docker_cmd[0]} is not in PATH")
+    code, stdout, stderr = _run_no_throw([*docker_cmd, "compose", "version"], runner)
     if code != 0:
         return CheckResult("docker_compose", "NO_GO", stderr or stdout or "docker compose unavailable")
     return CheckResult("docker_compose", "PASS", stdout)
@@ -101,13 +117,13 @@ def check_memory(min_memory_gb: int, runner: CommandRunner = _run) -> CheckResul
     return CheckResult("memory_total", "PASS", f"{total_gb:.1f}GiB total")
 
 
-def readiness_report(min_free_gb: int, min_memory_gb: int) -> dict:
+def readiness_report(min_free_gb: int, min_memory_gb: int, docker_cmd: list[str] | None = None) -> dict:
     checks = [
         check_os(),
         check_command("python3", ["python3", "--version"]),
         check_command("node", ["node", "--version"]),
-        check_docker(),
-        check_compose(),
+        check_docker(docker_cmd),
+        check_compose(docker_cmd),
         check_disk(min_free_gb),
         check_memory(min_memory_gb),
     ]
@@ -124,13 +140,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read-only Phase 1.5 isolated host readiness check.")
     parser.add_argument("--min-free-gb", type=int, default=20)
     parser.add_argument("--min-memory-gb", type=int, default=8)
+    parser.add_argument(
+        "--docker-cmd",
+        nargs="+",
+        default=["docker"],
+        help="Docker command prefix, for example: docker or sudo -n docker",
+    )
+    parser.add_argument(
+        "--use-sudo-docker",
+        action="store_true",
+        help="Use the non-interactive sudo Docker prefix: sudo -n docker",
+    )
     parser.add_argument("--fail-on-no-go", action="store_true")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    report = readiness_report(args.min_free_gb, args.min_memory_gb)
+    docker_cmd = ["sudo", "-n", "docker"] if args.use_sudo_docker else args.docker_cmd
+    report = readiness_report(args.min_free_gb, args.min_memory_gb, docker_cmd)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if args.fail_on_no_go and report["overall"] != "PASS":
         return 1
