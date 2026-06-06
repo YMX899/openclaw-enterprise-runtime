@@ -55,6 +55,23 @@ Memory: at least 8G preferred
 
 The host must not run production Dify containers. It may be disposable.
 
+Run the read-only readiness check before copying secrets or running any build:
+
+```bash
+python scripts/check_phase1_5_host_readiness.py --fail-on-no-go
+```
+
+The readiness check must report:
+
+```text
+schema_version: phase1.5-host-readiness.v1
+target: isolated_linux_docker_host
+overall: PASS
+```
+
+It only checks local host capabilities. It does not install Docker, start
+containers, write secrets, or approve production.
+
 ## Repository State To Test
 
 Use a clean checkout at or after:
