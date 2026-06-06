@@ -263,7 +263,7 @@ LAB_PAGE_HTML = """<!doctype html>
     const output = document.getElementById('output');
     const authStatus = document.getElementById('authStatus');
     let currentJobId = '';
-    const apiPrefix = window.location.pathname.startsWith('/ai/openclaw-lab') ? '/ai/openclaw-api' : '/openclaw-api';
+    const apiPrefix = window.location.pathname.startsWith('/ai/openclaw-lab') ? '/api/openclaw-api' : '/openclaw-api';
     const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
 
     function show(value) {
@@ -866,12 +866,14 @@ def create_app(
 
     @app.get("/openclaw-api/me")
     @app.get("/ai/openclaw-api/me")
+    @app.get("/api/openclaw-api/me")
     async def me(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         return {"principal_id": principal.principal_id, "authenticated": True, **runtime_metadata()}
 
     @app.get("/openclaw-api/identity/diagnostics")
     @app.get("/ai/openclaw-api/identity/diagnostics")
+    @app.get("/api/openclaw-api/identity/diagnostics")
     async def identity_diagnostics(request: Request) -> dict[str, Any]:
         result: dict[str, Any] = {
             "authenticated": False,
@@ -935,12 +937,14 @@ def create_app(
 
     @app.get("/openclaw-api/sessions")
     @app.get("/ai/openclaw-api/sessions")
+    @app.get("/api/openclaw-api/sessions")
     async def sessions(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         return {"sessions": [_serialize_session(item) for item in session_store.list_sessions(principal.principal_id)]}
 
     @app.post("/openclaw-api/sessions", status_code=201)
     @app.post("/ai/openclaw-api/sessions", status_code=201)
+    @app.post("/api/openclaw-api/sessions", status_code=201)
     async def create_session(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         payload = await request.json()
@@ -958,6 +962,7 @@ def create_app(
 
     @app.get("/openclaw-api/sessions/{session_id}/messages")
     @app.get("/ai/openclaw-api/sessions/{session_id}/messages")
+    @app.get("/api/openclaw-api/sessions/{session_id}/messages")
     async def messages(session_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
@@ -968,6 +973,7 @@ def create_app(
 
     @app.post("/openclaw-api/jobs")
     @app.post("/ai/openclaw-api/jobs")
+    @app.post("/api/openclaw-api/jobs")
     async def create_job(request: Request) -> JSONResponse:
         principal = await current_principal(request)
         payload = await request.json()
@@ -1012,6 +1018,7 @@ def create_app(
 
     @app.post("/openclaw-api/uploads")
     @app.post("/ai/openclaw-api/uploads")
+    @app.post("/api/openclaw-api/uploads")
     async def create_upload_job(request: Request) -> JSONResponse:
         principal = await current_principal(request)
         form = await request.form()
@@ -1059,6 +1066,7 @@ def create_app(
 
     @app.get("/openclaw-api/jobs/{job_id}")
     @app.get("/ai/openclaw-api/jobs/{job_id}")
+    @app.get("/api/openclaw-api/jobs/{job_id}")
     async def get_job(job_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
@@ -1069,6 +1077,7 @@ def create_app(
 
     @app.get("/openclaw-api/jobs/{job_id}/result")
     @app.get("/ai/openclaw-api/jobs/{job_id}/result")
+    @app.get("/api/openclaw-api/jobs/{job_id}/result")
     async def get_job_result(job_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
@@ -1079,6 +1088,7 @@ def create_app(
 
     @app.get("/openclaw-api/jobs/{job_id}/events")
     @app.get("/ai/openclaw-api/jobs/{job_id}/events")
+    @app.get("/api/openclaw-api/jobs/{job_id}/events")
     async def job_events(job_id: str, request: Request) -> StreamingResponse:
         principal = await current_principal(request)
         try:
@@ -1115,6 +1125,7 @@ def create_app(
 
     @app.post("/openclaw-api/retention/cleanup")
     @app.post("/ai/openclaw-api/retention/cleanup")
+    @app.post("/api/openclaw-api/retention/cleanup")
     async def cleanup_retention(request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         retention_days = phase4_config.data_retention_days
@@ -1146,6 +1157,7 @@ def create_app(
 
     @app.post("/openclaw-api/chat")
     @app.post("/ai/openclaw-api/chat")
+    @app.post("/api/openclaw-api/chat")
     async def chat(request: Request) -> JSONResponse:
         payload = await request.json()
         if not isinstance(payload, dict):
