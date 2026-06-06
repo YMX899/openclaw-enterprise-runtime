@@ -73,6 +73,7 @@ class ComposeContractTests(unittest.TestCase):
             with self.subTest(entrypoint=entrypoint[:32]):
                 self.assertIn('APP_UID="${APP_UID:-65532}"', entrypoint)
                 self.assertIn("stage_secret", entrypoint)
+                self.assertIn('chmod 0700 "$SECRET_TMP_DIR"', entrypoint)
                 self.assertIn('chmod 0400 "$target_path"', entrypoint)
                 self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
 

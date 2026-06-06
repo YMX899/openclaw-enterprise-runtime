@@ -13,6 +13,8 @@ stage_secret() {
     exit 1
   fi
   mkdir -p "$SECRET_TMP_DIR"
+  chown "$APP_UID:$APP_GID" "$SECRET_TMP_DIR"
+  chmod 0700 "$SECRET_TMP_DIR"
   target_path="$SECRET_TMP_DIR/$target_name"
   cp "$source_path" "$target_path"
   chown "$APP_UID:$APP_GID" "$target_path"
