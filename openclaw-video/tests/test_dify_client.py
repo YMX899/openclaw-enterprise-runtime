@@ -109,6 +109,44 @@ class DifyClientTests(unittest.TestCase):
         self.assertEqual([method for method, _, _ in requests], ["GET", "POST", "GET"])
         self.assertNotIn("refresh-token", "".join(item[2] for item in requests))
 
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_huahuo_client_refreshes_business_status_login_expiry(self):
+        requests = []
+
+        def handler(request):
+            requests.append((request.method, str(request.url), request.headers.get("Authorization", "")))
+            if request.url.path == "/api/front/user/queryUserInfo" and len(requests) == 1:
+                return httpx.Response(200, json={"status": 401, "message": "login expired"})
+            if request.url.path == "/api/updateToken":
+                return httpx.Response(
+                    200,
+                    json={"status": 1, "data": {"accessToken": "fresh-access", "refreshToken": "fresh-refresh"}},
+                )
+            if request.url.path == "/api/front/user/queryUserInfo":
+                payload = request.headers.get("Authorization", "")
+                decoded = base64.b64decode(payload.removeprefix("Bearer ")).decode("utf-8")
+                self.assertIn("token=fresh-access", decoded)
+                return httpx.Response(200, json={"status": 1, "data": {"id": 20}})
+            return httpx.Response(404)
+
+        client = HuahuoFrontClient(
+            "https://www.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+        headers = {
+            HUAHUO_ACCESS_TOKEN_HEADER: "expired-access",
+            HUAHUO_REFRESH_TOKEN_HEADER: "refresh-token",
+            HUAHUO_APP_UUID_HEADER: "front-app-uuid",
+        }
+
+        import asyncio
+
+        profile = asyncio.run(client.profile(headers))
+
+        self.assertEqual(profile, {"id": "huahuo:20"})
+        self.assertEqual([method for method, _, _ in requests], ["GET", "POST", "GET"])
+        self.assertNotIn("refresh-token", "".join(item[2] for item in requests))
+
 
 if __name__ == "__main__":
     unittest.main()

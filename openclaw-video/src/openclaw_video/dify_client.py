@@ -138,6 +138,13 @@ class HuahuoFrontClient:
     timeout_seconds: float = 10.0
     transport: httpx.AsyncBaseTransport | None = None
 
+    @staticmethod
+    def _payload_requires_refresh(payload: object) -> bool:
+        if not isinstance(payload, dict) or "status" not in payload:
+            return False
+        status = payload.get("status")
+        return status not in (1, "normal")
+
     async def _get_json(self, path: str, headers: Mapping[str, str]) -> object:
         async with httpx.AsyncClient(
             base_url=self.base_url,
@@ -145,7 +152,11 @@ class HuahuoFrontClient:
             transport=self.transport,
         ) as client:
             response = await client.get(path, headers=huahuo_front_request_headers(headers))
-            if response.status_code in {401, 403}:
+            payload: object | None = None
+            if response.status_code not in {401, 403}:
+                response.raise_for_status()
+                payload = response.json()
+            if response.status_code in {401, 403} or self._payload_requires_refresh(payload):
                 refreshed_access_token = await self._refresh_access_token(client, headers)
                 if refreshed_access_token:
                     response = await client.get(
