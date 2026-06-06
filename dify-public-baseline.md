@@ -395,6 +395,67 @@ profile 401: PASS
 new 5xx: NONE
 ```
 
+## Real Chrome Attempt 2026-06-06 20:01 Asia/Shanghai
+
+Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
+storage, session storage, request headers, CSRF values, Authorization tokens or
+passwords were read or recorded.
+
+Routes attempted:
+
+```text
+https://ai001.huahuoai.com/apps
+https://ai001.huahuoai.com/signin
+```
+
+Observed:
+
+```text
+browser-side error: net::ERR_BLOCKED_BY_CLIENT
+```
+
+Interpretation:
+
+- The current Chrome automation layer blocked direct navigation to the
+  production public Dify domain before the page could load.
+- This is not treated as proof that production Dify is down.
+- Because the page could not be opened in Chrome, authenticated existing-app
+  open/message/reply/refresh/history/logout testing is still incomplete.
+
+Root server read-only internal refresh at the same time:
+
+```text
+http://127.0.0.1:8081/ -> 200 final http://127.0.0.1:8081/apps
+http://127.0.0.1:8081/signin -> 200
+http://127.0.0.1:8081/apps -> 200
+http://127.0.0.1:8081/console/api/account/profile -> 401
+```
+
+Dify container status and recent logs:
+
+```text
+openresty-prod: Up 10 days
+docker-nginx-1: Up 5 months
+docker-api-1: Up 5 months
+docker-web-1: Up 5 months (unhealthy, historical healthcheck issue)
+docker-nginx-1 recent error/exception/traceback/5xx matches: 0
+docker-web-1 recent error/exception/traceback/5xx matches: 0
+docker-api-1 recent error/exception/traceback/5xx matches: 0
+```
+
+Gate markers:
+
+```text
+authenticated_baseline: NO_GO
+existing app message: NO_GO
+streaming reply: NO_GO
+refresh: NO_GO
+history: NO_GO
+logout: NO_GO
+profile 401: PASS
+new 5xx: NONE
+```
+
 ## Real Chrome Refresh 2026-06-06 12:45 Asia/Shanghai
 
 Mode: real Chrome browser through the Codex Chrome extension. No cookies, local

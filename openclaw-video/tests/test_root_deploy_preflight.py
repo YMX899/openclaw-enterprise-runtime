@@ -44,6 +44,34 @@ def no_go_audit(*, include_git_clean=False):
     return {"overall": "NO_GO", "gates": gates}
 
 
+def no_go_douyin_and_auth_audit(*, include_git_clean=False):
+    gates = [
+        {"gate_id": "openclaw_security", "status": "PASS"},
+        {"gate_id": "douyin_artifact", "status": "PASS"},
+        {"gate_id": "douyin_real_sample", "status": "NO_GO"},
+        {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
+        {"gate_id": "authenticated_dify_baseline", "status": "NO_GO"},
+        {"gate_id": "openresty_no_route_change", "status": "PASS"},
+    ]
+    if include_git_clean:
+        gates.append({"gate_id": "git_clean", "status": "PASS"})
+    return {"overall": "NO_GO", "gates": gates}
+
+
+def no_go_only_douyin_audit(*, include_git_clean=False):
+    gates = [
+        {"gate_id": "openclaw_security", "status": "PASS"},
+        {"gate_id": "douyin_artifact", "status": "PASS"},
+        {"gate_id": "douyin_real_sample", "status": "NO_GO"},
+        {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
+        {"gate_id": "authenticated_dify_baseline", "status": "PASS"},
+        {"gate_id": "openresty_no_route_change", "status": "PASS"},
+    ]
+    if include_git_clean:
+        gates.append({"gate_id": "git_clean", "status": "PASS"})
+    return {"overall": "NO_GO", "gates": gates}
+
+
 PHASE1_5_PROOF = """
 status: PASS
 source: isolated-linux-docker-host
@@ -138,6 +166,58 @@ class RootDeployPreflightTests(unittest.TestCase):
         statuses = {check["check_id"]: check["status"] for check in report["checks"]}
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["production_readiness"], "NO_GO")
+
+    def test_douyin_deferred_env_does_not_hide_authenticated_baseline_gate(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "phase1.5-exit-proof.md", PHASE1_5_PROOF)
+            git_results = {
+                ("status", "--short"): (0, "", ""),
+                ("tag", "--points-at", "HEAD"): (0, "release-tag", ""),
+            }
+
+            def fake_git(_repo, args):
+                return git_results[tuple(args)]
+
+            with mock.patch.object(preflight_module, "_git", side_effect=fake_git), mock.patch.object(
+                preflight_module, "_load_audit_module"
+            ) as load_audit, mock.patch.dict("os.environ", {"ALLOW_DOUYIN_SAMPLE_DEFERRED": "1"}):
+                load_audit.return_value.audit.side_effect = (
+                    lambda _repo, include_git_clean=False: no_go_douyin_and_auth_audit(
+                        include_git_clean=include_git_clean
+                    )
+                )
+
+                report = preflight_module.preflight(repo, "root")
+
+        statuses = {check["check_id"]: check for check in report["checks"]}
+        self.assertEqual(report["overall"], "NO_GO")
+        self.assertEqual(statuses["production_readiness"]["status"], "NO_GO")
+        self.assertIn("authenticated_dify_baseline", statuses["production_readiness"]["evidence"])
+        self.assertNotIn("douyin_real_sample", statuses["production_readiness"]["evidence"])
+
+    def test_douyin_deferred_env_allows_preflight_when_only_douyin_sample_is_missing(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "phase1.5-exit-proof.md", PHASE1_5_PROOF)
+            git_results = {
+                ("status", "--short"): (0, "", ""),
+                ("tag", "--points-at", "HEAD"): (0, "release-tag", ""),
+            }
+
+            def fake_git(_repo, args):
+                return git_results[tuple(args)]
+
+            with mock.patch.object(preflight_module, "_git", side_effect=fake_git), mock.patch.object(
+                preflight_module, "_load_audit_module"
+            ) as load_audit, mock.patch.dict("os.environ", {"ALLOW_DOUYIN_SAMPLE_DEFERRED": "1"}):
+                load_audit.return_value.audit.side_effect = lambda _repo, include_git_clean=False: no_go_only_douyin_audit(
+                    include_git_clean=include_git_clean
+                )
+
+                report = preflight_module.preflight(repo, "root")
+
+        self.assertEqual(report["overall"], "GO")
 
 
 if __name__ == "__main__":

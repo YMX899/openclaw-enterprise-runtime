@@ -5,6 +5,7 @@ import argparse
 from dataclasses import asdict, dataclass
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -68,8 +69,10 @@ def check_git_tagged_head(repo: Path) -> PreflightCheck:
 def check_production_readiness(repo: Path) -> PreflightCheck:
     audit_module = _load_audit_module()
     report = audit_module.audit(repo, include_git_clean=True)
-    if report["overall"] != "GO":
-        no_go = [gate["gate_id"] for gate in report["gates"] if gate["status"] != "PASS"]
+    no_go = [gate["gate_id"] for gate in report["gates"] if gate["status"] != "PASS"]
+    if os.environ.get("ALLOW_DOUYIN_SAMPLE_DEFERRED") == "1":
+        no_go = [gate_id for gate_id in no_go if gate_id != "douyin_real_sample"]
+    if no_go:
         return PreflightCheck("production_readiness", "NO_GO", "NO_GO gates: " + ", ".join(no_go))
     return PreflightCheck("production_readiness", "PASS", "production readiness audit is GO")
 
