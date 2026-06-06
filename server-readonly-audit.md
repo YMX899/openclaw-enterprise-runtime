@@ -328,8 +328,120 @@ Direct Dify compose modification: NO-GO
 
 1. OpenClaw code, image, container, or deployment directory was not found.
 2. `openclaw-bridge` code or image was not found.
-3. `douyin_chong` or equivalent video analysis tool was not found.
-4. No locked API contract exists between Bridge, OpenClaw, and the video worker.
+3. A local `douyin_chong` candidate has since been found and a minimal V1
+   source subset has been vendored in this repository, but it is not
+   model-verified and is not present as a production server artifact.
+4. No production-proven API contract exists between Bridge, OpenClaw, and the
+   video worker on an isolated Linux Docker host.
 5. No resource-limited video analysis benchmark exists on this host.
 6. Dify public browser baseline is only partially complete because no Dify login credentials were provided for testing an authenticated existing app flow.
 
+## Refresh 2026-06-06 10:36 Asia/Shanghai
+
+Mode: read-only SSH inspection through `ssh-skill`; no deployment, reload,
+restart, install, upload, download, `.env` read, full environment dump, cookie
+read or token read was performed.
+
+System/resource refresh:
+
+```text
+date: 2026-06-06T10:36:08+08:00
+kernel: Linux AI-01 6.8.0-57-generic #59-Ubuntu SMP PREEMPT_DYNAMIC Sat Mar 15 17:40:59 UTC 2025 x86_64
+docker server: 28.1.1
+docker compose: v2.35.1
+memory: 14Gi total, 11Gi used, 954Mi free, 3.7Gi available, swap 0B
+/app: 500G total, 63G used, 438G available, 13% used
+cpu cores: 8
+uptime: 378 days, 19:03
+load average: 1.59, 1.35, 1.25
+```
+
+Container resource refresh:
+
+```text
+openresty-prod               0.18% CPU   47.71MiB   2 PIDs
+docker-nginx-1               0.09% CPU   11.33MiB   10 PIDs
+docker-api-1                 5.47% CPU   4.302GiB   62 PIDs
+docker-worker-1              0.02% CPU   296.8MiB   10 PIDs
+docker-worker_beat-1         0.00% CPU   263.5MiB   17 PIDs
+docker-web-1                 0.42% CPU   395.6MiB   34 PIDs
+docker-plugin_daemon-1       1.56% CPU   1.225GiB   78 PIDs
+docker-sandbox-1             0.00% CPU   442.6MiB   12 PIDs
+docker-ssrf_proxy-1          0.01% CPU   18.76MiB   9 PIDs
+weaviate-weaviate-master-1   2.76% CPU   194.8MiB   15 PIDs
+huahuo-ai-test               0.01% CPU   336.1MiB   6 PIDs
+huahuo-web-test              0.07% CPU   528.2MiB   46 PIDs
+huahuo-web-prod              0.07% CPU   801.9MiB   46 PIDs
+mysql                        0.73% CPU   716.9MiB   54 PIDs
+```
+
+Dify compose refresh:
+
+```text
+project: docker
+root: /app/bin/dify/dify-1.11.2/docker
+services: sandbox, init_permissions, api, web, nginx, worker, worker_beat, plugin_daemon, ssrf_proxy
+api image: langgenius/dify-api:1.11.2
+web image: langgenius/dify-web:1.11.2
+nginx image: nginx:latest
+plugin_daemon image: langgenius/dify-plugin-daemon:0.5.2-local
+sandbox image: langgenius/dify-sandbox:0.2.12
+```
+
+Network refresh:
+
+```text
+docker_default containers:
+  docker-api-1
+  docker-ssrf_proxy-1
+  docker-web-1
+  docker-nginx-1
+  docker-worker-1
+  docker-plugin_daemon-1
+  docker-worker_beat-1
+
+aliases:
+  docker-api-1   docker_default aliases=[docker-api-1 api]
+  docker-api-1   docker_ssrf_proxy_network aliases=[docker-api-1 api]
+  docker-web-1   docker_default aliases=[docker-web-1 web]
+  docker-nginx-1 docker_default aliases=[docker-nginx-1 nginx]
+```
+
+HTTP refresh from server:
+
+```text
+http://127.0.0.1:8081 -> 200 final http://127.0.0.1:8081/apps
+http://127.0.0.1:8081/apps -> 200
+http://127.0.0.1:8081/signin -> 200
+http://127.0.0.1:8081/console/api/account/profile -> 401
+docker-api-1 internal http://127.0.0.1:5001/console/api/account/profile -> 401
+```
+
+Healthcheck refresh:
+
+```text
+docker-web-1 status: unhealthy
+healthcheck: ["CMD","pg_isready","-h","db_postgres","-U","dify","-d","dify"]
+recent log output: exec: "pg_isready": executable file not found in $PATH
+```
+
+This confirms the earlier interpretation: the unhealthy status is a historical
+Dify healthcheck/config mismatch, not an OpenClaw-caused regression.
+
+Port refresh and risk note:
+
+```text
+0.0.0.0:80    openresty
+0.0.0.0:443   openresty
+0.0.0.0:8081  docker-proxy -> docker-nginx-1
+0.0.0.0:8443  docker-proxy -> docker-nginx-1
+0.0.0.0:5003  docker-proxy -> docker-plugin_daemon-1
+0.0.0.0:5001  gunicorn / Dify API
+18180, 18181, 18789, 5432, 6379: not observed in filtered listener output
+```
+
+Risk: `0.0.0.0:5001` is currently listening on the host for the Dify API. This
+was observed only as a baseline and was not changed. Future OpenClaw planning
+must not add any new public listener, and any separate remediation of existing
+`5001` exposure should be treated as a Dify/network hardening task outside this
+OpenClaw deployment phase.

@@ -150,3 +150,26 @@ OpenClaw route present: NO
 Safe to add route now: NO, OpenClaw/Bridge artifacts are missing
 ```
 
+## Refresh 2026-06-06 10:38 Asia/Shanghai
+
+Mode: read-only Docker inspect through `ssh-skill`; full OpenResty config,
+certificate private keys and secret material were not read.
+
+Mount summary:
+
+```text
+/app/data/upload       -> /app/data/upload                    type=bind rw=True
+/app/data/cache        -> /app/data/cache                     type=bind rw=True
+/app/test/data/upload  -> /app/test/data/upload               type=bind rw=True
+/app/test/apps/html    -> /app/test/apps/html                 type=bind rw=True
+/app/logs/openresty    -> /app/logs/openresty                 type=bind rw=True
+/app/apps/html         -> /app/apps/html                      type=bind rw=True
+/app/test/logs/openresty -> /app/test/logs/openresty          type=bind rw=True
+/etc/localtime         -> /etc/localtime                      type=bind rw=False
+/app/config/openresty/conf -> /usr/local/openresty/nginx/conf type=bind rw=True
+/app/test/data/cache   -> /app/test/data/cache                type=bind rw=True
+```
+
+No OpenClaw route was added. Safe-to-add-route remains `NO` because the
+Bridge/OpenClaw sidecar has not passed isolated Linux Docker and real-browser
+Dify baseline gates.

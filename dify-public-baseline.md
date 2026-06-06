@@ -211,3 +211,30 @@ Authenticated Dify app baseline: BLOCKED, credentials/session not provided
 ```
 
 Future OpenClaw public route work must not proceed past Phase 2 until authenticated real-browser Dify baseline is complete.
+
+## Internal Baseline Refresh 2026-06-06 10:36 Asia/Shanghai
+
+Mode: read-only checks from the root server and inside `docker-api-1`; no
+cookies, tokens, CSRF values, credentials or full headers were read.
+
+Server-local internal Dify Nginx:
+
+```text
+http://127.0.0.1:8081 -> 200 final http://127.0.0.1:8081/apps
+http://127.0.0.1:8081/apps -> 200
+http://127.0.0.1:8081/signin -> 200
+http://127.0.0.1:8081/console/api/account/profile -> 401
+```
+
+Inside `docker-api-1`:
+
+```text
+http://127.0.0.1:5001/console/api/account/profile -> 401
+```
+
+Interpretation:
+
+- Unauthenticated internal Dify baseline remains healthy.
+- `401` for profile without login remains expected.
+- Authenticated browser baseline is still incomplete and remains mandatory
+  before any future public `/openclaw-lab/` or `/openclaw-api/` route exposure.
