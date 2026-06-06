@@ -21,6 +21,7 @@ class Phase15AcceptanceRunnerTests(unittest.TestCase):
         self.assertIn("BUILD_INFO", self.text)
         self.assertIn("git_commit=", self.text)
         self.assertIn("git_tags=", self.text)
+        self.assertIn("sed -n 's/^git_refs: //p'", self.text)
         self.assertIn("rebuild the archive with git archive", self.text)
 
     def test_requires_non_production_secret_files_without_printing_contents(self):

@@ -28,7 +28,7 @@ print_version_anchor() {
   fi
 
   commit="$(awk -F': ' '/^git_commit:/ {print $2}' BUILD_INFO | head -n 1)"
-  refs="$(awk -F': ' '/^git_refs:/ {print $2}' BUILD_INFO | head -n 1)"
+  refs="$(sed -n 's/^git_refs: //p' BUILD_INFO | head -n 1)"
   if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
     fail "BUILD_INFO does not contain a resolved git commit; rebuild the archive with git archive."
   fi
