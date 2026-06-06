@@ -86,6 +86,12 @@ class ComposeContractTests(unittest.TestCase):
                 self.assertIn('published: "18181"', script)
                 self.assertIn("target: 3000", script)
 
+    def test_worker_image_smoke_has_compose_v5_image_id_fallback(self):
+        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
+
+        self.assertIn("compose -f \"$compose_file\" images -q video-analysis-worker", gate_script)
+        self.assertIn("image inspect openclaw-video-video-analysis-worker:latest", gate_script)
+
     def test_worker_resource_and_filesystem_limits_are_declared(self):
         compose = COMPOSE.read_text(encoding="utf-8")
         for required in [

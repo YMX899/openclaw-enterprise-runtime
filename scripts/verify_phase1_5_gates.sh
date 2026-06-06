@@ -282,6 +282,9 @@ step "compose build"
 step "worker image smoke"
 worker_image="$("${docker_cmd_parts[@]}" compose -f "$compose_file" images -q video-analysis-worker)"
 if [[ -z "$worker_image" ]]; then
+  worker_image="$("${docker_cmd_parts[@]}" image inspect openclaw-video-video-analysis-worker:latest --format '{{.Id}}' 2>/dev/null || true)"
+fi
+if [[ -z "$worker_image" ]]; then
   fail "could not resolve built video-analysis-worker image id"
 fi
 "${docker_cmd_parts[@]}" run --rm "$worker_image" openclaw-douyin-adapter --help >/dev/null
