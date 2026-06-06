@@ -40,6 +40,20 @@ def identity_headers(headers: Mapping[str, str]) -> dict[str, str]:
     return forwarded
 
 
+def _safe_cookie_names(headers: Mapping[str, str]) -> list[str]:
+    cookie = _header_value(headers, "cookie")
+    names: list[str] = []
+    for item in cookie.split(";"):
+        name = item.split("=", 1)[0].strip()
+        if name:
+            names.append(name)
+    return sorted(set(names))
+
+
+def dify_identity_material_present(headers: Mapping[str, str]) -> bool:
+    return bool(identity_headers(headers))
+
+
 def _header_value(headers: Mapping[str, str], name: str) -> str:
     lowered = name.lower()
     for key, value in headers.items():
@@ -124,14 +138,64 @@ def huahuo_front_request_headers(headers: Mapping[str, str], *, access_token: st
 class DifyClient:
     base_url: str
     timeout_seconds: float = 10.0
+    transport: httpx.AsyncBaseTransport | None = None
 
     async def _get_json(self, path: str, headers: Mapping[str, str]) -> object:
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=self.timeout_seconds,
+            transport=self.transport,
+        ) as client:
             response = await client.get(path, headers=identity_headers(headers))
             if response.status_code == 401:
                 raise PermissionError("dify login required")
             response.raise_for_status()
             return response.json()
+
+    async def safe_identity_probe(self, headers: Mapping[str, str]) -> dict[str, object]:
+        result: dict[str, object] = {
+            "provider": "dify",
+            "identity_headers_present": dify_identity_material_present(headers),
+            "cookie_names": _safe_cookie_names(headers),
+            "authorization_present": bool(_header_value(headers, "authorization")),
+            "csrf_header_present": bool(_header_value(headers, "x-csrf-token") or _header_value(headers, "x-xsrf-token")),
+            "profile_http_status": None,
+            "profile_body_keys": [],
+            "workspaces_http_status": None,
+            "workspaces_body_keys": [],
+            "error_stage": None,
+        }
+        try:
+            async with httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout_seconds,
+                transport=self.transport,
+            ) as client:
+                profile_response = await client.get(
+                    "/console/api/account/profile",
+                    headers=identity_headers(headers),
+                )
+                result["profile_http_status"] = profile_response.status_code
+                if profile_response.status_code not in {401, 403}:
+                    profile_payload = profile_response.json()
+                    if isinstance(profile_payload, dict):
+                        result["profile_body_keys"] = sorted(str(key) for key in profile_payload.keys())
+                workspaces_response = await client.get(
+                    "/console/api/workspaces",
+                    headers=identity_headers(headers),
+                )
+                result["workspaces_http_status"] = workspaces_response.status_code
+                if workspaces_response.status_code not in {401, 403}:
+                    workspaces_payload = workspaces_response.json()
+                    if isinstance(workspaces_payload, dict):
+                        result["workspaces_body_keys"] = sorted(str(key) for key in workspaces_payload.keys())
+                return result
+        except httpx.HTTPError:
+            result["error_stage"] = "network"
+            return result
+        except ValueError:
+            result["error_stage"] = "json"
+            return result
 
     async def profile(self, headers: Mapping[str, str]) -> dict:
         data = await self._get_json("/console/api/account/profile", headers)

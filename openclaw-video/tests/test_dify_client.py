@@ -6,7 +6,9 @@ from openclaw_video.dify_client import (
     HUAHUO_APP_UUID_HEADER,
     HUAHUO_ACCESS_TOKEN_HEADER,
     HUAHUO_REFRESH_TOKEN_HEADER,
+    DifyClient,
     HuahuoFrontClient,
+    dify_identity_material_present,
     huahuo_cookie_headers,
     huahuo_authorization_header,
     huahuo_identity_headers,
@@ -36,6 +38,48 @@ class DifyClientTests(unittest.TestCase):
         self.assertEqual(selected["X-CSRF-Token"], "csrf")
         self.assertNotIn("User-Agent", selected)
         self.assertNotIn("OpenClaw-Gateway-Token", selected)
+        self.assertTrue(dify_identity_material_present({"Cookie": "access_token=secret"}))
+        self.assertFalse(dify_identity_material_present({"User-Agent": "browser"}))
+
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_dify_safe_identity_probe_reports_only_safe_metadata(self):
+        requests = []
+
+        def handler(request):
+            requests.append((request.method, str(request.url), request.headers.get("Cookie", "")))
+            if request.url.path == "/console/api/account/profile":
+                return httpx.Response(401, json={"code": "unauthorized"})
+            if request.url.path == "/console/api/workspaces":
+                return httpx.Response(401, json={"code": "unauthorized"})
+            return httpx.Response(404)
+
+        client = DifyClient(
+            "https://ai001.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+
+        import asyncio
+
+        probe = asyncio.run(
+            client.safe_identity_probe(
+                {
+                    "Cookie": "__Host-access_token=secret; csrf_token=csrf",
+                    "Authorization": "Bearer token-secret",
+                    "X-CSRF-Token": "csrf-secret",
+                }
+            )
+        )
+
+        self.assertEqual(probe["provider"], "dify")
+        self.assertEqual(probe["identity_headers_present"], True)
+        self.assertEqual(probe["cookie_names"], ["__Host-access_token", "csrf_token"])
+        self.assertEqual(probe["authorization_present"], True)
+        self.assertEqual(probe["csrf_header_present"], True)
+        self.assertEqual(probe["profile_http_status"], 401)
+        self.assertEqual(probe["workspaces_http_status"], 401)
+        rendered = repr(probe)
+        self.assertNotIn("secret", rendered)
+        self.assertTrue(all(cookie == "__Host-access_token=secret; csrf_token=csrf" for _, _, cookie in requests))
 
     def test_huahuo_authorization_header_matches_frontend_signing_shape(self):
         header = huahuo_authorization_header("HUAHUO-access", app_uuid="abc123", app_time_ms=123456)
