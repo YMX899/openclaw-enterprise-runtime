@@ -147,6 +147,65 @@ class DifyClientTests(unittest.TestCase):
         self.assertEqual([method for method, _, _ in requests], ["GET", "POST", "GET"])
         self.assertNotIn("refresh-token", "".join(item[2] for item in requests))
 
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_huahuo_safe_identity_probe_reports_only_safe_metadata(self):
+        query_count = 0
+
+        def handler(request):
+            nonlocal query_count
+            if request.url.path == "/api/front/user/queryUserInfo":
+                query_count += 1
+                if query_count == 1:
+                    return httpx.Response(200, json={"status": 401, "message": "login expired"})
+                return httpx.Response(
+                    200,
+                    json={
+                        "status": 1,
+                        "data": {
+                            "id": 20,
+                            "loginName": "safe-name",
+                            "mobile": "hidden",
+                        },
+                    },
+                )
+            if request.url.path == "/api/updateToken":
+                return httpx.Response(
+                    200,
+                    json={"status": 1, "data": {"accessToken": "fresh-access", "refreshToken": "fresh-refresh"}},
+                )
+            return httpx.Response(404)
+
+        client = HuahuoFrontClient(
+            "https://www.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+        headers = {
+            HUAHUO_ACCESS_TOKEN_HEADER: "expired-access",
+            HUAHUO_REFRESH_TOKEN_HEADER: "refresh-token",
+            HUAHUO_APP_UUID_HEADER: "front-app-uuid",
+        }
+
+        import asyncio
+
+        probe = asyncio.run(client.safe_identity_probe(headers))
+
+        self.assertEqual(probe["provider"], "huahuo_front")
+        self.assertEqual(probe["profile_http_status"], 200)
+        self.assertEqual(probe["profile_business_status"], 401)
+        self.assertEqual(probe["refresh_attempted"], True)
+        self.assertEqual(probe["refresh_business_status"], 1)
+        self.assertEqual(probe["refresh_issued_access_token"], True)
+        self.assertEqual(probe["retry_http_status"], 200)
+        self.assertEqual(probe["retry_business_status"], 1)
+        self.assertEqual(probe["retry_data_keys"], ["id", "loginName", "mobile"])
+        rendered = repr(probe)
+        self.assertNotIn("expired-access", rendered)
+        self.assertNotIn("refresh-token", rendered)
+        self.assertNotIn("fresh-access", rendered)
+        self.assertNotIn("fresh-refresh", rendered)
+        self.assertNotIn("safe-name", rendered)
+        self.assertNotIn("hidden", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

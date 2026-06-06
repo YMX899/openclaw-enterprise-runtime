@@ -48,6 +48,48 @@ class FakeHuahuoClient:
     async def workspaces(self, headers):
         return {"data": [{"id": "huahuo-front", "current": True}]}
 
+    async def safe_identity_probe(self, headers):
+        return {
+            "provider": "huahuo_front",
+            "identity_headers_present": bool(headers.get("x-huahuo-access-token")),
+            "profile_http_status": 200,
+            "profile_business_status": 1,
+            "profile_data_keys": ["id", "loginName"],
+            "refresh_attempted": False,
+            "refresh_http_status": None,
+            "refresh_business_status": None,
+            "refresh_issued_access_token": False,
+            "retry_http_status": None,
+            "retry_business_status": None,
+            "retry_data_keys": [],
+            "error_stage": None,
+        }
+
+
+class FailingProbeHuahuoClient:
+    async def profile(self, headers):
+        raise PermissionError("login required")
+
+    async def workspaces(self, headers):
+        return {"data": [{"id": "huahuo-front", "current": True}]}
+
+    async def safe_identity_probe(self, headers):
+        return {
+            "provider": "huahuo_front",
+            "identity_headers_present": bool(headers.get("x-huahuo-access-token")),
+            "profile_http_status": 200,
+            "profile_business_status": 401,
+            "profile_data_keys": [],
+            "refresh_attempted": True,
+            "refresh_http_status": 200,
+            "refresh_business_status": 0,
+            "refresh_issued_access_token": False,
+            "retry_http_status": None,
+            "retry_business_status": None,
+            "retry_data_keys": [],
+            "error_stage": "refresh_payload",
+        }
+
 
 class FakeGateway:
     def __init__(self):
@@ -327,8 +369,43 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["authenticated"], True)
         self.assertEqual(body["huahuo_access_token_present"], True)
         self.assertEqual(body["huahuo_app_uuid_present"], True)
+        self.assertEqual(body["provider_probe"]["provider"], "huahuo_front")
+        self.assertEqual(body["provider_probe"]["profile_data_keys"], ["id", "loginName"])
         self.assertNotIn("HUAHUO-access", response.text)
         self.assertNotIn("front-app-uuid", response.text)
+        self.assertNotIn("accessToken", response.text)
+        self.assertNotIn("refreshToken", response.text)
+
+    def test_huahuo_identity_diagnostics_probe_is_safe_when_profile_fails(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=FailingProbeHuahuoClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.get(
+            "/openclaw-api/identity/diagnostics",
+            headers={
+                "X-Huahuo-Access-Token": "HUAHUO-access",
+                "X-Huahuo-App-UUID": "front-app-uuid",
+                "X-Huahuo-Refresh-Token": "refresh-secret",
+            },
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], False)
+        self.assertEqual(body["failure_stage"], "profile")
+        self.assertEqual(body["provider_probe"]["refresh_attempted"], True)
+        self.assertEqual(body["provider_probe"]["error_stage"], "refresh_payload")
+        self.assertNotIn("HUAHUO-access", response.text)
+        self.assertNotIn("front-app-uuid", response.text)
+        self.assertNotIn("refresh-secret", response.text)
+        self.assertNotIn("Authorization", response.text)
+        self.assertNotIn("Cookie", response.text)
 
     def test_create_and_list_sessions_for_owner_only(self):
         session_a = self.create_session("account-a")

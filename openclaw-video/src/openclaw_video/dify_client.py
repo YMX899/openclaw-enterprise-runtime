@@ -189,6 +189,86 @@ class HuahuoFrontClient:
         access_token = data.get("accessToken")
         return str(access_token) if access_token else ""
 
+    async def safe_identity_probe(self, headers: Mapping[str, str]) -> dict[str, object]:
+        result: dict[str, object] = {
+            "provider": "huahuo_front",
+            "identity_headers_present": bool(huahuo_identity_headers(headers)),
+            "profile_http_status": None,
+            "profile_business_status": None,
+            "profile_data_keys": [],
+            "refresh_attempted": False,
+            "refresh_http_status": None,
+            "refresh_business_status": None,
+            "refresh_issued_access_token": False,
+            "retry_http_status": None,
+            "retry_business_status": None,
+            "retry_data_keys": [],
+            "error_stage": None,
+        }
+        try:
+            async with httpx.AsyncClient(
+                base_url=self.base_url,
+                timeout=self.timeout_seconds,
+                transport=self.transport,
+            ) as client:
+                response = await client.get("/api/front/user/queryUserInfo", headers=huahuo_front_request_headers(headers))
+                result["profile_http_status"] = response.status_code
+                payload: object | None = None
+                if response.status_code not in {401, 403}:
+                    payload = response.json()
+                    if isinstance(payload, dict):
+                        result["profile_business_status"] = payload.get("status")
+                        data = payload.get("data")
+                        if isinstance(data, dict):
+                            result["profile_data_keys"] = sorted(str(key) for key in data.keys())
+                if response.status_code in {401, 403} or self._payload_requires_refresh(payload):
+                    result["refresh_attempted"] = True
+                    refresh_token = _header_value(headers, HUAHUO_REFRESH_TOKEN_HEADER).strip()
+                    if not refresh_token:
+                        result["error_stage"] = "refresh_missing"
+                        return result
+                    refresh_response = await client.post(
+                        "/api/updateToken",
+                        headers=huahuo_front_request_headers(headers),
+                        json={"refreshToken": refresh_token},
+                    )
+                    result["refresh_http_status"] = refresh_response.status_code
+                    if refresh_response.status_code in {401, 403}:
+                        result["error_stage"] = "refresh_http"
+                        return result
+                    refresh_payload = refresh_response.json()
+                    if isinstance(refresh_payload, dict):
+                        result["refresh_business_status"] = refresh_payload.get("status")
+                        data = refresh_payload.get("data")
+                        access_token = data.get("accessToken") if isinstance(data, dict) else None
+                        result["refresh_issued_access_token"] = bool(access_token)
+                    else:
+                        access_token = None
+                    if not access_token:
+                        result["error_stage"] = "refresh_payload"
+                        return result
+                    retry_response = await client.get(
+                        "/api/front/user/queryUserInfo",
+                        headers=huahuo_front_request_headers(headers, access_token=str(access_token)),
+                    )
+                    result["retry_http_status"] = retry_response.status_code
+                    if retry_response.status_code not in {401, 403}:
+                        retry_payload = retry_response.json()
+                        if isinstance(retry_payload, dict):
+                            result["retry_business_status"] = retry_payload.get("status")
+                            data = retry_payload.get("data")
+                            if isinstance(data, dict):
+                                result["retry_data_keys"] = sorted(str(key) for key in data.keys())
+                    if retry_response.status_code in {401, 403}:
+                        result["error_stage"] = "retry_http"
+                return result
+        except httpx.HTTPError:
+            result["error_stage"] = "network"
+            return result
+        except ValueError:
+            result["error_stage"] = "json"
+            return result
+
     async def profile(self, headers: Mapping[str, str]) -> dict:
         payload = await self._get_json("/api/front/user/queryUserInfo", headers)
         if not isinstance(payload, dict):

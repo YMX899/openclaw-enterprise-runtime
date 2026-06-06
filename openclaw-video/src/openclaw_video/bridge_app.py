@@ -724,6 +724,7 @@ def create_app(
             "current_workspace_count": 0,
             "principal_id": None,
             "failure_stage": None,
+            "provider_probe": None,
         }
         try:
             if _test_identity_headers_allowed(request, enable_test_identity_headers, test_identity_secret):
@@ -742,6 +743,11 @@ def create_app(
                 result["authenticated"] = True
                 result["principal_id"] = principal.principal_id
                 return result
+            if hasattr(dify, "safe_identity_probe"):
+                try:
+                    result["provider_probe"] = await dify.safe_identity_probe(request.headers)
+                except Exception:
+                    result["provider_probe"] = {"provider": identity_provider, "error_stage": "probe"}
             profile = await dify.profile(request.headers)
             result["profile_ok"] = True
         except PermissionError:

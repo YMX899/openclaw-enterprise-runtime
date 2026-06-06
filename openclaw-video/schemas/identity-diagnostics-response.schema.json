@@ -12,7 +12,8 @@
     "access_ok",
     "current_workspace_count",
     "principal_id",
-    "failure_stage"
+    "failure_stage",
+    "provider_probe"
   ],
   "additionalProperties": false,
   "properties": {
@@ -33,6 +34,68 @@
     "failure_stage": {
       "oneOf": [
         {"enum": ["profile", "workspace", "access"]},
+        {"type": "null"}
+      ]
+    },
+    "provider_probe": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "identity_headers_present",
+            "profile_http_status",
+            "profile_business_status",
+            "profile_data_keys",
+            "refresh_attempted",
+            "refresh_http_status",
+            "refresh_business_status",
+            "refresh_issued_access_token",
+            "retry_http_status",
+            "retry_business_status",
+            "retry_data_keys",
+            "error_stage"
+          ],
+          "properties": {
+            "provider": {"type": "string"},
+            "identity_headers_present": {"type": "boolean"},
+            "profile_http_status": {
+              "oneOf": [{"type": "integer"}, {"type": "null"}]
+            },
+            "profile_business_status": {
+              "oneOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}]
+            },
+            "profile_data_keys": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "refresh_attempted": {"type": "boolean"},
+            "refresh_http_status": {
+              "oneOf": [{"type": "integer"}, {"type": "null"}]
+            },
+            "refresh_business_status": {
+              "oneOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}]
+            },
+            "refresh_issued_access_token": {"type": "boolean"},
+            "retry_http_status": {
+              "oneOf": [{"type": "integer"}, {"type": "null"}]
+            },
+            "retry_business_status": {
+              "oneOf": [{"type": "integer"}, {"type": "string"}, {"type": "null"}]
+            },
+            "retry_data_keys": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "error_stage": {
+              "oneOf": [
+                {"enum": ["refresh_missing", "refresh_http", "refresh_payload", "retry_http", "network", "json", "probe"]},
+                {"type": "null"}
+              ]
+            }
+          }
+        },
         {"type": "null"}
       ]
     }
