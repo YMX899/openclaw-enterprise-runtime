@@ -38,4 +38,4 @@ RUN mkdir -p /var/lib/openclaw /etc/openclaw \
 
 EXPOSE 18789
 ENTRYPOINT ["sh", "/usr/local/bin/openclaw-gateway-entrypoint.sh"]
-CMD ["openclaw", "gateway", "run", "--allow-unconfigured", "--bind", "custom", "--port", "18789", "--auth", "token"]
+CMD ["openclaw", "gateway", "run", "--allow-unconfigured", "--bind", "lan", "--port", "18789", "--auth", "token"]

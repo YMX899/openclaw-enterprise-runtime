@@ -58,6 +58,8 @@ class ComposeContractTests(unittest.TestCase):
         entrypoint = GATEWAY_ENTRYPOINT.read_text(encoding="utf-8")
         self.assertIn('"--auth", "token"', dockerfile)
         self.assertIn('"--allow-unconfigured"', dockerfile)
+        self.assertIn('"--bind", "lan"', dockerfile)
+        self.assertNotIn('"--bind", "custom"', dockerfile)
         self.assertNotIn('"--force"', dockerfile)
         self.assertNotIn('"--reset"', dockerfile)
         self.assertNotIn("--token", dockerfile)
