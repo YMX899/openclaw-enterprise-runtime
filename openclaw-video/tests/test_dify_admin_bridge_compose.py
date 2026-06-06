@@ -13,7 +13,7 @@ class DifyAdminBridgeComposeTests(unittest.TestCase):
 
         self.assertIn("dify-openclaw-bridge:", text)
         self.assertIn("BRIDGE_IDENTITY_PROVIDER: dify", text)
-        self.assertIn("DIFY_API_BASE: http://api:5001", text)
+        self.assertIn("DIFY_API_BASE: ${DIFY_ADMIN_API_BASE:-http://nginx:8081}", text)
         self.assertIn('"127.0.0.1:18182:3000"', text)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: \"0\"", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET: \"\"", text)

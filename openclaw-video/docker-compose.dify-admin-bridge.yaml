@@ -4,7 +4,7 @@ services:
   dify-openclaw-bridge:
     image: ${OPENCLAW_BRIDGE_IMAGE:-openclaw-video-openclaw-bridge:fast}
     environment:
-      DIFY_API_BASE: http://api:5001
+      DIFY_API_BASE: ${DIFY_ADMIN_API_BASE:-http://nginx:8081}
       BRIDGE_IDENTITY_PROVIDER: dify
       HUAHUO_FRONT_BASE: ${HUAHUO_FRONT_BASE:-https://www.huahuoai.com}
       HUAHUO_FRONT_TENANT_ID: ${HUAHUO_FRONT_TENANT_ID:-huahuo-front}
