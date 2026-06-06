@@ -88,7 +88,7 @@ class ProductionReadinessAuditTests(unittest.TestCase):
         self.assertEqual(statuses["openclaw_security"], "PASS")
         self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
-        self.assertEqual(statuses["phase1_5_exit_proof"], "NO_GO")
+        self.assertEqual(statuses["phase1_5_exit_proof"], "PASS")
         self.assertEqual(statuses["authenticated_dify_baseline"], "NO_GO")
 
     def test_all_markers_present_is_go(self):
