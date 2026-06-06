@@ -2,6 +2,8 @@ import os
 import tempfile
 import unittest
 
+from cryptography.hazmat.primitives import serialization
+
 from openclaw_video.openclaw_gateway import (
     DisabledGatewayClient,
     GatewayChatRequest,
@@ -56,6 +58,20 @@ class GatewayClientTests(unittest.TestCase):
         self.assertEqual(params["device"]["id"], self.identity.device_id)
         self.assertEqual(params["device"]["publicKey"], self.identity.public_key_raw_base64url)
         self.assertIn("signature", params["device"])
+
+    def test_openssh_ed25519_private_key_is_supported(self):
+        pem_key = serialization.load_pem_private_key(TEST_ED25519_PRIVATE_KEY.encode("utf-8"), password=None)
+        openssh_private_key = pem_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.OpenSSH,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode("utf-8")
+
+        identity = OpenClawDeviceIdentity.from_private_key_pem(openssh_private_key)
+
+        self.assertEqual(identity.device_id, self.identity.device_id)
+        self.assertEqual(identity.public_key_raw_base64url, self.identity.public_key_raw_base64url)
+        self.assertTrue(identity.sign("payload"))
 
     def test_chat_send_uses_hmac_routing_user_as_agent_session_key(self):
         client = OpenClawGatewayWsClient("ws://openclaw-gateway:18789", "secret", self.identity)

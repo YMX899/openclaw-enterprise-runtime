@@ -98,7 +98,7 @@ class OpenClawDeviceIdentity:
     def from_private_key_pem(cls, private_key_pem: str) -> "OpenClawDeviceIdentity":
         if serialization is None or ed25519 is None:
             raise GatewayNotConfigured("cryptography is required for OpenClaw Gateway device signing")
-        key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
+        key = _load_ed25519_private_key(private_key_pem)
         if not isinstance(key, ed25519.Ed25519PrivateKey):
             raise GatewayError("OpenClaw Gateway device key must be an Ed25519 private key")
         public_key = key.public_key()
@@ -122,10 +122,27 @@ class OpenClawDeviceIdentity:
     def sign(self, payload: str) -> str:
         if serialization is None or ed25519 is None:
             raise GatewayNotConfigured("cryptography is required for OpenClaw Gateway device signing")
-        key = serialization.load_pem_private_key(self.private_key_pem.encode("utf-8"), password=None)
+        key = _load_ed25519_private_key(self.private_key_pem)
         if not isinstance(key, ed25519.Ed25519PrivateKey):
             raise GatewayError("OpenClaw Gateway device key must be an Ed25519 private key")
         return _base64url(key.sign(payload.encode("utf-8")))
+
+
+def _load_ed25519_private_key(private_key_text: str):
+    if serialization is None or ed25519 is None:
+        raise GatewayNotConfigured("cryptography is required for OpenClaw Gateway device signing")
+    private_key_bytes = private_key_text.encode("utf-8")
+    loaders = (
+        serialization.load_pem_private_key,
+        serialization.load_ssh_private_key,
+    )
+    last_error: Exception | None = None
+    for loader in loaders:
+        try:
+            return loader(private_key_bytes, password=None)
+        except (TypeError, ValueError) as exc:
+            last_error = exc
+    raise ValueError("OpenClaw Gateway device key must be an unencrypted Ed25519 PEM or OpenSSH private key") from last_error
 
 
 def build_device_auth_payload_v3(
