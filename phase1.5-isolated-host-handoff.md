@@ -145,6 +145,29 @@ Do not commit or upload these files. They are ignored by git.
 
 ## Required Commands
 
+Preferred one-command acceptance runner on the isolated Linux host:
+
+```bash
+TARGET_LABEL=ubuntu22.04 \
+DOCKER_CMD='docker' \
+PYTHON=python3 \
+scripts/run_phase1_5_acceptance.sh
+```
+
+If Docker is granted only through passwordless non-interactive sudo:
+
+```bash
+TARGET_LABEL=ubuntu22.04 \
+DOCKER_CMD='sudo -n docker' \
+PYTHON=python3 \
+scripts/run_phase1_5_acceptance.sh
+```
+
+The runner refuses to run on the production `AI-01`/`root` path, checks only
+that required non-production secret files exist and are non-empty, runs host
+readiness, then runs the full Phase 1.5 gate with compose-up. It does not read
+or print secret file contents.
+
 No compose-up build/smoke gate:
 
 ```bash
