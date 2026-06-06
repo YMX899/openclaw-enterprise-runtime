@@ -68,15 +68,25 @@ engineering_owner: bob
                 repo / "phase1.5-exit-proof.md",
                 """
 status: PASS
+source: isolated-linux-docker-host
+production_host: NO
+host_os: Linux
+SKIP_DOCKER=0
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
 REQUIRE_DOUYIN_ARTIFACT=1
 RUN_COMPOSE_UP=1
+scripts/verify_phase1_5_gates.sh
+docker version
+docker compose version
 docker compose config
 docker compose build --no-cache
 docker compose up -d
 healthz
 port exposure check
 127.0.0.1:18181
+docker compose down --remove-orphans
+no 0.0.0.0 listener
+worker image
 """,
             )
             write(
@@ -115,15 +125,25 @@ engineering_owner: bob
                 repo / "phase1.5-exit-proof.md",
                 """
 status: PASS
+source: isolated-linux-docker-host
+production_host: NO
+host_os: Linux
+SKIP_DOCKER=0
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
 REQUIRE_DOUYIN_ARTIFACT=1
 RUN_COMPOSE_UP=1
+scripts/verify_phase1_5_gates.sh
+docker version
+docker compose version
 docker compose config
 docker compose build --no-cache
 docker compose up -d
 healthz
 port exposure check
 127.0.0.1:18181
+docker compose down --remove-orphans
+no 0.0.0.0 listener
+worker image
 """,
             )
             write(
@@ -181,6 +201,41 @@ new 5xx: NONE
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("raw URL", result.evidence)
+
+    def test_phase1_5_exit_rejects_template_placeholders(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "phase1.5-exit-proof.md",
+                """
+status: PASS
+source: isolated-linux-docker-host
+production_host: NO
+host_os: Linux
+SKIP_DOCKER=0
+REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
+REQUIRE_DOUYIN_ARTIFACT=1
+RUN_COMPOSE_UP=1
+scripts/verify_phase1_5_gates.sh
+docker version
+docker compose version
+docker compose config
+docker compose build --no-cache
+docker compose up -d
+healthz
+port exposure check
+127.0.0.1:18181
+docker compose down --remove-orphans
+no 0.0.0.0 listener
+worker image
+operator: <fill-me>
+""",
+            )
+
+            result = audit_module.check_phase1_5_exit(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("template placeholders", result.evidence)
 
     def test_real_sample_evidence_rejects_http_raw_url_leak(self):
         with TemporaryDirectory() as tmp:

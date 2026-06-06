@@ -111,17 +111,37 @@ def check_phase1_5_exit(repo: Path) -> GateResult:
     if not path.exists():
         return GateResult("phase1_5_exit_proof", "NO_GO", f"missing {path.name}")
     text = _read(path)
+    placeholder_patterns = [
+        r"TEMPLATE_PENDING",
+        r"DO_NOT_USE",
+        r"<[^>\n]+>",
+        r"\bTODO\b",
+        r"\bTBD\b",
+    ]
+    placeholders = [pattern for pattern in placeholder_patterns if re.search(pattern, text, re.IGNORECASE)]
+    if placeholders:
+        return GateResult("phase1_5_exit_proof", "NO_GO", "exit proof still contains template placeholders")
     required = [
         r"status:\s*PASS\b",
+        r"source:\s*isolated-linux-docker-host\b",
+        r"production_host:\s*NO\b",
+        r"host_os:\s*Linux\b",
+        r"SKIP_DOCKER=0",
         r"REQUIRE_OPENCLAW_SECURITY_APPROVAL=1",
         r"REQUIRE_DOUYIN_ARTIFACT=1",
         r"RUN_COMPOSE_UP=1",
+        r"scripts/verify_phase1_5_gates\.sh",
+        r"docker version",
+        r"docker compose version",
         r"docker compose config",
         r"docker compose build",
         r"docker compose up",
         r"healthz",
         r"port exposure check",
         r"127\.0\.0\.1:18181",
+        r"docker compose down --remove-orphans",
+        r"no 0\.0\.0\.0 listener",
+        r"worker image",
     ]
     missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
     if missing:

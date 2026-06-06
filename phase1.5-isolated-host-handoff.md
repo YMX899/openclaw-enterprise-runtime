@@ -23,6 +23,21 @@ ubuntu: invalid alias, missing password/key_file
 prod-web-01: invalid alias, missing password/key_file
 ```
 
+SSH non-production host refresh on 2026-06-06 after tag
+`douyin-real-sample-promotion-gate-20260606`:
+
+```text
+ubuntu22.04: timed out
+myproj: timed out
+xcp: timed out
+linaro: timed out
+run: reachable, Darwin 25.2.0 arm64, no Docker Engine evidence returned
+xiaojianping: reachable, Darwin 25.2.0 arm64, no Docker Engine evidence returned
+```
+
+Result: no eligible non-production Linux Docker host is currently available
+through the configured SSH aliases.
+
 Production Dify host `root` / `AI-01` is intentionally excluded from this gate
 because Phase 1.5 must be isolated from Dify.
 
@@ -45,8 +60,7 @@ The host must not run production Dify containers. It may be disposable.
 Use a clean checkout at or after:
 
 ```text
-commit: 937ce36
-tag: phase1-5-docker-gates-loader-smoke
+tag: douyin-real-sample-promotion-gate-20260606
 ```
 
 The test must run from a clean worktree:
@@ -86,6 +100,7 @@ No compose-up build/smoke gate:
 
 ```bash
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
+REQUIRE_DOUYIN_ARTIFACT=1 \
 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 ```
 
@@ -93,6 +108,7 @@ Full isolated sidecar boot gate:
 
 ```bash
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
+REQUIRE_DOUYIN_ARTIFACT=1 \
 RUN_COMPOSE_UP=1 \
 PYTHON=/path/to/python scripts/verify_phase1_5_gates.sh
 ```
@@ -102,10 +118,11 @@ The full script must prove:
 ```text
 clean git rollback anchor
 Python dependency gate
-92 unit tests
+103 unit tests or more
 vendored douyin_chong SOURCE_SHA256SUMS gate
 Node syntax gate
 static compose safety gates
+real douyin_chong artifact and REAL_SAMPLE_EVIDENCE.json verified
 OpenClaw 2026.3.13 security decision approved, not rejected/unapproved
 docker compose config render
 docker compose build --no-cache
@@ -147,6 +164,7 @@ summary of successful gates
 docker compose ps output if RUN_COMPOSE_UP=1
 ss -lntp filtered output for 18181/18789/5432
 worker image id/digest if available
+phase1.5-exit-proof.md filled from phase1.5-exit-proof.template.md
 ```
 
 Do not capture or share:
