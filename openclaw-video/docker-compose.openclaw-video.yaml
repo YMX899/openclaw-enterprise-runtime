@@ -2,6 +2,7 @@ name: openclaw-video
 
 services:
   openclaw-bridge:
+    image: ${OPENCLAW_BRIDGE_IMAGE:-openclaw-video-openclaw-bridge}
     build:
       context: .
       dockerfile: docker/bridge/Dockerfile
