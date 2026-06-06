@@ -12,11 +12,12 @@ RUN set -eux; \
             -e "s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" \
             -e "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g"; \
     apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
+    && apt-get install -y --no-install-recommends ca-certificates git openssh-client \
     && rm -rf /var/lib/apt/lists/*
 RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
         npm config set registry "$NPM_CONFIG_REGISTRY"; \
     fi \
+    && git config --global url."https://github.com/".insteadOf ssh://git@github.com/ \
     && npm install -g "openclaw@${OPENCLAW_VERSION}" --ignore-scripts \
     && openclaw --version
 
