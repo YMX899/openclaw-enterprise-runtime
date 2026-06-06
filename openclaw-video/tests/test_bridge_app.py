@@ -151,6 +151,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("const apiPrefix", response.text)
         self.assertIn("'/openclaw-api'", response.text)
         self.assertIn("'/api/openclaw-api'", response.text)
+        self.assertIn("'/console/api/openclaw-api'", response.text)
         self.assertIn("apiPrefix + '/me'", response.text)
         self.assertIn("apiPrefix + '/identity/diagnostics'", response.text)
         self.assertIn("apiPrefix + '/jobs'", response.text)
@@ -194,6 +195,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("OpenClaw Lab", response.text)
         self.assertIn("/api/openclaw-api", response.text)
+        self.assertIn("/console/api/openclaw-api", response.text)
         self.assertIn("/openclaw-api", response.text)
         self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
         self.assertNotIn("Authorization", response.text)
@@ -427,6 +429,15 @@ class BridgeAppTests(unittest.TestCase):
 
     def test_api_scoped_api_alias_uses_same_auth_and_response_shape(self):
         response = self.client.get("/api/openclaw-api/me", headers=self.auth())
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(len(body["principal_id"]), 64)
+        self.assertNotIn("account-a", response.text)
+        self.assertNotIn("tenant-a", response.text)
+
+    def test_console_api_scoped_alias_uses_same_auth_and_response_shape(self):
+        response = self.client.get("/console/api/openclaw-api/me", headers=self.auth())
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
         self.assertEqual(body["authenticated"], True)
