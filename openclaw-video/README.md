@@ -141,3 +141,13 @@ python scripts/preflight_root_deploy.py --target-host root --fail-on-no-go
 This preflight intentionally fails closed until the ubuntu22.04 or another
 non-production Linux Docker host has produced a valid `phase1.5-exit-proof.md`
 and the production readiness audit is fully `GO`.
+
+After the preflight returns `GO`, build the sanitized root deployment bundle
+instead of uploading a working directory by hand:
+
+```bash
+python scripts/build_root_deploy_bundle.py --target-host root --fail-on-no-go
+```
+
+The bundle builder records the git commit, tags, SHA256 digest and preflight
+report, and refuses to create a bundle while the preflight is `NO_GO`.
