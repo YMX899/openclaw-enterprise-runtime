@@ -74,3 +74,37 @@ temporary_storage_exhausted
 
 Internal stack traces, cookies, tokens, local filesystem paths and raw request
 headers must not be returned to users.
+
+## Real Sample Evidence Runner
+
+Before the artifact can become production verified, run one real model-backed
+sample in an isolated environment with an explicit runtime secret file:
+
+```bash
+python scripts/run_douyin_real_sample.py \
+  --input-url '<douyin-single-video-url>' \
+  --env-file /path/to/douyin_chong.env \
+  --adapter-bin openclaw-douyin-adapter \
+  --output-dir tmp/douyin-real-samples/<run-id>
+```
+
+The runner deliberately records only sanitized evidence:
+
+```text
+input_url_sha256
+input_url_host
+env_file_present = true/false
+secret_file_contents_recorded = false
+adapter return code
+elapsed seconds
+stdout/stderr character counts only
+result schema version
+summary length
+result JSON SHA256
+result JSON size
+Linux child max_rss_kb when available
+```
+
+It must not print or commit the runtime secret file, raw headers, cookies,
+Authorization values, CSRF values, or full model output. The generated output
+directory is under `tmp/` by default and is ignored by git.

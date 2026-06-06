@@ -110,6 +110,16 @@ JSON schema. The clean candidate source is mounted read-only at
 - isolated Linux Docker validation through `scripts/verify_phase1_5_gates.sh`
   without skipping Docker.
 
+The committed helper for producing sanitized real-sample evidence is:
+
+```text
+scripts/run_douyin_real_sample.py
+```
+
+This helper is not itself production approval. It is a controlled way to
+produce the missing real model-backed sample, schema, timing and resource
+evidence without recording secrets.
+
 ## Production Constraints
 
 - The tool must run in a dedicated non-root worker container.

@@ -55,6 +55,21 @@ the candidate's default CLI. Production remains blocked until pinned
 dependencies, real model-backed sample runs, schema validation, resource
 profile and isolated Docker validation are complete.
 
+Run a real model-backed sample only in an isolated environment with an explicit
+runtime secret file:
+
+```bash
+python scripts/run_douyin_real_sample.py \
+  --input-url '<douyin-single-video-url>' \
+  --env-file /path/to/douyin_chong.env \
+  --adapter-bin openclaw-douyin-adapter
+```
+
+The runner writes sanitized evidence under `tmp/douyin-real-samples/` by
+default. It records URL hash/host, timing, schema status and result hash/size;
+it does not record the secret file, raw stdout/stderr, cookies, tokens or full
+request headers.
+
 ## Local Unit Tests
 
 The unit tests cover the pure safety logic and do not require server access:
@@ -73,6 +88,7 @@ Phase 1.5 development gate on Windows without Docker:
 Phase 1.5 exit gate on an isolated Linux Docker host:
 
 ```bash
+REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
 PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
 ```
 

@@ -74,6 +74,19 @@ It is still blocked until the vendored minimal source is tested with a runtime
 secret file in an isolated Linux Docker host and proves the real model-backed
 V1 single-video path.
 
+Use the committed sanitized evidence runner for the real sample:
+
+```bash
+python scripts/run_douyin_real_sample.py \
+  --input-url '<douyin-single-video-url>' \
+  --env-file /path/to/douyin_chong.env \
+  --adapter-bin openclaw-douyin-adapter \
+  --output-dir tmp/douyin-real-samples/<run-id>
+```
+
+Do not commit the raw result JSON or runtime secret file. Record only the
+sanitized evidence summary after review.
+
 ### P0: Isolated Docker/Linux Validation
 
 Run in a non-production Linux Docker host, not on the Dify server:
