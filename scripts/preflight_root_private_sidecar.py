@@ -117,6 +117,7 @@ def check_private_compose_contract(repo: Path) -> PrivatePreflightCheck:
         'OPENCLAW_GATEWAY_DEVICE_KEY_FILE: /run/secrets/openclaw_bridge_device_key.pem',
         'DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env',
         'WORKER_CONCURRENCY: "1"',
+        'image: postgres:15-alpine',
         'name: ${DIFY_DOCKER_NETWORK:-docker_default}',
         '../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro',
     ]

@@ -38,7 +38,7 @@ services:
       - no-new-privileges:true
 
   bridge-postgres:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     environment:
       POSTGRES_DB: bridge
       POSTGRES_USER: bridge

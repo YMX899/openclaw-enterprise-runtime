@@ -52,6 +52,7 @@ services:
       - openclaw-internal
       - dify-default
   bridge-postgres:
+    image: postgres:15-alpine
     ports: []
     networks:
       - openclaw-internal
@@ -116,6 +117,19 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("video-analysis-worker", result.evidence)
+
+    def test_private_compose_contract_requires_root_available_postgres_image(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "openclaw-video/docker-compose.openclaw-video.yaml",
+                MIN_COMPOSE.replace("image: postgres:15-alpine", "image: postgres:16-alpine"),
+            )
+
+            result = preflight_module.check_private_compose_contract(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("postgres:15-alpine", result.evidence)
 
     def test_preflight_go_when_private_gates_pass(self):
         with TemporaryDirectory() as tmp:

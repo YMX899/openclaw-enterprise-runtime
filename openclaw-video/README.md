@@ -162,6 +162,9 @@ root deployment scope is a private Phase 2 sidecar:
 - no Dify container restart.
 - `openclaw-bridge` bound only to `127.0.0.1:18181`.
 - OpenClaw Gateway, worker and Postgres without host-published ports.
+- `bridge-postgres` uses `postgres:15-alpine` for the private root sidecar,
+  matching the image already present on the production host. The schema only
+  uses PostgreSQL 15-compatible features.
 
 Use the narrower private preflight and bundle builder for that scope:
 

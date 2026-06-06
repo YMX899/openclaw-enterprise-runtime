@@ -90,6 +90,13 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("name: openclaw_video_internal", compose)
         self.assertNotIn("internal: true", compose)
 
+    def test_bridge_postgres_uses_root_available_postgres_15_image(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        postgres_block = compose.split("\n  bridge-postgres:", 1)[1].split("\n  openclaw-gateway:", 1)[0]
+
+        self.assertIn("image: postgres:15-alpine", postgres_block)
+        self.assertNotIn("image: postgres:16-alpine", postgres_block)
+
     def test_dify_network_defaults_to_production_and_can_be_overridden_for_isolated_tests(self):
         compose = COMPOSE.read_text(encoding="utf-8")
 
