@@ -12,6 +12,7 @@ BRIDGE_DOCKERFILE = ROOT / "docker" / "bridge" / "Dockerfile"
 WORKER_DOCKERFILE = ROOT / "docker" / "worker" / "Dockerfile"
 BRIDGE_ENTRYPOINT = ROOT / "docker" / "bridge" / "entrypoint.sh"
 GATEWAY_ENTRYPOINT = ROOT / "docker" / "openclaw-gateway" / "entrypoint.sh"
+GATEWAY_CONFIG = ROOT / "openclaw" / "config" / "config.yaml"
 WORKER_ENTRYPOINT = ROOT / "docker" / "worker" / "entrypoint.sh"
 DOCKERIGNORE = ROOT / ".dockerignore"
 VENDOR_GITIGNORE = ROOT / "vendor" / "douyin_chong" / ".gitignore"
@@ -68,6 +69,22 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
         self.assertNotIn("exec openclaw", entrypoint)
         self.assertNotIn("--token", entrypoint)
+
+    def test_gateway_config_is_private_backend_only(self):
+        config = GATEWAY_CONFIG.read_text(encoding="utf-8")
+
+        self.assertIn('mode: "local"', config)
+        self.assertIn('bind: "lan"', config)
+        self.assertIn("port: 18789", config)
+        self.assertIn('mode: "token"', config)
+        self.assertIn("controlUi:", config)
+        self.assertIn("enabled: false", config)
+        self.assertNotIn("allowedOrigins: [\"*\"]", config)
+        self.assertNotIn("dangerouslyAllowHostHeaderOriginFallback", config)
+        self.assertNotIn("dangerouslyDisableDeviceAuth", config)
+        self.assertNotIn("allowInsecureAuth", config)
+        self.assertNotIn("token:", config)
+        self.assertNotIn("password:", config)
 
     def test_service_entrypoints_stage_secrets_then_drop_privileges(self):
         bridge = BRIDGE_ENTRYPOINT.read_text(encoding="utf-8")

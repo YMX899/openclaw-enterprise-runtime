@@ -72,6 +72,22 @@ networks:
     name: ${DIFY_DOCKER_NETWORK:-docker_default}
 """
 
+MIN_GATEWAY_CONFIG = """
+{
+  gateway: {
+    mode: "local",
+    bind: "lan",
+    port: 18789,
+    auth: {
+      mode: "token",
+    },
+    controlUi: {
+      enabled: false,
+    },
+  },
+}
+"""
+
 
 class RootPrivateSidecarPreflightTests(unittest.TestCase):
     def test_rejects_non_root_target(self):
@@ -84,6 +100,7 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "openclaw-video/docker-compose.openclaw-video.yaml", MIN_COMPOSE)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
 
             result = preflight_module.check_private_compose_contract(repo)
 
@@ -92,6 +109,7 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
     def test_private_compose_contract_rejects_public_gateway_port(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
             write(
                 repo / "openclaw-video/docker-compose.openclaw-video.yaml",
                 MIN_COMPOSE.replace("ports: []", 'ports:\n      - "0.0.0.0:18789:18789"', 1),
@@ -105,6 +123,7 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
     def test_private_compose_contract_rejects_worker_on_dify_network(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
             write(
                 repo / "openclaw-video/docker-compose.openclaw-video.yaml",
                 MIN_COMPOSE.replace(
@@ -121,6 +140,7 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
     def test_private_compose_contract_requires_root_available_postgres_image(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
             write(
                 repo / "openclaw-video/docker-compose.openclaw-video.yaml",
                 MIN_COMPOSE.replace("image: postgres:15-alpine", "image: postgres:16-alpine"),
@@ -131,10 +151,28 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("postgres:15-alpine", result.evidence)
 
+    def test_private_compose_contract_rejects_gateway_control_ui_break_glass(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "openclaw-video/docker-compose.openclaw-video.yaml", MIN_COMPOSE)
+            write(
+                repo / "openclaw-video/openclaw/config/config.yaml",
+                MIN_GATEWAY_CONFIG.replace(
+                    "enabled: false",
+                    'enabled: true,\n      allowedOrigins: ["*"],',
+                ),
+            )
+
+            result = preflight_module.check_private_compose_contract(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("allowedOrigins", result.evidence)
+
     def test_preflight_go_when_private_gates_pass(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "openclaw-video/docker-compose.openclaw-video.yaml", MIN_COMPOSE)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
             write(repo / "openresty-route-map-redacted.md", "no OpenClaw route present\n")
             git_results = {
                 ("status", "--short"): (0, "", ""),
@@ -158,6 +196,7 @@ class RootPrivateSidecarPreflightTests(unittest.TestCase):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "openclaw-video/docker-compose.openclaw-video.yaml", MIN_COMPOSE)
+            write(repo / "openclaw-video/openclaw/config/config.yaml", MIN_GATEWAY_CONFIG)
             write(repo / "openresty-route-map-redacted.md", "no OpenClaw route present\n")
             git_results = {
                 ("status", "--short"): (0, "", ""),

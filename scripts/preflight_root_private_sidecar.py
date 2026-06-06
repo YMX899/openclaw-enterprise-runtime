@@ -90,6 +90,10 @@ def check_private_compose_contract(repo: Path) -> PrivatePreflightCheck:
     if not compose_path.exists():
         return PrivatePreflightCheck("private_compose_contract", "NO_GO", f"missing {compose_path}")
     compose = compose_path.read_text(encoding="utf-8")
+    gateway_config_path = repo / "openclaw-video" / "openclaw" / "config" / "config.yaml"
+    if not gateway_config_path.exists():
+        return PrivatePreflightCheck("private_compose_contract", "NO_GO", f"missing {gateway_config_path}")
+    gateway_config = gateway_config_path.read_text(encoding="utf-8")
 
     forbidden = [
         "0.0.0.0:18181",
@@ -107,6 +111,38 @@ def check_private_compose_contract(repo: Path) -> PrivatePreflightCheck:
             "private_compose_contract",
             "NO_GO",
             "compose exposes forbidden private deployment surfaces: " + ", ".join(found),
+        )
+
+    forbidden_config = [
+        "dangerouslyAllowHostHeaderOriginFallback",
+        "dangerouslyDisableDeviceAuth",
+        "allowInsecureAuth",
+        'allowedOrigins: ["*"]',
+        "token:",
+        "password:",
+    ]
+    found_config = [item for item in forbidden_config if item in gateway_config]
+    if found_config:
+        return PrivatePreflightCheck(
+            "private_compose_contract",
+            "NO_GO",
+            "gateway config contains forbidden private deployment settings: " + ", ".join(found_config),
+        )
+
+    required_config = [
+        'mode: "local"',
+        'bind: "lan"',
+        'port: 18789',
+        'mode: "token"',
+        'controlUi:',
+        'enabled: false',
+    ]
+    missing_config = [item for item in required_config if item not in gateway_config]
+    if missing_config:
+        return PrivatePreflightCheck(
+            "private_compose_contract",
+            "NO_GO",
+            "gateway config missing private deployment markers: " + ", ".join(missing_config),
         )
 
     required = [

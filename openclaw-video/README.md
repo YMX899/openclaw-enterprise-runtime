@@ -165,6 +165,9 @@ root deployment scope is a private Phase 2 sidecar:
 - `bridge-postgres` uses `postgres:15-alpine` for the private root sidecar,
   matching the image already present on the production host. The schema only
   uses PostgreSQL 15-compatible features.
+- OpenClaw Gateway uses the committed `openclaw/config/config.yaml` with
+  `gateway.controlUi.enabled=false`; browsers must only talk to Bridge, never
+  directly to Gateway.
 
 Use the narrower private preflight and bundle builder for that scope:
 
