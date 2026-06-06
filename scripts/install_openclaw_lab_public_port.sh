@@ -158,6 +158,12 @@ redact_config_summary
 docker exec "$OPENRESTY_CONTAINER" openresty -t
 docker exec "$OPENRESTY_CONTAINER" openresty -s reload
 
+if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
+  if ! ufw status | grep -Eq "^${PORT}/tcp[[:space:]]+ALLOW"; then
+    ufw allow "${PORT}/tcp" comment "openclaw-lab-public-port-${PORT}"
+  fi
+fi
+
 lab_ready=0
 for _ in 1 2 3 4 5; do
   if curl -kfsS --resolve "${SERVER_NAME}:${PORT}:127.0.0.1" "https://${SERVER_NAME}:${PORT}/openclaw-lab/" >/dev/null; then

@@ -42,4 +42,16 @@ fi
 docker exec "$OPENRESTY_CONTAINER" openresty -t
 docker exec "$OPENRESTY_CONTAINER" openresty -s reload
 
+if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
+  ufw status numbered | awk -v port="$PORT" '
+    $0 ~ port "/tcp" && $0 ~ "openclaw-lab-public-port-" port {
+      gsub(/[][]/, "", $1)
+      print $1
+    }
+  ' | sort -rn | while read -r rule_number; do
+    [ -n "$rule_number" ] || continue
+    yes | ufw delete "$rule_number"
+  done
+fi
+
 echo "public_port_rollback=PASS"

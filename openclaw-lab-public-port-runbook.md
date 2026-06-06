@@ -42,6 +42,7 @@ extracts TLS certificate directives from the existing ai001.huahuoai.com server
 writes a dedicated conf.d/openclaw-lab-public-18443.conf file
 runs openresty -t
 reloads OpenResty only after syntax passes
+adds an active UFW allow rule for 18443/tcp when UFW is enabled
 checks /openclaw-lab/ returns 200 locally over HTTPS
 checks unauthenticated /openclaw-api/me returns 401 locally over HTTPS
 ```
@@ -59,6 +60,7 @@ backs up the managed OpenClaw public-port config
 removes only conf.d/openclaw-lab-public-18443.conf
 runs openresty -t
 reloads OpenResty
+removes the managed UFW allow rule for 18443/tcp when present
 does not stop or restart Dify
 does not change Dify compose
 ```
@@ -79,6 +81,7 @@ Server checks:
 
 ```text
 ss -ltnp shows 0.0.0.0:18443 under OpenResty
+ufw status shows 18443/tcp ALLOW with the openclaw-lab-public-port-18443 comment
 ss -ltnp does not show host listeners for 18789 or 5432
 docker compose -p openclaw-video ps remains healthy/up
 docker ps shows docker-api-1, docker-web-1, docker-nginx-1 unchanged
@@ -111,6 +114,7 @@ git commit
 git tag
 config file path
 config sha256
+UFW rule status
 OpenResty syntax-check result
 reload time
 public status codes

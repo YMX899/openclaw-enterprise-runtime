@@ -23,6 +23,7 @@ class PublicPortScriptTests(unittest.TestCase):
         self.assertIn('openresty -s reload', text)
         self.assertIn('lab_ready=0', text)
         self.assertIn('for _ in 1 2 3 4 5', text)
+        self.assertIn('ufw allow "${PORT}/tcp" comment "openclaw-lab-public-port-${PORT}"', text)
         self.assertIn('local_https_me=401', text)
 
     def test_install_script_does_not_publish_gateway_postgres_or_touch_dify(self):
@@ -42,6 +43,7 @@ class PublicPortScriptTests(unittest.TestCase):
         self.assertIn('rm -f "$TARGET_CONF"', text)
         self.assertIn('openresty -t', text)
         self.assertIn('openresty -s reload', text)
+        self.assertIn('ufw delete "$rule_number"', text)
         self.assertNotIn("docker compose -p docker", text)
 
     def test_runbook_records_public_port_gate_and_dify_baseline(self):
@@ -50,6 +52,7 @@ class PublicPortScriptTests(unittest.TestCase):
         self.assertIn("https://ai001.huahuoai.com:18443/openclaw-lab/", text)
         self.assertIn("https://ai001.huahuoai.com:18443/openclaw-api/", text)
         self.assertIn("https://ai001.huahuoai.com/signin -> 200", text)
+        self.assertIn("18443/tcp ALLOW", text)
         self.assertIn("rollback", text.lower())
         self.assertIn("does not change Dify compose", text)
 
