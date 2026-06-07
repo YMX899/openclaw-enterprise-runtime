@@ -1,0 +1,30 @@
+{
+  "schema": "openclaw-chrome-readonly-review.v1",
+  "captured_at": "2026-06-07T10:04:00Z",
+  "status": "PASS",
+  "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "browser_surface": "chrome_extension_readonly",
+  "checks": {
+    "title": "OpenClaw Lab",
+    "h1": "OpenClaw Lab",
+    "openclaw_owned_login_copy_present": true,
+    "openclaw_login_form_present": true,
+    "dify_web_separate_login_not_required_copy_present": true,
+    "read_link_entry_present": true,
+    "page_level_horizontal_overflow": false,
+    "run_state": "Create session",
+    "auth_status": "Authenticated"
+  },
+  "notes": [
+    "The Chrome review was read-only and did not inspect cookies, local storage, browser profiles, passwords, headers, or request bodies.",
+    "The Diagnostics panel was not expanded during this read-only review, so Post-Login Acceptance text was not visible in the collapsed DOM snapshot; root acceptance evidence already verifies that flow."
+  ],
+  "sanitization": {
+    "account_recorded": false,
+    "password_recorded": false,
+    "cookies_recorded": false,
+    "local_storage_recorded": false,
+    "headers_recorded": false,
+    "tokens_recorded": false
+  }
+}

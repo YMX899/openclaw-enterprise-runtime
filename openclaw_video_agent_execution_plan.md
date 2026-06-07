@@ -137,6 +137,7 @@ artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260
 artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json
 artifacts/evidence/phase4/openclaw-ui-productized-root-desktop-20260607.png
 artifacts/evidence/phase4/openclaw-ui-productized-root-mobile-20260607.png
+artifacts/evidence/phase4/openclaw-chrome-readonly-review-20260607.json
 ```
 
 Current real video analysis root evidence:
@@ -144,6 +145,11 @@ Current real video analysis root evidence:
 ```text
 artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json
 ```
+
+This evidence proves a previous root real-model run, but its recorded release is
+`/app/bin/openclaw-video/releases/f1ba8273e7b6`. It must be refreshed on the
+currently deployed root release before the whole execution plan can be marked
+complete.
 
 Current engineering baseline:
 
@@ -153,14 +159,32 @@ openclaw-video/README.md
 phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md
 ```
 
+## Current Status
+
+Completed on 2026-06-07:
+
+- Productized OpenClaw UI implementation, root deployment, desktop/mobile
+  evidence and post-login acceptance are complete for root release
+  `/app/bin/openclaw-video/releases/c9aaaa8c6655`.
+- The OpenClaw-owned login gate is active; the retired Dify Web login baseline
+  and `REAL_SAMPLE_EVIDENCE.json` promotion path have been removed from current
+  audits.
+- A Chrome read-only review confirms the current browser-facing page shows
+  OpenClaw-owned login copy, Dify Web login independence, the Read Link entry
+  and no page-level horizontal overflow.
+- The newest engineering commit `e24b2594be5679ef4624f08d0da1424ee2326800`
+  changes only evidence, tests, audit helpers and retired-file cleanup relative
+  to deployed release `c9aaaa8c6655`; it does not require a root Bridge restart
+  by itself.
+
 ## Remaining Work
 
-1. Keep the productized UI aligned with the visual-review requirements.
-2. Deploy the latest UI revision to root after code/design review.
-3. Capture fresh root UI acceptance evidence for the latest release.
-4. Re-run real video analysis on the latest deployed release after the user
+1. Keep the productized UI aligned with the visual-review requirements during
+   future feature changes.
+2. Re-run real video analysis on the latest deployed release after the user
    provides a test video link or explicitly confirms which link to reuse.
-5. Commit, tag, push, and record sanitized final evidence.
+3. Commit, tag, push, and record sanitized final evidence after the real-video
+   analysis evidence has been refreshed.
 
 ## Deletion Policy For Old Files
 
