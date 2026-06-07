@@ -118,7 +118,8 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
         self.assertEqual(statuses["chrome_post_login_runner"], "PASS")
         self.assertEqual(statuses["public_smoke_latest"], "PASS")
         self.assertEqual(statuses["authenticated_browser_gate"], "PASS")
-        self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
+        self.assertEqual(statuses["video_link_read_mode"], "PASS")
+        self.assertIn(statuses["git_clean"], {"PASS", "NO_GO"})
 
     def test_all_phase4_current_state_markers_can_pass(self):
         with TemporaryDirectory() as tmp:
@@ -136,9 +137,22 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
                 json.dumps(STANDALONE_LOGIN_PASS),
             )
             write(
-                repo / "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json",
-                json.dumps({"schema_version": "douyin-real-sample-evidence.v1", "status": "succeeded"}),
+                repo / "artifacts/douyin_chong/LINK_READ_DECISION.md",
+                """
+link_read_mode: ADOPTED
+REAL_SAMPLE_EVIDENCE.json: NOT_REQUIRED
+douyin_account_login: NOT_REQUIRED
+browser_storage_state: NOT_REQUIRED
+runtime_path: url_guard -> worker_service -> douyin_legacy_adapter -> UniversalVideoResolver
+allowlisted_douyin_hosts: PASS
+redirect_revalidation: PASS
+private_ip_blocking: PASS
+no_browser_login_state: PASS
+""",
             )
+            source_root = REPO_ROOT / "openclaw-video" / "src" / "openclaw_video"
+            for name in ("url_guard.py", "worker_service.py", "douyin_legacy_adapter.py"):
+                write(repo / "openclaw-video/src/openclaw_video" / name, (source_root / name).read_text(encoding="utf-8"))
             smoke = repo / "summary.json"
             smoke.write_text(json.dumps(SMOKE_PASS), encoding="utf-8")
 

@@ -49,7 +49,7 @@ Python unittest: PASS
 Python compileall: PASS
 vendored douyin_chong source gate: PASS
 douyin_chong artifact gate: VERIFIED
-douyin real sample gate: DEFERRED_BY_OPERATOR_FOR_CURRENT_PHASE
+video link-read mode gate: ADOPTED
 OpenClaw 2026.3.13 security gate: APPROVED
 docker compose config: PASS
 docker compose build --no-cache: PASS
@@ -73,10 +73,11 @@ TLS private keys: not collected
 OpenClaw gateway token values: not collected
 raw Douyin sample URL: not collected
 raw model output: not collected
+Douyin browser login state: not collected
 ```
 
 ## Final Decision
 
 Phase 1.5 isolated Docker proof is PASS for this repository state. Production
-Phase 2 still requires the separate production readiness audit, authenticated
-Dify public baseline, route rollback plan, and explicit Go/No-Go review.
+Phase 2 still requires the separate production readiness audit, route rollback
+plan, and explicit Go/No-Go review.

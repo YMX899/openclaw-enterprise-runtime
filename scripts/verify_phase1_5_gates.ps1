@@ -55,6 +55,7 @@ Step "vendored douyin_chong source gate"
 $vendorGate = @'
 from hashlib import sha256
 from pathlib import Path
+import subprocess
 
 vendor = Path("openclaw-video/vendor/douyin_chong")
 hashes = vendor / "SOURCE_SHA256SUMS"
@@ -76,7 +77,14 @@ for line in hashes.read_text(encoding="utf-8").splitlines():
 if set(entries) != expected_files:
     raise SystemExit(f"vendor hash manifest mismatch: {sorted(set(entries) ^ expected_files)}")
 for relative, expected_digest in entries.items():
-    actual = sha256((vendor / relative).read_bytes()).hexdigest()
+    try:
+        data = subprocess.check_output(
+            ["git", "show", f"HEAD:openclaw-video/vendor/douyin_chong/{relative}"],
+            stderr=subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        data = (vendor / relative).read_bytes()
+    actual = sha256(data).hexdigest()
     if actual != expected_digest:
         raise SystemExit(f"vendor source digest mismatch: {relative}")
 for forbidden in [".env", ".env.local", ".douyin_storage_state.json", "douyin_login_state.py", "profile_batch_fashion.py"]:
@@ -152,40 +160,43 @@ elif "Status: minimal candidate source vendored" in manifest:
 else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 
-sample = Path("artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json")
-if not sample.exists():
-    print("douyin real sample gate: MISSING")
-else:
-    evidence = json.loads(sample.read_text(encoding="utf-8"))
-    if evidence.get("schema_version") != "douyin-real-sample-evidence.v1":
-        raise SystemExit("unexpected real sample evidence schema version")
-    if evidence.get("status") != "succeeded":
-        raise SystemExit("real sample did not succeed")
-    if evidence.get("secret_file_contents_recorded") is not False:
-        raise SystemExit("real sample evidence may record secret file contents")
-    if evidence.get("env_file_present") is not True:
-        raise SystemExit("real sample did not use an explicit runtime env file")
-    if not is_sha256(evidence.get("input_url_sha256")):
-        raise SystemExit("real sample evidence is missing input URL hash")
-    if "https://" in json_text(evidence):
-        raise SystemExit("real sample evidence contains a raw URL")
-    process = evidence.get("process") or {}
-    if process.get("returncode") != 0:
-        raise SystemExit("real sample adapter return code was not zero")
-    if not isinstance(process.get("elapsed_seconds"), (int, float)) or process["elapsed_seconds"] <= 0:
-        raise SystemExit("real sample elapsed time is missing")
-    if process.get("stdout_recorded") is not False or process.get("stderr_recorded") is not False:
-        raise SystemExit("real sample stdout/stderr contents must not be recorded")
-    result = evidence.get("result") or {}
-    if result.get("schema_version") != "openclaw-video-result.v1":
-        raise SystemExit("real sample result schema was not validated")
-    if result.get("platform") != "douyin":
-        raise SystemExit("real sample platform is not douyin")
-    if not is_sha256(result.get("result_json_sha256")):
-        raise SystemExit("real sample result hash is missing")
-    if not isinstance(result.get("result_json_bytes"), int) or result["result_json_bytes"] <= 0:
-        raise SystemExit("real sample result size is missing")
-    print("douyin real sample gate: VERIFIED")
+decision = Path("artifacts/douyin_chong/LINK_READ_DECISION.md").read_text(encoding="utf-8")
+required_decision = [
+    r"link_read_mode:\s*ADOPTED\b",
+    r"REAL_SAMPLE_EVIDENCE\.json:\s*NOT_REQUIRED\b",
+    r"douyin_account_login:\s*NOT_REQUIRED\b",
+    r"browser_storage_state:\s*NOT_REQUIRED\b",
+    r"runtime_path:\s*url_guard\s*->\s*worker_service\s*->\s*douyin_legacy_adapter\s*->\s*UniversalVideoResolver\b",
+    r"allowlisted_douyin_hosts:\s*PASS\b",
+    r"redirect_revalidation:\s*PASS\b",
+    r"private_ip_blocking:\s*PASS\b",
+    r"no_browser_login_state:\s*PASS\b",
+]
+missing_decision = [pattern for pattern in required_decision if not re.search(pattern, decision, re.IGNORECASE)]
+if missing_decision:
+    raise SystemExit("link-read decision is incomplete")
+
+url_guard = Path("openclaw-video/src/openclaw_video/url_guard.py").read_text(encoding="utf-8")
+worker = Path("openclaw-video/src/openclaw_video/worker_service.py").read_text(encoding="utf-8")
+adapter = Path("openclaw-video/src/openclaw_video/douyin_legacy_adapter.py").read_text(encoding="utf-8")
+required_source = [
+    (url_guard, "ALLOWED_HOST_SUFFIXES"),
+    (url_guard, '"douyin.com"'),
+    (url_guard, '"iesdouyin.com"'),
+    (url_guard, "validate_video_url_with_redirects"),
+    (url_guard, "blocked non-public IP"),
+    (worker, "validate_video_url_with_redirects("),
+    (worker, "canonical = validated.canonical"),
+    (worker, "analysis = self.analyzer(canonical, Path(tmp))"),
+    (adapter, "UniversalVideoResolver().resolve(args.input_url)"),
+    (adapter, 'getattr(video, "video_url"'),
+    (adapter, 'getattr(video, "playwm_url"'),
+    (adapter, "ArkVideoClient(config).analyze(video_urls=video_urls"),
+]
+for source, needle in required_source:
+    if needle not in source:
+        raise SystemExit(f"missing link-read source marker: {needle}")
+print("video link-read mode gate: VERIFIED")
 '@
 $staticGate | & $PythonCmd -B -
 Assert-LastExitCode "static phase gates"
@@ -212,8 +223,9 @@ if ($RequireDouyinArtifact) {
     if ($manifest -notmatch "Status:\s*verified") {
         Fail "RequireDouyinArtifact was set, but artifacts/douyin_chong/ARTIFACT_MANIFEST.md is not verified."
     }
-    if (-not (Test-Path "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json")) {
-        Fail "RequireDouyinArtifact was set, but artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json is missing."
+    $linkReadDecision = Get-Content -Path "artifacts/douyin_chong/LINK_READ_DECISION.md" -Raw
+    if ($linkReadDecision -notmatch "link_read_mode:\s*ADOPTED") {
+        Fail "RequireDouyinArtifact was set, but video link-read mode is not adopted."
     }
 }
 

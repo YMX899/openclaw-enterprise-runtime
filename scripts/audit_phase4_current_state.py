@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict, dataclass
+import importlib.util
 import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 from typing import Any
 
 
@@ -14,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PHASE4_EVIDENCE = REPO_ROOT / "phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md"
 RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
 REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
+PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
 STANDALONE_LOGIN_EVIDENCE = (
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json"
 )
@@ -28,6 +31,15 @@ class GateResult:
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _load_production_audit():
+    spec = importlib.util.spec_from_file_location("audit_production_readiness", PRODUCTION_AUDIT)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _git(repo: Path, args: list[str]) -> tuple[int, str, str]:
@@ -212,13 +224,18 @@ def check_real_douyin_sample(repo: Path) -> GateResult:
     return GateResult("douyin_real_sample", "PASS", "real douyin sample evidence is present")
 
 
+def check_video_link_read_mode(repo: Path) -> GateResult:
+    gate = _load_production_audit().check_video_link_read_mode(repo)
+    return GateResult(gate.gate_id, gate.status, gate.evidence)
+
+
 def audit(repo: Path, *, smoke_summary: Path | None = None, include_git_clean: bool = False) -> dict[str, Any]:
     gates = [
         check_phase4_deployment_evidence(repo),
         check_chrome_runner_ready(repo),
         check_public_smoke_summary(smoke_summary),
         check_authenticated_browser_gate(repo),
-        check_real_douyin_sample(repo),
+        check_video_link_read_mode(repo),
     ]
     if include_git_clean:
         gates.append(check_git_clean(repo))

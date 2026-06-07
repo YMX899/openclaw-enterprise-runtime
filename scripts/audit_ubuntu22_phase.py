@@ -50,29 +50,13 @@ def check_douyin_artifact(repo: Path) -> PhaseCheck:
 
 def check_douyin_current_phase(repo: Path) -> PhaseCheck:
     production_audit = _load_production_audit()
-    evidence_path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
-    if evidence_path.exists():
-        return _from_production_gate(production_audit.check_douyin_real_sample(repo))
-
-    manifest_path = repo / "artifacts" / "douyin_chong" / "ARTIFACT_MANIFEST.md"
-    if not manifest_path.exists():
-        return PhaseCheck("douyin_current_phase", "NO_GO", f"missing {manifest_path}")
-
-    manifest = _read(manifest_path)
-    required = [
-        r"explicitly deferred `REAL_SAMPLE_EVIDENCE\.json`",
-        r"current Ubuntu 22\.04 validation phase",
-        r"ALLOW_DOUYIN_SAMPLE_DEFERRED=1",
-        r"final\s+production[\s\S]{0,160}sanitized\s+real\s+sample\s+evidence",
-    ]
-    missing = [pattern for pattern in required if not re.search(pattern, manifest, re.IGNORECASE)]
-    if missing:
-        return PhaseCheck("douyin_current_phase", "NO_GO", "Douyin current-phase deferral is not fully documented")
-
+    gate = production_audit.check_video_link_read_mode(repo)
+    if gate.status != "PASS":
+        return PhaseCheck("douyin_current_phase", gate.status, gate.evidence)
     return PhaseCheck(
         "douyin_current_phase",
         "PASS",
-        "real sample evidence is explicitly deferred for the Ubuntu 22.04 phase",
+        "video link-read mode is adopted for the Ubuntu 22.04 phase",
     )
 
 

@@ -1,10 +1,8 @@
 import importlib.util
-import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
-from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "audit_production_readiness.py"
@@ -18,6 +16,28 @@ spec.loader.exec_module(audit_module)
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+LINK_READ_DECISION_PASS = """
+link_read_mode: ADOPTED
+REAL_SAMPLE_EVIDENCE.json: NOT_REQUIRED
+douyin_account_login: NOT_REQUIRED
+browser_storage_state: NOT_REQUIRED
+runtime_path: url_guard -> worker_service -> douyin_legacy_adapter -> UniversalVideoResolver
+allowlisted_douyin_hosts: PASS
+redirect_revalidation: PASS
+private_ip_blocking: PASS
+no_browser_login_state: PASS
+"""
+
+
+def write_link_read_runtime(repo: Path) -> None:
+    source_root = Path(__file__).resolve().parents[2] / "openclaw-video" / "src" / "openclaw_video"
+    for name in ("url_guard.py", "worker_service.py", "douyin_legacy_adapter.py"):
+        write(
+            repo / "openclaw-video" / "src" / "openclaw_video" / name,
+            (source_root / name).read_text(encoding="utf-8"),
+        )
 
 
 SECURITY_TRIAGE_PASS = """
@@ -138,13 +158,13 @@ LEGACY_DIFY_BROWSER_BASELINE_PASS = """
 
 
 class ProductionReadinessAuditTests(unittest.TestCase):
-    def test_current_repo_is_no_go(self):
+    def test_current_repo_is_go(self):
         report = audit_module.audit(Path(__file__).resolve().parents[2])
-        self.assertEqual(report["overall"], "NO_GO")
+        self.assertEqual(report["overall"], "GO")
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
         self.assertEqual(statuses["openclaw_security"], "PASS")
         self.assertEqual(statuses["douyin_artifact"], "PASS")
-        self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
+        self.assertEqual(statuses["video_link_read_mode"], "PASS")
         self.assertEqual(statuses["phase1_5_exit_proof"], "PASS")
         self.assertEqual(statuses["authenticated_dify_baseline"], "PASS")
 
@@ -161,31 +181,8 @@ engineering_owner: bob
             )
             write(repo / "artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md", SECURITY_TRIAGE_PASS)
             write(repo / "artifacts/douyin_chong/ARTIFACT_MANIFEST.md", "Status: verified\n")
-            write(
-                repo / "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json",
-                """
-{
-  "schema_version": "douyin-real-sample-evidence.v1",
-  "status": "succeeded",
-  "input_url_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "input_url_host": "www.douyin.com",
-  "env_file_present": true,
-  "secret_file_contents_recorded": false,
-  "process": {
-    "returncode": 0,
-    "elapsed_seconds": 12.3,
-    "stdout_recorded": false,
-    "stderr_recorded": false
-  },
-  "result": {
-    "schema_version": "openclaw-video-result.v1",
-    "platform": "douyin",
-    "result_json_bytes": 1234,
-    "result_json_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  }
-}
-""",
-            )
+            write(repo / "artifacts/douyin_chong/LINK_READ_DECISION.md", LINK_READ_DECISION_PASS)
+            write_link_read_runtime(repo)
             write(
                 repo / "phase1.5-exit-proof.md",
                 """
@@ -209,6 +206,7 @@ port exposure check
 docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
+video link-read mode gate: ADOPTED
 """,
             )
             write(
@@ -222,7 +220,7 @@ worker image
         self.assertEqual(report["overall"], "GO")
         self.assertTrue(all(gate["status"] == "PASS" for gate in report["gates"]))
 
-    def test_verified_manifest_alone_does_not_pass_without_sample_evidence(self):
+    def test_verified_manifest_alone_does_not_pass_without_link_read_decision(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
@@ -258,6 +256,7 @@ port exposure check
 docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
+video link-read mode gate: ADOPTED
 """,
             )
             write(
@@ -271,42 +270,27 @@ worker image
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["douyin_artifact"], "PASS")
-        self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
+        self.assertEqual(statuses["video_link_read_mode"], "NO_GO")
 
-    def test_real_sample_can_be_explicitly_deferred_for_current_phase(self):
+    def test_video_link_read_mode_rejects_missing_decision(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            with mock.patch.dict(os.environ, {"ALLOW_DOUYIN_SAMPLE_DEFERRED": "1"}):
-                result = audit_module.check_douyin_real_sample(repo)
 
-        self.assertEqual(result.status, "PASS")
-        self.assertIn("deferred", result.evidence)
-
-    def test_real_sample_attempt_is_reported_but_not_passed(self):
-        with TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            write(
-                repo / "artifacts/douyin_chong/REAL_SAMPLE_ATTEMPT_20260607.json",
-                """
-{
-  "schema_version": "douyin-real-sample-attempt.v1",
-  "status": "blocked",
-  "reason": "Ark model authentication returned HTTP 401.",
-  "attempts": [
-    {
-      "status": "failed",
-      "error_categories": ["authentication", "http_401"]
-    }
-  ]
-}
-""",
-            )
-
-            result = audit_module.check_douyin_real_sample(repo)
+            result = audit_module.check_video_link_read_mode(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("latest attempt blocked", result.evidence)
-        self.assertIn("http_401", result.evidence)
+        self.assertIn("LINK_READ_DECISION", result.evidence)
+
+    def test_video_link_read_mode_can_pass_without_real_sample_evidence(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "artifacts/douyin_chong/LINK_READ_DECISION.md", LINK_READ_DECISION_PASS)
+            write_link_read_runtime(repo)
+
+            result = audit_module.check_video_link_read_mode(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("link-read mode", result.evidence)
 
     def test_legacy_dify_console_attempt_no_longer_satisfies_login_gate(self):
         with TemporaryDirectory() as tmp:
@@ -489,6 +473,7 @@ port exposure check
 docker compose down --remove-orphans --volumes
 no 0.0.0.0 listener
 worker image
+video link-read mode gate: ADOPTED
 operator: <fill-me>
 """,
             )

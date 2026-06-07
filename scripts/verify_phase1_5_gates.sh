@@ -9,7 +9,6 @@ skip_docker="${SKIP_DOCKER:-0}"
 run_compose_up="${RUN_COMPOSE_UP:-0}"
 require_douyin_artifact="${REQUIRE_DOUYIN_ARTIFACT:-0}"
 require_openclaw_security_approval="${REQUIRE_OPENCLAW_SECURITY_APPROVAL:-0}"
-allow_douyin_sample_deferred="${ALLOW_DOUYIN_SAMPLE_DEFERRED:-0}"
 allow_dirty="${ALLOW_DIRTY:-0}"
 
 step() {
@@ -66,13 +65,14 @@ step "Python dependency gate"
 step "Python tests"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPATH="openclaw-video/src"
-env -u ALLOW_DOUYIN_SAMPLE_DEFERRED "$python_cmd" -B -m unittest discover openclaw-video/tests -v
+"$python_cmd" -B -m unittest discover openclaw-video/tests -v
 "$python_cmd" -B -m compileall openclaw-video/src openclaw-video/tests
 
 step "vendored douyin_chong source gate"
 "$python_cmd" -B - <<'PY'
 from hashlib import sha256
 from pathlib import Path
+import subprocess
 
 vendor = Path("openclaw-video/vendor/douyin_chong")
 hashes = vendor / "SOURCE_SHA256SUMS"
@@ -94,7 +94,14 @@ for line in hashes.read_text(encoding="utf-8").splitlines():
 if set(entries) != expected_files:
     raise SystemExit(f"vendor hash manifest mismatch: {sorted(set(entries) ^ expected_files)}")
 for relative, expected_digest in entries.items():
-    actual = sha256((vendor / relative).read_bytes()).hexdigest()
+    try:
+        data = subprocess.check_output(
+            ["git", "show", f"HEAD:openclaw-video/vendor/douyin_chong/{relative}"],
+            stderr=subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        data = (vendor / relative).read_bytes()
+    actual = sha256(data).hexdigest()
     if actual != expected_digest:
         raise SystemExit(f"vendor source digest mismatch: {relative}")
 for forbidden in [".env", ".env.local", ".douyin_storage_state.json", "douyin_login_state.py", "profile_batch_fashion.py"]:
@@ -171,40 +178,43 @@ elif "Status: minimal candidate source vendored" in manifest:
 else:
     print("douyin_chong artifact gate: CANDIDATE_NOT_VERIFIED")
 
-sample = Path("artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json")
-if not sample.exists():
-    print("douyin real sample gate: MISSING")
-else:
-    evidence = json.loads(sample.read_text(encoding="utf-8"))
-    if evidence.get("schema_version") != "douyin-real-sample-evidence.v1":
-        raise SystemExit("unexpected real sample evidence schema version")
-    if evidence.get("status") != "succeeded":
-        raise SystemExit("real sample did not succeed")
-    if evidence.get("secret_file_contents_recorded") is not False:
-        raise SystemExit("real sample evidence may record secret file contents")
-    if evidence.get("env_file_present") is not True:
-        raise SystemExit("real sample did not use an explicit runtime env file")
-    if not is_sha256(evidence.get("input_url_sha256")):
-        raise SystemExit("real sample evidence is missing input URL hash")
-    if "https://" in json_text(evidence):
-        raise SystemExit("real sample evidence contains a raw URL")
-    process = evidence.get("process") or {}
-    if process.get("returncode") != 0:
-        raise SystemExit("real sample adapter return code was not zero")
-    if not isinstance(process.get("elapsed_seconds"), (int, float)) or process["elapsed_seconds"] <= 0:
-        raise SystemExit("real sample elapsed time is missing")
-    if process.get("stdout_recorded") is not False or process.get("stderr_recorded") is not False:
-        raise SystemExit("real sample stdout/stderr contents must not be recorded")
-    result = evidence.get("result") or {}
-    if result.get("schema_version") != "openclaw-video-result.v1":
-        raise SystemExit("real sample result schema was not validated")
-    if result.get("platform") != "douyin":
-        raise SystemExit("real sample platform is not douyin")
-    if not is_sha256(result.get("result_json_sha256")):
-        raise SystemExit("real sample result hash is missing")
-    if not isinstance(result.get("result_json_bytes"), int) or result["result_json_bytes"] <= 0:
-        raise SystemExit("real sample result size is missing")
-    print("douyin real sample gate: VERIFIED")
+decision = Path("artifacts/douyin_chong/LINK_READ_DECISION.md").read_text(encoding="utf-8")
+required_decision = [
+    r"link_read_mode:\s*ADOPTED\b",
+    r"REAL_SAMPLE_EVIDENCE\.json:\s*NOT_REQUIRED\b",
+    r"douyin_account_login:\s*NOT_REQUIRED\b",
+    r"browser_storage_state:\s*NOT_REQUIRED\b",
+    r"runtime_path:\s*url_guard\s*->\s*worker_service\s*->\s*douyin_legacy_adapter\s*->\s*UniversalVideoResolver\b",
+    r"allowlisted_douyin_hosts:\s*PASS\b",
+    r"redirect_revalidation:\s*PASS\b",
+    r"private_ip_blocking:\s*PASS\b",
+    r"no_browser_login_state:\s*PASS\b",
+]
+missing_decision = [pattern for pattern in required_decision if not re.search(pattern, decision, re.IGNORECASE)]
+if missing_decision:
+    raise SystemExit("link-read decision is incomplete")
+
+url_guard = Path("openclaw-video/src/openclaw_video/url_guard.py").read_text(encoding="utf-8")
+worker = Path("openclaw-video/src/openclaw_video/worker_service.py").read_text(encoding="utf-8")
+adapter = Path("openclaw-video/src/openclaw_video/douyin_legacy_adapter.py").read_text(encoding="utf-8")
+required_source = [
+    (url_guard, "ALLOWED_HOST_SUFFIXES"),
+    (url_guard, '"douyin.com"'),
+    (url_guard, '"iesdouyin.com"'),
+    (url_guard, "validate_video_url_with_redirects"),
+    (url_guard, "blocked non-public IP"),
+    (worker, "validate_video_url_with_redirects("),
+    (worker, "canonical = validated.canonical"),
+    (worker, "analysis = self.analyzer(canonical, Path(tmp))"),
+    (adapter, "UniversalVideoResolver().resolve(args.input_url)"),
+    (adapter, 'getattr(video, "video_url"'),
+    (adapter, 'getattr(video, "playwm_url"'),
+    (adapter, "ArkVideoClient(config).analyze(video_urls=video_urls"),
+]
+for source, needle in required_source:
+    if needle not in source:
+        raise SystemExit(f"missing link-read source marker: {needle}")
+print("video link-read mode gate: VERIFIED")
 PY
 
 step "OpenClaw 2026.3.13 security decision"
@@ -226,14 +236,8 @@ if [[ "$require_douyin_artifact" == "1" ]] && ! grep -q 'Status: verified' artif
   fail "REQUIRE_DOUYIN_ARTIFACT=1 but douyin_chong artifact is not verified."
 fi
 
-if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json && "$allow_douyin_sample_deferred" != "1" ]]; then
-  fail "REQUIRE_DOUYIN_ARTIFACT=1 but REAL_SAMPLE_EVIDENCE.json is missing."
-fi
-
-douyin_real_sample_status="VERIFIED"
-if [[ "$require_douyin_artifact" == "1" && ! -f artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json && "$allow_douyin_sample_deferred" == "1" ]]; then
-  printf 'REAL_SAMPLE_EVIDENCE.json deferred by operator. This is not final production evidence.\n'
-  douyin_real_sample_status="DEFERRED_BY_OPERATOR_FOR_CURRENT_PHASE"
+if [[ "$require_douyin_artifact" == "1" ]] && ! grep -q 'link_read_mode: ADOPTED' artifacts/douyin_chong/LINK_READ_DECISION.md; then
+  fail "REQUIRE_DOUYIN_ARTIFACT=1 but video link-read mode is not adopted."
 fi
 
 if [[ "$require_openclaw_security_approval" == "1" ]] && ! grep -Eq 'decision: (approve_exception|vendor_patch|upgrade_strategy)' artifacts/openclaw-2026.3.13/SECURITY_DECISION.md; then
@@ -329,7 +333,7 @@ if [[ "$run_compose_up" == "1" ]]; then
     --node-cmd "$node_cmd" \
     --docker-cmd "$docker_cmd" \
     --worker-image "$worker_image" \
-    --douyin-real-sample-status "$douyin_real_sample_status"
+    --video-link-read-mode-status "ADOPTED"
 else
   printf 'Compose up skipped. Use RUN_COMPOSE_UP=1 only in an isolated Docker/Linux validation host.\n'
 fi

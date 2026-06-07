@@ -15,6 +15,10 @@ with older preflight code, but it is now satisfied by the OpenClaw standalone
 login browser evidence. The legacy ai001 console login is no longer a blocking
 requirement for this project.
 
+Scheme clarification on 2026-06-07: the Douyin path now uses video link-read
+mode. Douyin account login, browser storage state, and
+`REAL_SAMPLE_EVIDENCE.json` are no longer production readiness blockers.
+
 No cookies, Authorization headers, CSRF values, browser storage, password
 values, private key contents, model API key contents, `.env` contents, database
 connection strings, Redis passwords or full request headers were read or
@@ -29,9 +33,9 @@ recorded for this inventory.
 - OpenClaw version under test: `2026.3.13`.
 - OpenClaw security triage: allowed by operator-approved exception.
 - `douyin_chong` artifact manifest: verified.
-- `REAL_SAMPLE_EVIDENCE.json`: explicitly deferred for the current Ubuntu 22.04
-  phase by operator instruction. Final production can still require it by
-  running without `ALLOW_DOUYIN_SAMPLE_DEFERRED=1`.
+- Video link-read mode: adopted.
+- `REAL_SAMPLE_EVIDENCE.json`: optional diagnostic evidence, not required for
+  the adopted link-read production scheme.
 - Ubuntu 22.04 `openclaw_bridge_device_key.pem`: present, mode `600`, contents
   not read.
 - Ubuntu 22.04 `douyin_chong.env`: present, mode `600`, contents not read.
@@ -43,10 +47,12 @@ recorded for this inventory.
 
 ## Blocking Item
 
-The remaining hard blocker is:
+No hard blocker remains from Dify web login or Douyin sample evidence after the
+2026-06-07 scope and scheme clarifications. The current production readiness
+audit should be used for the live gate state.
 
 ```text
-douyin_real_sample
+remaining production readiness gate: none expected from login/sample scope
 ```
 
 Current evidence:
@@ -56,12 +62,13 @@ OpenClaw standalone login evidence: PASS
 Huahuo/OpenClaw post-login browser acceptance: PASS
 REAL_SAMPLE_EVIDENCE.json: missing
 latest real sample attempt: Ark model authentication returned HTTP 401
-remaining production readiness gate: douyin_real_sample
+video link-read mode: ADOPTED
+remaining production readiness gate from this document: NONE
 ```
 
-This means the system still needs one sanitized, model-backed, real Douyin
-sample evidence file before full production GO. The OpenClaw browser login
-scope is no longer blocking.
+This means `REAL_SAMPLE_EVIDENCE.json` is retained only as optional diagnostic
+history. The OpenClaw browser login scope and the Douyin sample-evidence scope
+are no longer blocking.
 
 ## Retired Legacy Browser Baseline
 

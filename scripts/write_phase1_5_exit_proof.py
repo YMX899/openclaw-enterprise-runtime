@@ -60,7 +60,7 @@ class ProofContext:
     node_cmd: str
     docker_cmd: str
     worker_image: str
-    douyin_real_sample_status: str
+    video_link_read_mode_status: str
 
 
 def _run(command: Sequence[str], *, cwd: Path) -> str:
@@ -153,7 +153,7 @@ def collect_context(args: argparse.Namespace) -> ProofContext:
         node_cmd=_clean_line(args.node_cmd, "node_cmd"),
         docker_cmd=_clean_line(args.docker_cmd, "docker_cmd"),
         worker_image=_clean_line(args.worker_image, "worker_image"),
-        douyin_real_sample_status=_clean_line(args.douyin_real_sample_status, "douyin_real_sample_status"),
+        video_link_read_mode_status=_clean_line(args.video_link_read_mode_status, "video_link_read_mode_status"),
     )
 
 
@@ -212,7 +212,7 @@ Python unittest: PASS
 Python compileall: PASS
 vendored douyin_chong source gate: PASS
 douyin_chong artifact gate: VERIFIED
-douyin real sample gate: {context.douyin_real_sample_status}
+video link-read mode gate: {context.video_link_read_mode_status}
 OpenClaw 2026.3.13 security gate: APPROVED
 docker compose config: PASS
 docker compose build --no-cache: PASS
@@ -236,13 +236,14 @@ TLS private keys: not collected
 OpenClaw gateway token values: not collected
 raw Douyin sample URL: not collected
 raw model output: not collected
+Douyin browser login state: not collected
 ```
 
 ## Final Decision
 
 Phase 1.5 isolated Docker proof is PASS for this repository state. Production
-Phase 2 still requires the separate production readiness audit, authenticated
-Dify public baseline, route rollback plan, and explicit Go/No-Go review.
+Phase 2 still requires the separate production readiness audit, route rollback
+plan, and explicit Go/No-Go review.
 """
     validate_proof_text(text)
     return text
@@ -265,7 +266,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--node-cmd", default=os.environ.get("NODE", "node"))
     parser.add_argument("--docker-cmd", default=os.environ.get("DOCKER_CMD", "docker"))
     parser.add_argument("--worker-image", required=True)
-    parser.add_argument("--douyin-real-sample-status", default=os.environ.get("DOUYIN_REAL_SAMPLE_STATUS", "VERIFIED"))
+    parser.add_argument(
+        "--video-link-read-mode-status",
+        default=os.environ.get("VIDEO_LINK_READ_MODE_STATUS", "ADOPTED"),
+    )
     parser.add_argument("--operator", default=os.environ.get("PHASE1_5_OPERATOR") or getpass.getuser())
     parser.add_argument(
         "--reviewer",

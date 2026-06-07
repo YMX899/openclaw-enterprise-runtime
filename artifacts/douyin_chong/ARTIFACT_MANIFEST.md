@@ -1,8 +1,7 @@
 # douyin_chong Artifact Manifest
 
-Status: verified for current Phase 1.5 isolated validation with real sample
-evidence deferred by operator. This file is a production gate, not a deployment
-approval.
+Status: verified for current Phase 1.5 isolated validation with video link-read
+mode adopted. This file is a production gate, not a deployment approval.
 
 A local candidate Python package was found at:
 
@@ -81,18 +80,28 @@ candidate Ark video analyzer, and writes the committed `openclaw-video-result.v1
 JSON schema. The clean candidate source is mounted read-only at
 `/app/vendor/douyin_chong`.
 
+## Adopted Link-Read Mode
+
+The operator has changed the production scheme: OpenClaw now uses a
+user-provided video link and reads the video through the link-resolution path.
+Douyin account login, browser storage state, and
+`artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json` are not production readiness
+requirements for this scheme.
+
+The committed decision record is:
+
+```text
+artifacts/douyin_chong/LINK_READ_DECISION.md
+```
+
+The historical real-sample runner remains available as an optional diagnostic
+tool, but the production gate now validates link-read mode instead of requiring
+a committed sample evidence file.
+
 ## Required Evidence Before Phase 2
 
-The operator has explicitly deferred `REAL_SAMPLE_EVIDENCE.json` for the
-current Ubuntu 22.04 validation phase. Public Douyin videos can be viewed
-without an account login, so the current phase does not require a Douyin account
-or browser storage state to prove that path. The deployment gates still keep
-this deferral explicit through `ALLOW_DOUYIN_SAMPLE_DEFERRED=1`; final
-production can require the sanitized real sample evidence again by omitting
-that flag.
-
-- real model-backed execution through the vendored minimal source using only
-  the explicit runtime secret file.
+- verification that the V1 path reads from a validated video link, not a Douyin
+  account login session or browser storage state.
 - verification that the vendored minimal source is sufficient for the V1
   single-video path under Linux Docker.
 - archive or image digest for the exported candidate after Linux Docker
@@ -114,8 +123,8 @@ that flag.
 - CPU, memory and disk profile.
 - temporary file path.
 - cleanup behavior.
-- sample success output.
-- sample failed output.
+- link-read success behavior through unit and browser acceptance coverage.
+- link-read failed behavior for rejected URLs and tool failures.
 - isolated Linux Docker validation through `scripts/verify_phase1_5_gates.sh`
   without skipping Docker.
 
@@ -125,9 +134,8 @@ The committed helper for producing sanitized real-sample evidence is:
 scripts/run_douyin_real_sample.py
 ```
 
-This helper is not itself production approval. It is a controlled way to
-produce the missing real model-backed sample, schema, timing and resource
-evidence without recording secrets.
+This helper is not itself production approval. It is a controlled optional
+diagnostic for schema, timing and resource evidence without recording secrets.
 
 ## Production Constraints
 

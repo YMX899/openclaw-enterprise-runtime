@@ -39,7 +39,7 @@ class Phase15ExitProofWriterTests(unittest.TestCase):
             node_cmd="node",
             docker_cmd="sudo -n docker",
             worker_image="sha256:" + "b" * 64,
-            douyin_real_sample_status="VERIFIED",
+            video_link_read_mode_status="ADOPTED",
         )
 
     def test_generated_proof_satisfies_production_audit_exit_gate(self):
@@ -80,19 +80,13 @@ class Phase15ExitProofWriterTests(unittest.TestCase):
         self.assertIn("DOCKER_CMD=sudo -n docker", proof)
         self.assertIn("docker version command: sudo -n docker version", proof)
 
-    def test_generated_proof_can_record_operator_deferred_real_sample_without_claiming_verified(self):
+    def test_generated_proof_records_video_link_read_mode(self):
         context = self.context()
-        deferred = writer.ProofContext(
-            **{
-                **context.__dict__,
-                "douyin_real_sample_status": "DEFERRED_BY_OPERATOR_FOR_CURRENT_PHASE",
-            }
-        )
 
-        proof = writer.build_proof(deferred)
+        proof = writer.build_proof(context)
 
-        self.assertIn("douyin real sample gate: DEFERRED_BY_OPERATOR_FOR_CURRENT_PHASE", proof)
-        self.assertNotIn("douyin real sample gate: VERIFIED", proof)
+        self.assertIn("video link-read mode gate: ADOPTED", proof)
+        self.assertNotIn("douyin real sample gate", proof)
 
     def test_collect_context_can_use_archive_build_info_without_git_directory(self):
         from argparse import Namespace
@@ -117,7 +111,7 @@ git_refs: HEAD, tag: phase1-5-archive-test, master
                 python_cmd="python3",
                 node_cmd="node",
                 worker_image="sha256:" + "d" * 64,
-                douyin_real_sample_status="VERIFIED",
+                video_link_read_mode_status="ADOPTED",
             )
 
             def fake_run(command, *, cwd):

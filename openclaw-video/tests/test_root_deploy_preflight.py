@@ -24,7 +24,7 @@ def pass_audit(*, include_git_clean=False):
     gates = [
         {"gate_id": "openclaw_security", "status": "PASS"},
         {"gate_id": "douyin_artifact", "status": "PASS"},
-        {"gate_id": "douyin_real_sample", "status": "PASS"},
+        {"gate_id": "video_link_read_mode", "status": "PASS"},
         {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
         {"gate_id": "authenticated_dify_baseline", "status": "PASS"},
         {"gate_id": "openresty_no_route_change", "status": "PASS"},
@@ -44,11 +44,11 @@ def no_go_audit(*, include_git_clean=False):
     return {"overall": "NO_GO", "gates": gates}
 
 
-def no_go_douyin_and_auth_audit(*, include_git_clean=False):
+def no_go_link_mode_and_auth_audit(*, include_git_clean=False):
     gates = [
         {"gate_id": "openclaw_security", "status": "PASS"},
         {"gate_id": "douyin_artifact", "status": "PASS"},
-        {"gate_id": "douyin_real_sample", "status": "NO_GO"},
+        {"gate_id": "video_link_read_mode", "status": "NO_GO"},
         {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
         {"gate_id": "authenticated_dify_baseline", "status": "NO_GO"},
         {"gate_id": "openresty_no_route_change", "status": "PASS"},
@@ -58,11 +58,11 @@ def no_go_douyin_and_auth_audit(*, include_git_clean=False):
     return {"overall": "NO_GO", "gates": gates}
 
 
-def no_go_only_douyin_audit(*, include_git_clean=False):
+def no_go_only_link_mode_audit(*, include_git_clean=False):
     gates = [
         {"gate_id": "openclaw_security", "status": "PASS"},
         {"gate_id": "douyin_artifact", "status": "PASS"},
-        {"gate_id": "douyin_real_sample", "status": "NO_GO"},
+        {"gate_id": "video_link_read_mode", "status": "NO_GO"},
         {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
         {"gate_id": "authenticated_dify_baseline", "status": "PASS"},
         {"gate_id": "openresty_no_route_change", "status": "PASS"},
@@ -167,7 +167,7 @@ class RootDeployPreflightTests(unittest.TestCase):
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["production_readiness"], "NO_GO")
 
-    def test_douyin_deferred_env_does_not_hide_authenticated_baseline_gate(self):
+    def test_link_mode_gate_and_auth_gate_both_block(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "phase1.5-exit-proof.md", PHASE1_5_PROOF)
@@ -181,9 +181,9 @@ class RootDeployPreflightTests(unittest.TestCase):
 
             with mock.patch.object(preflight_module, "_git", side_effect=fake_git), mock.patch.object(
                 preflight_module, "_load_audit_module"
-            ) as load_audit, mock.patch.dict("os.environ", {"ALLOW_DOUYIN_SAMPLE_DEFERRED": "1"}):
+            ) as load_audit:
                 load_audit.return_value.audit.side_effect = (
-                    lambda _repo, include_git_clean=False: no_go_douyin_and_auth_audit(
+                    lambda _repo, include_git_clean=False: no_go_link_mode_and_auth_audit(
                         include_git_clean=include_git_clean
                     )
                 )
@@ -194,9 +194,9 @@ class RootDeployPreflightTests(unittest.TestCase):
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["production_readiness"]["status"], "NO_GO")
         self.assertIn("authenticated_dify_baseline", statuses["production_readiness"]["evidence"])
-        self.assertNotIn("douyin_real_sample", statuses["production_readiness"]["evidence"])
+        self.assertIn("video_link_read_mode", statuses["production_readiness"]["evidence"])
 
-    def test_douyin_deferred_env_allows_preflight_when_only_douyin_sample_is_missing(self):
+    def test_link_mode_gate_blocks_when_it_is_the_only_missing_gate(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "phase1.5-exit-proof.md", PHASE1_5_PROOF)
@@ -210,14 +210,14 @@ class RootDeployPreflightTests(unittest.TestCase):
 
             with mock.patch.object(preflight_module, "_git", side_effect=fake_git), mock.patch.object(
                 preflight_module, "_load_audit_module"
-            ) as load_audit, mock.patch.dict("os.environ", {"ALLOW_DOUYIN_SAMPLE_DEFERRED": "1"}):
-                load_audit.return_value.audit.side_effect = lambda _repo, include_git_clean=False: no_go_only_douyin_audit(
+            ) as load_audit:
+                load_audit.return_value.audit.side_effect = lambda _repo, include_git_clean=False: no_go_only_link_mode_audit(
                     include_git_clean=include_git_clean
                 )
 
                 report = preflight_module.preflight(repo, "root")
 
-        self.assertEqual(report["overall"], "GO")
+        self.assertEqual(report["overall"], "NO_GO")
 
 
 if __name__ == "__main__":

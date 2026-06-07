@@ -34,9 +34,10 @@ and must not read the candidate project's default `.env`, `.env.local`, browser
 storage state, cookies, token files or runtime outputs. Runtime credentials must
 be mounted as a read-only secret file and must not be committed.
 
-This exact shape still must be proven with the real candidate source exported
-into the worker image and with real model credentials in an isolated Linux
-Docker host before any server deployment.
+This exact shape is validated as the current link-read runtime path. The worker
+accepts a user-provided video link, validates and canonicalizes the URL, and
+uses the resolver to find direct video URL candidates. A Douyin account login or
+browser storage state is not part of the runtime contract.
 
 ## Required Result Shape
 
@@ -75,10 +76,12 @@ temporary_storage_exhausted
 Internal stack traces, cookies, tokens, local filesystem paths and raw request
 headers must not be returned to users.
 
-## Real Sample Evidence Runner
+## Optional Real Sample Evidence Runner
 
-Before the artifact can become production verified, run one real model-backed
-sample in an isolated environment with an explicit runtime secret file:
+`REAL_SAMPLE_EVIDENCE.json` is no longer required by the production readiness
+gate after the 2026-06-07 link-read scheme change. If deeper diagnostics are
+needed, a real model-backed sample can still be run in an isolated environment
+with an explicit runtime secret file:
 
 ```bash
 python scripts/run_douyin_real_sample.py \
@@ -109,8 +112,8 @@ It must not print or commit the runtime secret file, raw headers, cookies,
 Authorization values, CSRF values, or full model output. The generated output
 directory is under `tmp/` by default and is ignored by git.
 
-After the sanitized evidence has been reviewed, promote it into the committed
-production-readiness evidence path only through the promotion script:
+If the sanitized evidence is useful for troubleshooting, promote it only through
+the promotion script:
 
 ```bash
 python scripts/promote_douyin_real_sample_evidence.py \
@@ -120,7 +123,7 @@ python scripts/promote_douyin_real_sample_evidence.py \
 The promotion script fails closed if the sample did not succeed, if the runtime
 secret file was missing, if stdout/stderr contents were recorded, if a raw URL is
 present, or if the result hash/schema evidence is missing. It also strips local
-temporary output paths before writing:
+temporary output paths before writing the optional evidence file:
 
 ```text
 artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json

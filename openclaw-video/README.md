@@ -51,12 +51,14 @@ committed or deployed. A minimal V1 source subset is vendored at
 separately as `./secrets/douyin_chong.env`.
 
 The worker calls the candidate through `openclaw-douyin-adapter`, not through
-the candidate's default CLI. Production remains blocked until pinned
-dependencies, real model-backed sample runs, schema validation, resource
-profile and isolated Docker validation are complete.
+the candidate's default CLI. The current V1 scheme uses a user-provided video
+link, validates/canonicalizes it through the URL guard, and resolves the direct
+video URL candidates without a Douyin account login or browser storage state.
+Production readiness no longer depends on committing
+`artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json`.
 
-Run a real model-backed sample only in an isolated environment with an explicit
-runtime secret file:
+Run a real model-backed sample only as an optional diagnostic in an isolated
+environment with an explicit runtime secret file:
 
 ```bash
 python scripts/run_douyin_real_sample.py \

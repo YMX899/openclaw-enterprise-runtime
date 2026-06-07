@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict, dataclass
 import json
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -106,6 +105,89 @@ def check_douyin_artifact(repo: Path) -> GateResult:
     return GateResult("douyin_artifact", "NO_GO", "douyin_chong artifact is not verified")
 
 
+def check_video_link_read_mode(repo: Path) -> GateResult:
+    decision_path = repo / "artifacts" / "douyin_chong" / "LINK_READ_DECISION.md"
+    if not decision_path.exists():
+        return GateResult("video_link_read_mode", "NO_GO", f"missing {decision_path}")
+
+    text = _read(decision_path)
+    forbidden = [
+        r"Authorization:\s*Bearer\s+\S+",
+        r"Cookie:\s*\S+=\S+",
+        r"CSRF[-_ ]?Token:\s*\S+",
+        r"password\s*[:=]\s*\S+",
+        r"sk-[0-9a-zA-Z]{16,}",
+        r"-----BEGIN (?:OPENSSH|RSA|EC|PRIVATE) KEY-----",
+    ]
+    if any(re.search(pattern, text, re.IGNORECASE) for pattern in forbidden):
+        return GateResult("video_link_read_mode", "NO_GO", "link-read decision records sensitive material")
+
+    required_decision = [
+        r"link_read_mode:\s*ADOPTED\b",
+        r"REAL_SAMPLE_EVIDENCE\.json:\s*NOT_REQUIRED\b",
+        r"douyin_account_login:\s*NOT_REQUIRED\b",
+        r"browser_storage_state:\s*NOT_REQUIRED\b",
+        r"runtime_path:\s*url_guard\s*->\s*worker_service\s*->\s*douyin_legacy_adapter\s*->\s*UniversalVideoResolver\b",
+        r"allowlisted_douyin_hosts:\s*PASS\b",
+        r"redirect_revalidation:\s*PASS\b",
+        r"private_ip_blocking:\s*PASS\b",
+        r"no_browser_login_state:\s*PASS\b",
+    ]
+    missing_decision = [pattern for pattern in required_decision if not re.search(pattern, text, re.IGNORECASE)]
+    if missing_decision:
+        return GateResult("video_link_read_mode", "NO_GO", "link-read decision missing required markers")
+
+    url_guard = repo / "openclaw-video" / "src" / "openclaw_video" / "url_guard.py"
+    worker_service = repo / "openclaw-video" / "src" / "openclaw_video" / "worker_service.py"
+    adapter = repo / "openclaw-video" / "src" / "openclaw_video" / "douyin_legacy_adapter.py"
+    for path in (url_guard, worker_service, adapter):
+        if not path.exists():
+            return GateResult("video_link_read_mode", "NO_GO", f"missing runtime source: {path}")
+
+    url_guard_text = _read(url_guard)
+    worker_text = _read(worker_service)
+    adapter_text = _read(adapter)
+    required_source = [
+        (url_guard_text, "ALLOWED_HOST_SUFFIXES", "url guard missing allowlist"),
+        (url_guard_text, '"douyin.com"', "url guard missing douyin.com allowlist"),
+        (url_guard_text, '"iesdouyin.com"', "url guard missing iesdouyin.com allowlist"),
+        (url_guard_text, "validate_video_url_with_redirects", "url guard missing redirect validation"),
+        (url_guard_text, "blocked non-public IP", "url guard missing non-public IP block"),
+        (worker_text, "validate_video_url_with_redirects(", "worker does not validate video URL redirects"),
+        (worker_text, "canonical = validated.canonical", "worker does not use canonical link target"),
+        (worker_text, "analysis = self.analyzer(canonical, Path(tmp))", "worker does not pass canonical URL to analyzer"),
+        (adapter_text, "UniversalVideoResolver().resolve(args.input_url)", "adapter does not resolve input link"),
+        (adapter_text, 'getattr(video, "video_url"', "adapter does not use resolved direct video URL"),
+        (adapter_text, 'getattr(video, "playwm_url"', "adapter does not use resolved fallback video URL"),
+        (adapter_text, "ArkVideoClient(config).analyze(video_urls=video_urls", "adapter does not analyze resolved video URLs"),
+    ]
+    for source, needle, message in required_source:
+        if needle not in source:
+            return GateResult("video_link_read_mode", "NO_GO", message)
+
+    vendor = repo / "openclaw-video" / "vendor" / "douyin_chong"
+    forbidden_vendor_files = [
+        ".env",
+        ".env.local",
+        ".douyin_storage_state.json",
+        "douyin_login_state.py",
+        "profile_batch_fashion.py",
+    ]
+    present_forbidden = [name for name in forbidden_vendor_files if (vendor / name).exists()]
+    if present_forbidden:
+        return GateResult(
+            "video_link_read_mode",
+            "NO_GO",
+            "browser login-state or secret material is present in vendored source",
+        )
+
+    return GateResult(
+        "video_link_read_mode",
+        "PASS",
+        "video link-read mode is adopted; REAL_SAMPLE_EVIDENCE.json and Douyin account login are not required",
+    )
+
+
 def check_douyin_real_sample(repo: Path) -> GateResult:
     path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
     if not path.exists():
@@ -124,12 +206,6 @@ def check_douyin_real_sample(repo: Path) -> GateResult:
                 "douyin_real_sample",
                 "NO_GO",
                 f"missing {path}; latest attempt blocked: {reason}; categories={category_text}",
-            )
-        if os.environ.get("ALLOW_DOUYIN_SAMPLE_DEFERRED") == "1":
-            return GateResult(
-                "douyin_real_sample",
-                "PASS",
-                "real sample evidence deferred by operator for current phase",
             )
         return GateResult("douyin_real_sample", "NO_GO", f"missing {path}")
     try:
@@ -206,6 +282,7 @@ def check_phase1_5_exit(repo: Path) -> GateResult:
         r"docker compose down --remove-orphans --volumes",
         r"no 0\.0\.0\.0 listener",
         r"worker image",
+        r"video link-read mode gate:\s*ADOPTED\b",
     ]
     missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
     if missing:
@@ -317,7 +394,7 @@ def check_git_clean(repo: Path) -> GateResult:
 GATES: tuple[Callable[[Path], GateResult], ...] = (
     check_openclaw_security,
     check_douyin_artifact,
-    check_douyin_real_sample,
+    check_video_link_read_mode,
     check_phase1_5_exit,
     check_authenticated_dify_baseline,
     check_production_route_absent,

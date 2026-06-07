@@ -80,7 +80,7 @@ class Ubuntu22PhaseAuditTests(unittest.TestCase):
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("sensitive", result.evidence)
 
-    def test_douyin_phase_deferral_requires_explicit_manifest(self):
+    def test_douyin_phase_requires_link_read_decision(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "artifacts/douyin_chong/ARTIFACT_MANIFEST.md", "Status: verified\n")
@@ -88,20 +88,28 @@ class Ubuntu22PhaseAuditTests(unittest.TestCase):
             result = audit_module.check_douyin_current_phase(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("deferral", result.evidence)
+        self.assertIn("LINK_READ_DECISION", result.evidence)
 
-    def test_douyin_phase_accepts_documented_current_phase_deferral(self):
+    def test_douyin_phase_accepts_link_read_mode(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "artifacts/douyin_chong/ARTIFACT_MANIFEST.md",
+                repo / "artifacts/douyin_chong/LINK_READ_DECISION.md",
                 """
-The operator has explicitly deferred `REAL_SAMPLE_EVIDENCE.json` for the
-current Ubuntu 22.04 validation phase. The deployment gates still keep this
-deferral explicit through `ALLOW_DOUYIN_SAMPLE_DEFERRED=1`; final production
-can require the sanitized real sample evidence again by omitting that flag.
+link_read_mode: ADOPTED
+REAL_SAMPLE_EVIDENCE.json: NOT_REQUIRED
+douyin_account_login: NOT_REQUIRED
+browser_storage_state: NOT_REQUIRED
+runtime_path: url_guard -> worker_service -> douyin_legacy_adapter -> UniversalVideoResolver
+allowlisted_douyin_hosts: PASS
+redirect_revalidation: PASS
+private_ip_blocking: PASS
+no_browser_login_state: PASS
 """,
             )
+            source_root = Path(__file__).resolve().parents[2] / "openclaw-video" / "src" / "openclaw_video"
+            for name in ("url_guard.py", "worker_service.py", "douyin_legacy_adapter.py"):
+                write(repo / "openclaw-video/src/openclaw_video" / name, (source_root / name).read_text(encoding="utf-8"))
 
             result = audit_module.check_douyin_current_phase(repo)
 
