@@ -17,11 +17,20 @@ PHASE4_EVIDENCE = REPO_ROOT / "phase4-same-origin-openclaw-lab-deployment-eviden
 RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
 REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
 PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
+CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-current-root-chrome-evidence-20260607.json",
+)
 STANDALONE_LOGIN_EVIDENCE_CANDIDATES = (
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-workbench-login-acceptance-root-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-root-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json",
 )
+
+EXPECTED_DIFY_CORE = {
+    "api": ("1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631", "2026-01-05T11:17:20.555976179Z"),
+    "web": ("62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36", "2026-01-05T11:17:19.85303869Z"),
+    "nginx": ("8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe", "2026-01-05T11:17:20.937420886Z"),
+}
 
 
 @dataclass(frozen=True)
@@ -42,6 +51,14 @@ def _load_production_audit():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _first_existing(repo: Path, candidates: tuple[Path, ...]) -> Path | None:
+    for path in candidates:
+        candidate = repo / path.relative_to(REPO_ROOT)
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _git(repo: Path, args: list[str]) -> tuple[int, str, str]:
@@ -78,6 +95,87 @@ def check_phase4_deployment_evidence(repo: Path) -> GateResult:
     if missing:
         return GateResult("phase4_deployment_evidence", "NO_GO", "phase4 deployment evidence is incomplete")
     return GateResult("phase4_deployment_evidence", "PASS", "same-origin Lab deployment and Dify container invariants recorded")
+
+
+def check_current_root_chrome_evidence(repo: Path) -> GateResult:
+    path = _first_existing(repo, CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES)
+    if path is None:
+        return GateResult("current_root_chrome_evidence", "NO_GO", "missing current root/Chrome evidence")
+    try:
+        payload = json.loads(_read(path))
+    except json.JSONDecodeError:
+        return GateResult("current_root_chrome_evidence", "NO_GO", "current root/Chrome evidence is not valid JSON")
+
+    root = payload.get("root_runtime") or {}
+    chrome = payload.get("chrome_visible_acceptance") or {}
+    acceptance = chrome.get("post_login_acceptance") or {}
+    public_routes = root.get("public_routes") or {}
+    ports = root.get("openclaw_ports") or {}
+    dify_core = root.get("dify_core") or {}
+    smoke = payload.get("public_smoke") or {}
+    video_scope = payload.get("video_link_read_scope") or {}
+
+    dify_ok = True
+    for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
+        current = dify_core.get(name) or {}
+        dify_ok = dify_ok and current.get("id") == expected_id
+        dify_ok = dify_ok and current.get("started_at") == expected_started_at
+        dify_ok = dify_ok and current.get("status") == "running"
+
+    safe_flags = (
+        chrome.get("account_recorded") is False
+        and chrome.get("password_recorded") is False
+        and chrome.get("cookies_recorded") is False
+        and chrome.get("headers_recorded") is False
+        and chrome.get("secrets_recorded") is False
+        and chrome.get("local_storage_values_recorded") is False
+        and smoke.get("secrets_recorded") is False
+        and smoke.get("headers_recorded") is False
+        and smoke.get("bodies_recorded") is False
+        and video_scope.get("raw_url_recorded") is False
+        and video_scope.get("secret_file_contents_recorded") is False
+        and video_scope.get("headers_recorded") is False
+        and video_scope.get("cookies_recorded") is False
+        and video_scope.get("tokens_recorded") is False
+    )
+
+    checks = [
+        payload.get("schema") == "openclaw-current-root-chrome-evidence.v1",
+        payload.get("status") == "PASS",
+        root.get("current_release") == "/app/bin/openclaw-video/releases/bea6534980dc",
+        root.get("gateway_version") == "OpenClaw 2026.3.13 (61d171a)",
+        dify_ok,
+        "127.0.0.1:18181" in str(ports.get("bridge", "")),
+        ports.get("gateway") == "",
+        ports.get("postgres") == "",
+        ports.get("worker") == "",
+        public_routes.get("ai_openclaw_lab") == 200,
+        public_routes.get("openclaw_api_me_unauth") == 401,
+        public_routes.get("huahuo_ai") == 200,
+        chrome.get("status") == "PASS",
+        chrome.get("lab_has_login_form") is True,
+        chrome.get("lab_has_workbench") is True,
+        chrome.get("lab_has_acceptance_button") is True,
+        chrome.get("me_status") == 200,
+        chrome.get("me_authenticated") is True,
+        acceptance.get("overall") == "PASS",
+        acceptance.get("step_count") == 16,
+        acceptance.get("failed_steps") == [],
+        chrome.get("console_error_count") == 0,
+        smoke.get("status") == "PASS",
+        video_scope.get("mode") == "ADOPTED",
+        video_scope.get("douyin_login_required") is False,
+        video_scope.get("real_sample_evidence_required") is False,
+        video_scope.get("runtime_path_verified_by_tests") is True,
+        safe_flags,
+    ]
+    if not all(checks):
+        return GateResult("current_root_chrome_evidence", "NO_GO", "current root/Chrome evidence failed required checks")
+    return GateResult(
+        "current_root_chrome_evidence",
+        "PASS",
+        "root runtime proves OpenClaw 2026.3.13, private sidecar ports, Dify invariants, and Chrome acceptance",
+    )
 
 
 def check_chrome_runner_ready(repo: Path) -> GateResult:
@@ -242,6 +340,7 @@ def check_video_link_read_mode(repo: Path) -> GateResult:
 def audit(repo: Path, *, smoke_summary: Path | None = None, include_git_clean: bool = False) -> dict[str, Any]:
     gates = [
         check_phase4_deployment_evidence(repo),
+        check_current_root_chrome_evidence(repo),
         check_chrome_runner_ready(repo),
         check_public_smoke_summary(smoke_summary),
         check_authenticated_browser_gate(repo),

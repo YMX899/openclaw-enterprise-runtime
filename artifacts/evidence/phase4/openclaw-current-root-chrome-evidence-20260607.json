@@ -1,0 +1,101 @@
+{
+  "schema": "openclaw-current-root-chrome-evidence.v1",
+  "created_at": "2026-06-07T06:21:54.6944170Z",
+  "status": "PASS",
+  "root_runtime": {
+    "current_release": "/app/bin/openclaw-video/releases/bea6534980dc",
+    "gateway_version": "OpenClaw 2026.3.13 (61d171a)",
+    "dify_core": {
+      "api": {
+        "id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+        "started_at": "2026-01-05T11:17:20.555976179Z",
+        "status": "running"
+      },
+      "web": {
+        "id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+        "started_at": "2026-01-05T11:17:19.85303869Z",
+        "status": "running"
+      },
+      "nginx": {
+        "id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+        "started_at": "2026-01-05T11:17:20.937420886Z",
+        "status": "running"
+      }
+    },
+    "openclaw_ports": {
+      "bridge": "3000/tcp -> 127.0.0.1:18181",
+      "gateway": "",
+      "postgres": "",
+      "worker": ""
+    },
+    "public_routes": {
+      "ai_openclaw_lab": 200,
+      "openclaw_api_me_unauth": 401,
+      "huahuo_ai": 200
+    }
+  },
+  "chrome_visible_acceptance": {
+    "schema": "openclaw-current-chrome-visible-acceptance.v1",
+    "created_at": "2026-06-07T06:16:49.629Z",
+    "lab_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+    "status": "PASS",
+    "lab_has_login_form": true,
+    "lab_has_workbench": true,
+    "lab_has_acceptance_button": true,
+    "me_status": 200,
+    "me_authenticated": true,
+    "auth_status_text": "Authenticated",
+    "post_login_acceptance": {
+      "overall": "PASS",
+      "step_count": 16,
+      "failed_steps": [],
+      "step_names": [
+        "identity_diagnostics",
+        "me",
+        "random_session_404",
+        "random_job_404",
+        "random_result_404",
+        "create_session",
+        "non_allowlisted_domain_submitted",
+        "non_allowlisted_domain_terminal",
+        "localhost_blocked_submitted",
+        "localhost_blocked_terminal",
+        "cloud_metadata_blocked_submitted",
+        "cloud_metadata_blocked_terminal",
+        "tiny_upload_submitted",
+        "tiny_upload_terminal",
+        "tiny_upload_result",
+        "messages_visible_to_owner"
+      ]
+    },
+    "console_error_count": 0,
+    "account_recorded": false,
+    "password_recorded": false,
+    "cookies_recorded": false,
+    "headers_recorded": false,
+    "secrets_recorded": false,
+    "local_storage_values_recorded": false
+  },
+  "public_smoke": {
+    "summary_path": "tmp\\playwright-public-browser\\20260607T061801Z\\summary.json",
+    "status": "PASS",
+    "secrets_recorded": false,
+    "headers_recorded": false,
+    "bodies_recorded": false
+  },
+  "video_link_read_scope": {
+    "mode": "ADOPTED",
+    "douyin_login_required": false,
+    "real_sample_evidence_required": false,
+    "runtime_path_verified_by_tests": true,
+    "latest_real_sample_attempt": "blocked_by_model_auth_401",
+    "model_auth_is_current_external_configuration_gate": true,
+    "raw_url_recorded": false,
+    "secret_file_contents_recorded": false,
+    "stdout_recorded": false,
+    "stderr_recorded": false,
+    "headers_recorded": false,
+    "cookies_recorded": false,
+    "tokens_recorded": false
+  }
+}

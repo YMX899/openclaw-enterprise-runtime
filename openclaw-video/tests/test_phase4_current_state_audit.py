@@ -51,6 +51,81 @@ SMOKE_PASS = {
 }
 
 
+CURRENT_ROOT_CHROME_PASS = {
+    "schema": "openclaw-current-root-chrome-evidence.v1",
+    "status": "PASS",
+    "root_runtime": {
+        "current_release": "/app/bin/openclaw-video/releases/bea6534980dc",
+        "gateway_version": "OpenClaw 2026.3.13 (61d171a)",
+        "dify_core": {
+            "api": {
+                "id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+                "started_at": "2026-01-05T11:17:20.555976179Z",
+                "status": "running",
+            },
+            "web": {
+                "id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+                "started_at": "2026-01-05T11:17:19.85303869Z",
+                "status": "running",
+            },
+            "nginx": {
+                "id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+                "started_at": "2026-01-05T11:17:20.937420886Z",
+                "status": "running",
+            },
+        },
+        "openclaw_ports": {
+            "bridge": "3000/tcp -> 127.0.0.1:18181",
+            "gateway": "",
+            "postgres": "",
+            "worker": "",
+        },
+        "public_routes": {
+            "ai_openclaw_lab": 200,
+            "openclaw_api_me_unauth": 401,
+            "huahuo_ai": 200,
+        },
+    },
+    "chrome_visible_acceptance": {
+        "status": "PASS",
+        "lab_has_login_form": True,
+        "lab_has_workbench": True,
+        "lab_has_acceptance_button": True,
+        "me_status": 200,
+        "me_authenticated": True,
+        "post_login_acceptance": {
+            "overall": "PASS",
+            "step_count": 16,
+            "failed_steps": [],
+        },
+        "console_error_count": 0,
+        "account_recorded": False,
+        "password_recorded": False,
+        "cookies_recorded": False,
+        "headers_recorded": False,
+        "secrets_recorded": False,
+        "local_storage_values_recorded": False,
+    },
+    "public_smoke": {
+        "status": "PASS",
+        "secrets_recorded": False,
+        "headers_recorded": False,
+        "bodies_recorded": False,
+    },
+    "video_link_read_scope": {
+        "mode": "ADOPTED",
+        "douyin_login_required": False,
+        "real_sample_evidence_required": False,
+        "runtime_path_verified_by_tests": True,
+        "raw_url_recorded": False,
+        "secret_file_contents_recorded": False,
+        "headers_recorded": False,
+        "cookies_recorded": False,
+        "tokens_recorded": False,
+    },
+}
+
+
 PHASE4_BASE = """
 current=/app/bin/openclaw-video/releases/bea6534980dc
 tag: phase4-openclaw-ui-workbench-20260607
@@ -115,11 +190,12 @@ STANDALONE_LOGIN_PASS = {
 
 class Phase4CurrentStateAuditTests(unittest.TestCase):
     def test_current_repo_reports_current_gates_pass(self):
-        smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260607T060047Z" / "summary.json"
+        smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260607T061801Z" / "summary.json"
         report = phase4_audit.audit(REPO_ROOT, smoke_summary=smoke, include_git_clean=True)
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
 
         self.assertEqual(statuses["phase4_deployment_evidence"], "PASS")
+        self.assertEqual(statuses["current_root_chrome_evidence"], "PASS")
         self.assertEqual(statuses["chrome_post_login_runner"], "PASS")
         self.assertEqual(statuses["public_smoke_latest"], "PASS")
         self.assertEqual(statuses["authenticated_browser_gate"], "PASS")
@@ -138,6 +214,10 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
                 + '\n"status": "PASS"\n',
             )
             write(repo / "scripts/huahuo_post_login_acceptance_runner.mjs", RUNNER)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-current-root-chrome-evidence-20260607.json",
+                json.dumps(CURRENT_ROOT_CHROME_PASS),
+            )
             write(
                 repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
                 json.dumps(STANDALONE_LOGIN_PASS),
@@ -179,6 +259,34 @@ no_browser_login_state: PASS
 
         self.assertEqual(result.status, "PASS")
         self.assertIn("standalone", result.evidence)
+
+    def test_current_root_chrome_evidence_passes(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-current-root-chrome-evidence-20260607.json",
+                json.dumps(CURRENT_ROOT_CHROME_PASS),
+            )
+
+            result = phase4_audit.check_current_root_chrome_evidence(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("2026.3.13", result.evidence)
+
+    def test_current_root_chrome_evidence_rejects_public_gateway_port(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            payload = json.loads(json.dumps(CURRENT_ROOT_CHROME_PASS))
+            payload["root_runtime"]["openclaw_ports"]["gateway"] = "18789/tcp -> 0.0.0.0:18789"
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-current-root-chrome-evidence-20260607.json",
+                json.dumps(payload),
+            )
+
+            result = phase4_audit.check_current_root_chrome_evidence(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("root/Chrome", result.evidence)
 
     def test_standalone_login_evidence_rejects_sensitive_recording(self):
         with TemporaryDirectory() as tmp:

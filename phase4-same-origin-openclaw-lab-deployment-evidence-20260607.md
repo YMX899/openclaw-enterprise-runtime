@@ -953,6 +953,121 @@ No Cookie, Authorization header, CSRF value, browser storage value, account,
 password, model key, database URL, private key, .env content or full request
 header was recorded.
 
+## Current Root And Chrome Completion Check
+
+Date: 2026-06-07 Asia/Shanghai
+
+Purpose:
+
+```text
+Refresh the current-state evidence after the OpenClaw UI workbench deployment
+and prove the running Gateway version, public route behavior, Chrome visible
+acceptance, and Dify core container invariants.
+```
+
+Current root runtime:
+
+```text
+current=/app/bin/openclaw-video/releases/bea6534980dc
+gateway_version=OpenClaw 2026.3.13 (61d171a)
+ai_openclaw_lab=200
+openclaw_api_me_unauth=401
+huahuo_ai=200
+```
+
+Dify core container invariant:
+
+```text
+api=1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631|2026-01-05T11:17:20.555976179Z|running
+web=62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36|2026-01-05T11:17:19.85303869Z|running
+nginx=8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe|2026-01-05T11:17:20.937420886Z|running
+```
+
+OpenClaw sidecar port boundary:
+
+```text
+bridge_ports=3000/tcp -> 127.0.0.1:18181
+gateway_ports=
+postgres_ports=
+worker_ports=
+```
+
+Chrome visible acceptance on the public OpenClaw page:
+
+```json
+{
+  "schema": "openclaw-current-chrome-visible-acceptance.v1",
+  "status": "PASS",
+  "lab_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "lab_has_login_form": true,
+  "lab_has_workbench": true,
+  "lab_has_acceptance_button": true,
+  "me_status": 200,
+  "me_authenticated": true,
+  "auth_status_text": "Authenticated",
+  "post_login_acceptance": {
+    "overall": "PASS",
+    "step_count": 16,
+    "failed_steps": []
+  },
+  "console_error_count": 0,
+  "account_recorded": false,
+  "password_recorded": false,
+  "cookies_recorded": false,
+  "headers_recorded": false,
+  "secrets_recorded": false,
+  "local_storage_values_recorded": false
+}
+```
+
+Fresh public browser smoke:
+
+```text
+Command: python scripts\run_public_browser_smoke.py --timeout-seconds 90
+Run dir: tmp\playwright-public-browser\20260607T061801Z
+Overall: PASS
+Targets: openclaw-standalone-lab, openclaw-lab, openclaw-api-me-unauthenticated,
+huahuo-user-web, huahuo-admin-configuration
+http_5xx_count: 0
+gateway_direct_request_count: 0
+token_url_leak_count: 0
+headers_recorded: false
+bodies_recorded: false
+secrets_recorded: false
+```
+
+Video link-read scope boundary:
+
+```text
+link_read_mode=ADOPTED
+Douyin login required=false
+REAL_SAMPLE_EVIDENCE.json required=false
+runtime path verified by unit/schema/security tests=true
+latest real sample attempt=blocked_by_model_auth_401
+model auth is current external configuration gate=true
+```
+
+This check proves the OpenClaw 2026.3.13 private sidecar, public workbench,
+standalone OpenClaw login, post-login acceptance, URL security negatives,
+Tiny Upload job/result path, owner-visible message retrieval, and Dify
+container invariants. It does not claim that the external Ark model credential
+currently authorizes deep video analysis; the latest real sample attempt
+resolved the video candidate but stopped at model HTTP 401. That is tracked as
+runtime model configuration, not as a Douyin login or
+`REAL_SAMPLE_EVIDENCE.json` gate.
+
+Safety notes:
+
+```text
+No Dify compose file was modified.
+No Dify api/web/nginx container was restarted, rebuilt or recreated.
+Only OpenClaw Bridge was previously rebuilt/recreated for the UI workbench.
+OpenClaw Gateway, Worker and Bridge Postgres remain internal-only.
+No Cookie, Authorization header, CSRF value, browser storage value, account,
+password, model key, database URL, private key, .env content, raw video URL,
+stdout/stderr body, or full request header was recorded.
+```
+
 ## OpenClaw UI Workbench Root Deployment
 
 Date: 2026-06-07 Asia/Shanghai
