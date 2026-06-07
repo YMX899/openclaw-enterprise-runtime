@@ -1,0 +1,86 @@
+{
+  "schema_version": "openclaw-root-final-functional-smoke.v1",
+  "created_at": "2026-06-07T22:16:00+08:00",
+  "status": "PASS",
+  "scope": {
+    "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+    "login_surface": "openclaw_owned_session",
+    "huahuo_front_user_auth": true,
+    "dify_web_login_required": false,
+    "dify_core_restarted": false,
+    "secrets_recorded": false,
+    "account_recorded": false,
+    "password_recorded": false,
+    "cookies_recorded": false
+  },
+  "root_release": {
+    "current_release": "/app/bin/openclaw-video/releases/5225a04368c5",
+    "git_commit": "5225a04368c5664e1ea9aae0e9d7d9229c64eb7a",
+    "git_tag": "phase4-openclaw-gateway-doubao-chat-20260607",
+    "bundle_sha256": "7394f5bdeca56fc64125b24d124b8c6995e4698c92bb27accedc7a100a66ba8a"
+  },
+  "dify_core_invariants": {
+    "api": {
+      "container_id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+      "status": "running",
+      "started_at": "2026-01-05T11:17:20.555976179Z"
+    },
+    "web": {
+      "container_id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+      "status": "running",
+      "started_at": "2026-01-05T11:17:19.85303869Z"
+    },
+    "nginx": {
+      "container_id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+      "status": "running",
+      "started_at": "2026-01-05T11:17:20.937420886Z"
+    }
+  },
+  "gateway": {
+    "status": "PASS",
+    "home_root": "/var/lib/openclaw",
+    "root_home_inherited": false,
+    "bridge_device_paired": true,
+    "pending_device_count": 0,
+    "agent_model": "volcengine-plan/ark-code-latest",
+    "gateway_health_ok": true,
+    "default_agent_id": "main",
+    "runtime_secret_file_mounted": true,
+    "secret_values_recorded": false
+  },
+  "functional_smoke": {
+    "login_status": 200,
+    "login_authenticated": true,
+    "me_status": 200,
+    "me_authenticated": true,
+    "sessions_status": 200,
+    "sessions_count_before_new": 21,
+    "create_session_status": 201,
+    "session_created": true,
+    "chat_status": 200,
+    "chat_assistant_message": true,
+    "chat_assistant_length": 18,
+    "history_status": 200,
+    "history_message_count": 3,
+    "history_roles": ["user", "assistant", "user"],
+    "history_assistant_count": 1,
+    "history_job_message_count": 1,
+    "invalid_link_guard_status": 400,
+    "invalid_link_guard_detail": "host is not in the Douyin allowlist",
+    "upload_submit_status": 202,
+    "upload_job_created": true,
+    "upload_terminal_status": "succeeded",
+    "upload_attempt_count": 1,
+    "upload_error_code": null,
+    "upload_result_status": 200,
+    "upload_result_schema_version": "openclaw-video-result.v1",
+    "upload_result_payload_schema_version": "openclaw-video-result.v1",
+    "upload_source_platform": "upload"
+  },
+  "known_remaining_scope": {
+    "real_douyin_link_read_check_retested_this_run": false,
+    "reason": "No current user-provided accessible Douyin video URL was available during this run.",
+    "guard_for_non_douyin_urls_verified": true,
+    "upload_video_analysis_verified": true
+  }
+}

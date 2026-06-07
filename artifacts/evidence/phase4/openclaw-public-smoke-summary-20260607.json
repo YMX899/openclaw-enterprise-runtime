@@ -1,0 +1,105 @@
+{
+  "schema": "openclaw-public-browser-smoke.v1",
+  "created_at": "2026-06-07T22:16:00+08:00",
+  "status": "PASS",
+  "run_dir": "artifacts/evidence/phase4",
+  "targets": [
+    {
+      "name": "openclaw-standalone-lab",
+      "url": "https://www.huahuoai.com/ai/openclaw-lab/",
+      "status": "passed",
+      "http_5xx_count": 0,
+      "gateway_direct_request_count": 0,
+      "token_url_leak_count": 0,
+      "headers_recorded_in_summary": false,
+      "bodies_recorded_in_summary": false,
+      "expectations": [
+        {
+          "request": "GET https://www.huahuoai.com/ai/openclaw-lab/",
+          "expected_status": 200,
+          "actual_status": 200,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "openclaw-lab",
+      "url": "https://www.huahuoai.com/openclaw-lab/",
+      "status": "passed",
+      "http_5xx_count": 0,
+      "gateway_direct_request_count": 0,
+      "token_url_leak_count": 0,
+      "headers_recorded_in_summary": false,
+      "bodies_recorded_in_summary": false,
+      "expectations": [
+        {
+          "request": "GET https://www.huahuoai.com/openclaw-lab/",
+          "expected_status": 200,
+          "actual_status": 200,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "openclaw-api-me-unauthenticated",
+      "url": "https://www.huahuoai.com/openclaw-api/me",
+      "status": "passed",
+      "http_5xx_count": 0,
+      "gateway_direct_request_count": 0,
+      "token_url_leak_count": 0,
+      "headers_recorded_in_summary": false,
+      "bodies_recorded_in_summary": false,
+      "expectations": [
+        {
+          "request": "GET https://www.huahuoai.com/openclaw-api/me",
+          "expected_status": 401,
+          "actual_status": 401,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "huahuo-user-web",
+      "url": "https://www.huahuoai.com/?id=4",
+      "status": "passed",
+      "http_5xx_count": 0,
+      "gateway_direct_request_count": 0,
+      "token_url_leak_count": 0,
+      "headers_recorded_in_summary": false,
+      "bodies_recorded_in_summary": false,
+      "expectations": [
+        {
+          "request": "GET https://www.huahuoai.com/",
+          "expected_status": 200,
+          "actual_status": 200,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "name": "huahuo-admin-configuration",
+      "url": "https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration",
+      "status": "passed",
+      "http_5xx_count": 0,
+      "gateway_direct_request_count": 0,
+      "token_url_leak_count": 0,
+      "headers_recorded_in_summary": false,
+      "bodies_recorded_in_summary": false,
+      "expectations": [
+        {
+          "request": "GET https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration",
+          "expected_status": 200,
+          "actual_status": 200,
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "functional_smoke_reference": "artifacts/evidence/phase4/openclaw-functional-smoke-root-20260607.json",
+  "secrets_recorded": false,
+  "headers_recorded": false,
+  "bodies_recorded": false,
+  "cookies_recorded": false,
+  "tokens_recorded": false,
+  "full_video_url_recorded": false
+}
