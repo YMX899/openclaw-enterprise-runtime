@@ -4,48 +4,77 @@ Date: 2026-06-06 Asia/Shanghai
 Last refreshed: 2026-06-07 Asia/Shanghai
 
 Objective: execute the OpenClaw x Dify short-video analysis plan phase by phase
-with git version management, OpenClaw version 3.13, browser GPT review, server
-testing, and final deployment verification.
+with git version management, OpenClaw 3.13, root-server testing, browser
+verification, and final deployment evidence.
+
+## Current Execution Scope
+
+The user updated the execution policy on 2026-06-07:
+
+```text
+Mandatory web GPT/ChatGPT review before execution: retired.
+Direct root-server OpenClaw deployment/testing: allowed.
+Development gates: relaxed for root testing.
+Dify Web/admin login for OpenClaw: retired.
+Douyin account login/Cookie/storage-state scheme: retired.
+REAL_SAMPLE_EVIDENCE.json as a blocker: retired.
+Current OpenClaw entry: https://www.huahuoai.com/ai/openclaw-lab/
+```
+
+The authoritative engineering baseline is:
+
+```text
+openclaw-engineering-baseline.md
+development-pragmatic-gates-20260607.md
+go-no-go-gate-matrix.md
+```
 
 ## Requirement Status
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Use git version management | Complete for current Phase 4 state | Git history and remote are active. Latest pushed commit is `cdf815d` with tag `phase4-chrome-post-login-runner-20260607`; deployed sidecar code anchor is `85685dc` with tag `phase4-post-login-acceptance-check-20260607`. Server releases are versioned under `/app/bin/openclaw-video/releases/`, with current `/app/bin/openclaw-video/releases/85685dc463a1` and previous marker `/app/bin/openclaw-video/releases/84e13d007d33`. |
-| Re-review plan with ChatGPT web before execution | Complete for current gate | Completed architecture review captured in `chatgpt-architecture-review.md`; final execution Go/No-Go captured in `chatgpt-final-go-nogo-review.md`. Verdict: production deployment No-Go; local Phase 1 Conditional Go. A follow-up review attempt on 2026-06-06 found ChatGPT session expired; a later user reported GPT web recovered, but the project page still returned “Your authentication token has been invalidated” after refresh. No cookies/tokens/local storage were read. |
-| Use OpenClaw 3.13 | Complete for guarded private Gateway scope | OpenClaw artifact is versioned under `artifacts/openclaw-2026.3.13/`; current security state is approved exception for private Gateway behind Bridge only, with Gateway token never sent to browser. Full production still requires final acceptance evidence. |
-| Phase 0 server read-only verification | Complete for unauthenticated checks | `phase0-execution-log.md` and `phase0-readonly-recheck-20260606.md`; no server modification performed; Dify core container IDs/restart counts and compose hash recorded. |
-| Real public Dify unauthenticated baseline | Complete | `public-baseline-check-20260606.md`; `/signin=200`, `/apps=200`, profile unauthenticated `401`. |
-| Real public Huahuo/Dify authenticated app baseline | Incomplete | Earlier same-origin Phase 4 evidence shows Huahuo user-web chat succeeded before login expiry. Current Chrome state on 2026-06-07 redirects `https://www.huahuoai.com/ai/?id=4` to `/home/`, so the user-web login is absent. `ai001.huahuoai.com` admin page is logged in, but it is not the same user-web identity source for OpenClaw Lab. |
-| OpenClaw Bridge artifact | Complete for current sidecar scope | Bridge is deployed as sidecar, serving `/openclaw-lab/` and `/openclaw-api/*`; it performs Huahuo identity projection, access checks, session/job APIs, uploads, async polling, SSE endpoints, retention cleanup and safe diagnostics. Current release is `/app/bin/openclaw-video/releases/85685dc463a1`. |
-| douyin_chong video tool artifact | Partial / real sample missing | Artifact manifest is verified and upload-path worker is deployed. Real model-backed `REAL_SAMPLE_EVIDENCE.json` is still missing, so final production/readiness audit remains NO-GO for the real Douyin sample gate. |
-| Async video job implementation | Complete for upload/safety smoke, incomplete for real Douyin sample | Deployed Bridge/Worker supports async jobs and Tiny Upload end-to-end. Same-origin evidence includes `POST /openclaw-api/uploads -> 202`, polling and upload result. `Post-Login Acceptance` is deployed to re-run identity, negative URL jobs, Tiny Upload and result retrieval after login returns. Real Douyin URL sample still pending. |
-| SSRF and URL validation | Partial complete | URL guard rejects non-Douyin, localhost, private IP, metadata IP and userinfo URLs; redirect targets are revalidated hop by hop, loops and excessive redirects are rejected, and the worker analyzes the final canonical URL. Wrapper-level max download bytes, duration and frame-count arguments are contract-tested. Real downloader enforcement still depends on the missing `douyin_chong` artifact. |
+| Use git version management | In progress | Git history and remote are active. New relaxed-gate/root-test docs are being committed before the next root deployment checkpoint. |
+| Re-review plan with ChatGPT web before execution | Retired / not required | User explicitly retired the mandatory web-review gate on 2026-06-07. Web review is optional only for major architecture disputes, release/security sign-off, or explicit user request. Do not block implementation, root deployment, or testing on this step. |
+| Use OpenClaw 3.13 | Complete for current sidecar scope | OpenClaw artifact is versioned under `artifacts/openclaw-2026.3.13/`; current security state is approved exception for private Gateway behind Bridge only, with Gateway token never sent to browser. |
+| Phase 0 server read-only verification | Complete for prior baseline, refresh after deploy | `phase0-execution-log.md` and `phase0-readonly-recheck-20260606.md`; no server modification performed in those checks. Refresh container invariants after the next root deployment. |
+| Public Dify unauthenticated baseline | Complete, refresh after deploy | Public smoke has checked Dify routes and OpenClaw routes without recording sensitive material. Refresh after the next root deployment. |
+| Dify Web/admin authenticated login for OpenClaw | Retired | OpenClaw has an independent standalone login page at `https://www.huahuoai.com/ai/openclaw-lab/`. Users do not need to log in to Dify Web or Dify admin for this integration. |
+| OpenClaw standalone login UI | Complete, refresh after deploy | Phase 4 standalone login acceptance passed. The login UI is the current user entry point and should be tested directly in Chrome after the next root deployment. |
+| OpenClaw Bridge artifact | Complete for current sidecar scope | Bridge is deployed as sidecar and supports OpenClaw-owned sessions, identity/access checks, session/job APIs, uploads, async polling, SSE endpoints, retention cleanup and safe diagnostics. |
+| `douyin_chong` video tool artifact | Complete for current link-read scope | Artifact manifest is verified. Douyin account login, browser storage state and `REAL_SAMPLE_EVIDENCE.json` are retired as blockers. Runtime model credentials still need to be valid for deep analysis jobs to succeed. |
+| Async video job implementation | Complete for upload/safety/link-read gate scope | Bridge/Worker supports async jobs and Tiny Upload. `Post-Login Acceptance` covers identity, negative URL jobs, Tiny Upload and result retrieval. Real Douyin URL testing should run when an explicit sample URL and valid runtime model configuration are available. |
+| SSRF and URL validation | Complete for current gate scope | URL guard rejects non-Douyin, localhost, private IP, metadata IP and userinfo URLs; redirect targets are revalidated hop by hop; worker analyzes the final canonical URL. |
 | Bridge Postgres migrations | Complete for current sidecar scope | Sidecar compose includes Bridge Postgres; deployed service is internal-only. Durable queue and session/job storage are active for current sidecar. |
-| OpenClaw Gateway deployment | Partial | Gateway container is deployed internally and not publicly exposed. Full OpenClaw/Gateway model-backed behavior still needs final authenticated acceptance and real/sample evidence. |
-| Docker compose sidecar | Complete for current sidecar scope | `openclaw-video` compose project is deployed; Bridge is bound to `127.0.0.1:18181`; Gateway/Postgres remain private. Dify compose was not modified. |
-| Short-video knowledge base artifact | Complete for current sidecar scope | Versioned knowledge artifact exists and is included in sidecar bundle with read-only mount contract. |
-| OpenResty route integration | Complete for guarded same-origin route | `/openclaw-lab/` and `/openclaw-api/` are routed through the existing `www.huahuoai.com` OpenResty origin to `127.0.0.1:18181`. Dify Web image and compose were not changed. |
-| Public `/openclaw-lab/` and `/openclaw-api/` tests | Partial complete | Public Playwright smoke passes for Lab, unauthenticated `/openclaw-api/me=401`, Huahuo user web and Dify admin route. Authenticated OpenClaw post-login gate is still pending Huahuo user-web login. |
-| Dify unaffected under video-analysis load | Partial complete | Dify core container IDs/StartedAt timestamps remained unchanged; public smoke has no new 5xx; earlier same-origin evidence includes a Huahuo user-web parallel reply while Tiny Upload ran. Final logged-in regression after latest deployed `Post-Login Acceptance` remains pending. |
-| Rollback without Dify restart | Complete for current sidecar route | Rollback command to `/app/bin/openclaw-video/releases/84e13d007d33` is documented and does not require rebuilding/restarting Dify api/web/nginx containers. |
+| OpenClaw Gateway deployment | Complete for private sidecar scope | Gateway container is internal-only and not publicly exposed. Browser-visible requests go to Bridge routes only. |
+| Docker compose sidecar | Complete for current sidecar scope | `openclaw-video` compose project is deployed. Dify compose was not modified. |
+| Short-video knowledge base artifact | Complete for current sidecar scope | Versioned knowledge artifact exists and is included in the sidecar bundle with read-only mount contract. |
+| OpenResty route integration | Complete for guarded route scope | OpenClaw routes are isolated and rollbackable. Dify Web image and compose were not changed. |
+| Public OpenClaw browser tests | Complete for prior standalone-login checkpoint, refresh after deploy | Prior public smoke and standalone login acceptance passed. Next root deployment must refresh this evidence against `https://www.huahuoai.com/ai/openclaw-lab/`. |
+| Dify unaffected under OpenClaw testing | Complete for prior guarded evidence, refresh after deploy | Dify core container IDs/StartedAt timestamps remained unchanged during prior sidecar deployments; public smoke had no new checked 5xx. Refresh after the next root deploy/test cycle. |
+| Rollback without Dify restart | Complete for current sidecar route, refresh release pointer after deploy | Rollback command is documented and does not require rebuilding/restarting Dify api/web/nginx containers. |
 
 ## Current Go / No-Go
 
 ```text
-Continue Phase 4 post-login/browser acceptance work: GO
-Guarded sidecar route remains deployed: GO
-Run real/sanitized Douyin sample: GO when sample input/runtime is available
-Full production completion: NO-GO
+Continue direct root deployment/testing work: GO
+OpenClaw standalone login page: deployed previously; refresh now
+Video link-read mode: GO
 Modify Dify Web or compose: NO-GO
 Restart/recreate Dify containers: NO-GO
-Mark objective complete: NO-GO
+Mandatory web GPT review: NOT_REQUIRED
+Mark full objective complete: NO_GO until fresh root deploy/browser/server evidence is recorded and git is pushed
 ```
 
-## Blocking Conditions
+## Remaining Work For Completion
 
-1. Current Chrome lacks Huahuo user-web login at `https://www.huahuoai.com/ai/?id=4`; the post-login runner returns `PENDING_LOGIN`.
-2. `REAL_SAMPLE_EVIDENCE.json` for a real Douyin sample is still missing.
-3. Final logged-in Huahuo/Dify regression after the latest sidecar deployment is not yet recorded.
-4. Real local-file upload via Chrome file chooser remains limited by Chrome extension file access permission; Tiny Upload confirms the same API/worker path, but full local file chooser proof is still pending.
-5. Full objective cannot be marked complete until `scripts/audit_phase4_current_state.py --smoke-summary <latest summary.json> --include-git-clean` no longer reports `PENDING_LOGIN` or `NO_GO` gates.
+1. Run local tests for the relaxed-gate/documentation checkpoint.
+2. Commit and push the checkpoint.
+3. Build/upload/deploy current OpenClaw sidecar bundle on root using ssh-skill.
+4. Confirm root release pointer and rollback marker.
+5. Confirm Dify core container IDs and `StartedAt` did not change.
+6. Test `https://www.huahuoai.com/ai/openclaw-lab/` directly in Chrome.
+7. Log in through the OpenClaw standalone login UI and run post-login acceptance.
+8. Run security negative checks and video link-read checks with an explicit URL
+   when a valid sample URL/runtime model configuration is available.
+9. Run public smoke and Dify unaffected checks.
+10. Commit/push sanitized deployment evidence.

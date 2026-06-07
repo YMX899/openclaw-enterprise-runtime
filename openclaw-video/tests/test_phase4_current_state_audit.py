@@ -108,18 +108,18 @@ STANDALONE_LOGIN_PASS = {
 
 
 class Phase4CurrentStateAuditTests(unittest.TestCase):
-    def test_current_repo_reports_known_remaining_gates(self):
+    def test_current_repo_reports_current_gates_pass(self):
         smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260606T195713Z" / "summary.json"
         report = phase4_audit.audit(REPO_ROOT, smoke_summary=smoke, include_git_clean=True)
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
 
-        self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["phase4_deployment_evidence"], "PASS")
         self.assertEqual(statuses["chrome_post_login_runner"], "PASS")
         self.assertEqual(statuses["public_smoke_latest"], "PASS")
         self.assertEqual(statuses["authenticated_browser_gate"], "PASS")
         self.assertEqual(statuses["video_link_read_mode"], "PASS")
         self.assertIn(statuses["git_clean"], {"PASS", "NO_GO"})
+        self.assertEqual(report["overall"], "PASS" if statuses["git_clean"] == "PASS" else "NO_GO")
 
     def test_all_phase4_current_state_markers_can_pass(self):
         with TemporaryDirectory() as tmp:
