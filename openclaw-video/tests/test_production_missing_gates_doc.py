@@ -8,14 +8,15 @@ DOC_PATH = REPO_ROOT / "production-root-missing-gates-20260606.md"
 
 
 class ProductionMissingGatesDocTests(unittest.TestCase):
-    def test_doc_records_remaining_hard_gate_without_claiming_pass(self):
+    def test_doc_records_remaining_hard_gate_without_claiming_full_pass(self):
         text = DOC_PATH.read_text(encoding="utf-8")
 
         self.assertIn("root deployment is still NO_GO", text)
-        self.assertIn("authenticated_dify_baseline", text)
-        self.assertIn("remaining preflight gate: authenticated_dify_baseline", text)
-        self.assertNotRegex(text, r"authenticated_baseline:\s*PASS\b")
-        self.assertNotRegex(text, r"existing app message:\s*PASS\b")
+        self.assertIn("douyin_real_sample", text)
+        self.assertIn("remaining production readiness gate: douyin_real_sample", text)
+        self.assertIn("OpenClaw standalone login evidence: PASS", text)
+        self.assertIn("legacy ai001 console login is no longer a blocking", text)
+        self.assertNotRegex(text, r"REAL_SAMPLE_EVIDENCE\.json:\s*PASS\b")
 
     def test_doc_records_operator_deferred_sample_as_current_phase_only(self):
         text = DOC_PATH.read_text(encoding="utf-8")

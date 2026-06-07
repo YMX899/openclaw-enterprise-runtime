@@ -7,6 +7,14 @@ after the Ubuntu 22.04 test phase passed. It is intentionally versioned so the
 system can return to the previous state by checking out the tagged commit before
 any future production deploy bundle is built.
 
+Scope clarification on 2026-06-07: the user-facing Dify web path for this
+integration is the Huahuo/OpenClaw page on `https://www.huahuoai.com`, not the
+legacy `https://ai001.huahuoai.com/apps` operator console. The production
+readiness gate named `authenticated_dify_baseline` is kept for compatibility
+with older preflight code, but it is now satisfied by the OpenClaw standalone
+login browser evidence. The legacy ai001 console login is no longer a blocking
+requirement for this project.
+
 No cookies, Authorization headers, CSRF values, browser storage, password
 values, private key contents, model API key contents, `.env` contents, database
 connection strings, Redis passwords or full request headers were read or
@@ -17,6 +25,7 @@ recorded for this inventory.
 - Ubuntu 22.04 phase audit: PASS.
 - Isolated Linux Docker Phase 1.5 proof: PASS.
 - Ubuntu 22.04 authenticated Dify baseline: PASS.
+- OpenClaw standalone login on Huahuo user web: PASS.
 - OpenClaw version under test: `2026.3.13`.
 - OpenClaw security triage: allowed by operator-approved exception.
 - `douyin_chong` artifact manifest: verified.
@@ -37,22 +46,28 @@ recorded for this inventory.
 The remaining hard blocker is:
 
 ```text
-authenticated_dify_baseline
+douyin_real_sample
 ```
 
 Current evidence:
 
 ```text
-Chrome open tabs matching ai001.huahuoai.com or Dify: 0
-prior direct Chrome navigation: net::ERR_BLOCKED_BY_CLIENT
-root deploy preflight with ALLOW_DOUYIN_SAMPLE_DEFERRED=1: NO_GO
-remaining preflight gate: authenticated_dify_baseline
+OpenClaw standalone login evidence: PASS
+Huahuo/OpenClaw post-login browser acceptance: PASS
+REAL_SAMPLE_EVIDENCE.json: missing
+latest real sample attempt: Ark model authentication returned HTTP 401
+remaining production readiness gate: douyin_real_sample
 ```
 
-This means the system still needs a real logged-in production Dify browser
-baseline before any root deployment or public `/openclaw-lab/` route work.
+This means the system still needs one sanitized, model-backed, real Douyin
+sample evidence file before full production GO. The OpenClaw browser login
+scope is no longer blocking.
 
-## Required Production Browser Baseline
+## Retired Legacy Browser Baseline
+
+The old ai001 console browser baseline below is retained as historical context
+only. It is not part of the current blocking checklist because users now log in
+to the OpenClaw page itself.
 
 The next operator action is to open Chrome manually, sign in to:
 

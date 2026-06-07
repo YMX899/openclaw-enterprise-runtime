@@ -10,6 +10,26 @@ The Dify sign-in page is reachable from the local Chrome browser. Unauthenticate
 
 Server-side `curl` from the root server to the same public HTTPS host returned `403 Forbidden` from OpenResty, while the user's Chrome browser could load the sign-in page. This confirms that real browser testing must be part of every future acceptance and rollback run; server-side curl alone is not a reliable substitute for public browser behavior.
 
+## Scope Clarification 2026-06-07
+
+The current user-facing web scope for OpenClaw is independent from the legacy
+Dify operator console. Users now log in to the OpenClaw page on
+`https://www.huahuoai.com` with the OpenClaw standalone login form; the bridge
+checks those credentials against the configured identity backends and creates an
+OpenClaw session. The `https://ai001.huahuoai.com/apps` console login baseline
+below remains useful historical context, but it is no longer a production
+readiness blocker for the OpenClaw web integration.
+
+Current replacement evidence:
+
+```text
+OpenClaw standalone login browser acceptance: PASS
+Huahuo/OpenClaw page: https://www.huahuoai.com/ai/openclaw-lab/
+OpenClaw session mode: PASS
+Post-login browser acceptance: PASS
+Secrets/cookies/headers/passwords recorded: NO
+```
+
 ## Real Chrome Browser Baseline
 
 Browser route:
@@ -210,7 +230,10 @@ Server-side public curl baseline: NOT REPRESENTATIVE, returns 403
 Authenticated Dify app baseline: BLOCKED, credentials/session not provided
 ```
 
-Future OpenClaw public route work must not proceed past Phase 2 until authenticated real-browser Dify baseline is complete.
+Historical note: this Go / No-Go conclusion was superseded by the 2026-06-07
+scope clarification above. The current OpenClaw public route work is gated by
+OpenClaw standalone login evidence on `https://www.huahuoai.com`, not by a
+logged-in ai001 console session.
 
 ## Internal Baseline Refresh 2026-06-06 10:36 Asia/Shanghai
 
@@ -236,8 +259,10 @@ Interpretation:
 
 - Unauthenticated internal Dify baseline remains healthy.
 - `401` for profile without login remains expected.
-- Authenticated browser baseline is still incomplete and remains mandatory
-  before any future public `/openclaw-lab/` or `/openclaw-api/` route exposure.
+- Authenticated ai001 console browser baseline was incomplete at this point in
+  the history. As of 2026-06-07 this legacy console baseline is not mandatory
+  for the OpenClaw user-facing route because OpenClaw has its own standalone
+  login evidence.
 
 ## Real Chrome Refresh 2026-06-06
 
@@ -305,8 +330,9 @@ Interpretation:
 - Public unauthenticated UX remains consistent: `/apps` redirects to `/signin`.
 - The API direct-tab browser block is still a browser/client behavior and is not
   used as a Dify server failure signal.
-- Authenticated existing-app workflow testing remains incomplete and is still a
-  required gate before any public OpenClaw route exposure.
+- Authenticated ai001 existing-app workflow testing remained incomplete at this
+  historical checkpoint. As of 2026-06-07 it is no longer the public OpenClaw
+  route gate.
 
 ## Real Chrome Refresh 2026-06-06 12:16 Asia/Shanghai
 

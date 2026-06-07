@@ -80,7 +80,42 @@ decision: approve_exception
 """
 
 
-DIFY_BROWSER_BASELINE_PASS = """
+OPENCLAW_STANDALONE_LOGIN_PASS = """
+{
+  "schema": "openclaw-standalone-login-browser-acceptance.v1",
+  "status": "PASS",
+  "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "login_status": 200,
+  "login_authenticated": true,
+  "login_principal_len": 64,
+  "diagnostics": {
+    "authenticated": true,
+    "openclaw_session_present": true,
+    "auth_mode": "openclaw_session",
+    "huahuo_access_token_present": false,
+    "huahuo_app_uuid_present": false,
+    "profile_ok": true,
+    "workspace_ok": true,
+    "access_ok": true,
+    "provider_probe_present": false
+  },
+  "post_login_acceptance": {
+    "overall": "PASS",
+    "step_count": 16,
+    "failed_steps": []
+  },
+  "console_error_count": 0,
+  "account_recorded": false,
+  "password_recorded": false,
+  "secrets_recorded": false,
+  "headers_recorded": false,
+  "cookies_recorded": false,
+  "local_storage_values_recorded": false
+}
+"""
+
+
+LEGACY_DIFY_BROWSER_BASELINE_PASS = """
 {
   "schema": "dify-authenticated-baseline-browser-acceptance.v1",
   "status": "PASS",
@@ -111,7 +146,7 @@ class ProductionReadinessAuditTests(unittest.TestCase):
         self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["douyin_real_sample"], "NO_GO")
         self.assertEqual(statuses["phase1_5_exit_proof"], "PASS")
-        self.assertEqual(statuses["authenticated_dify_baseline"], "NO_GO")
+        self.assertEqual(statuses["authenticated_dify_baseline"], "PASS")
 
     def test_all_markers_present_is_go(self):
         with TemporaryDirectory() as tmp:
@@ -177,17 +212,8 @@ worker image
 """,
             )
             write(
-                repo / "dify-public-baseline.md",
-                """
-authenticated_baseline: PASS
-existing app message: PASS
-streaming reply: PASS
-refresh: PASS
-history: PASS
-logout: PASS
-profile 401: PASS
-new 5xx: NONE
-""",
+                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                OPENCLAW_STANDALONE_LOGIN_PASS,
             )
             write(repo / "openresty-route-map-redacted.md", "no OpenClaw route present\n")
 
@@ -235,17 +261,8 @@ worker image
 """,
             )
             write(
-                repo / "dify-public-baseline.md",
-                """
-authenticated_baseline: PASS
-existing app message: PASS
-streaming reply: PASS
-refresh: PASS
-history: PASS
-logout: PASS
-profile 401: PASS
-new 5xx: NONE
-""",
+                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                OPENCLAW_STANDALONE_LOGIN_PASS,
             )
             write(repo / "openresty-route-map-redacted.md", "no OpenClaw route present\n")
 
@@ -291,7 +308,7 @@ new 5xx: NONE
         self.assertIn("latest attempt blocked", result.evidence)
         self.assertIn("http_401", result.evidence)
 
-    def test_dify_authenticated_baseline_attempt_is_reported_but_not_passed(self):
+    def test_legacy_dify_console_attempt_no_longer_satisfies_login_gate(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(repo / "dify-public-baseline.md", "authenticated_baseline: BLOCKED\n")
@@ -310,28 +327,28 @@ new 5xx: NONE
             result = audit_module.check_authenticated_dify_baseline(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("authenticated public Dify baseline blocked", result.evidence)
-        self.assertIn("signin", result.evidence)
+        self.assertIn("OpenClaw standalone login evidence", result.evidence)
+        self.assertIn("legacy ai001", result.evidence)
 
-    def test_dify_authenticated_browser_evidence_can_pass(self):
+    def test_openclaw_standalone_login_evidence_can_pass(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-browser-acceptance-20260607.json",
-                DIFY_BROWSER_BASELINE_PASS,
+                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                OPENCLAW_STANDALONE_LOGIN_PASS,
             )
 
             result = audit_module.check_authenticated_dify_baseline(repo)
 
         self.assertEqual(result.status, "PASS")
-        self.assertIn("browser evidence", result.evidence)
+        self.assertIn("OpenClaw standalone login", result.evidence)
 
-    def test_dify_authenticated_browser_evidence_rejects_sensitive_recording(self):
+    def test_openclaw_standalone_login_evidence_rejects_sensitive_recording(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            payload = DIFY_BROWSER_BASELINE_PASS.replace('"cookies_recorded": false', '"cookies_recorded": true')
+            payload = OPENCLAW_STANDALONE_LOGIN_PASS.replace('"password_recorded": false', '"password_recorded": true')
             write(
-                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-browser-acceptance-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
                 payload,
             )
 
@@ -339,6 +356,19 @@ new 5xx: NONE
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("did not pass", result.evidence)
+
+    def test_legacy_dify_browser_evidence_no_longer_passes_gate(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-browser-acceptance-20260607.json",
+                LEGACY_DIFY_BROWSER_BASELINE_PASS,
+            )
+
+            result = audit_module.check_authenticated_dify_baseline(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("legacy ai001", result.evidence)
 
     def test_openclaw_security_requires_triage_when_decision_approved(self):
         with TemporaryDirectory() as tmp:

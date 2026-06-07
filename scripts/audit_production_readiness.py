@@ -213,72 +213,80 @@ def check_phase1_5_exit(repo: Path) -> GateResult:
     return GateResult("phase1_5_exit_proof", "PASS", "isolated Linux Docker exit proof markers present")
 
 
+def _openclaw_standalone_login_safe(payload: dict[str, Any]) -> bool:
+    return (
+        payload.get("secrets_recorded") is False
+        and payload.get("headers_recorded") is False
+        and payload.get("cookies_recorded") is False
+        and payload.get("local_storage_values_recorded") is False
+        and payload.get("account_recorded") is False
+        and payload.get("password_recorded") is False
+    )
+
+
+def _openclaw_standalone_login_passed(payload: dict[str, Any]) -> bool:
+    diagnostics = payload.get("diagnostics") or {}
+    acceptance = payload.get("post_login_acceptance") or {}
+    return (
+        payload.get("schema") == "openclaw-standalone-login-browser-acceptance.v1"
+        and payload.get("status") == "PASS"
+        and payload.get("login_status") == 200
+        and payload.get("login_authenticated") is True
+        and payload.get("login_principal_len") == 64
+        and isinstance(payload.get("page_url"), str)
+        and payload["page_url"].startswith("https://www.huahuoai.com/")
+        and "openclaw-lab" in payload["page_url"]
+        and diagnostics.get("authenticated") is True
+        and diagnostics.get("openclaw_session_present") is True
+        and diagnostics.get("auth_mode") == "openclaw_session"
+        and diagnostics.get("huahuo_access_token_present") is False
+        and diagnostics.get("huahuo_app_uuid_present") is False
+        and diagnostics.get("profile_ok") is True
+        and diagnostics.get("workspace_ok") is True
+        and diagnostics.get("access_ok") is True
+        and diagnostics.get("provider_probe_present") is False
+        and acceptance.get("overall") == "PASS"
+        and acceptance.get("step_count") == 16
+        and acceptance.get("failed_steps") == []
+        and payload.get("console_error_count") == 0
+        and _openclaw_standalone_login_safe(payload)
+    )
+
+
 def check_authenticated_dify_baseline(repo: Path) -> GateResult:
-    evidence_path = repo / "artifacts" / "evidence" / "phase4" / "dify-authenticated-baseline-browser-acceptance-20260607.json"
+    # Compatibility note: the gate id is kept so older preflight code keeps
+    # working, but the current production scope is the OpenClaw standalone login
+    # on the Huahuo user-facing web. The ai001 Dify console login is legacy
+    # operator-console evidence and is no longer a blocking requirement here.
+    evidence_path = (
+        repo
+        / "artifacts"
+        / "evidence"
+        / "phase4"
+        / "openclaw-standalone-login-browser-acceptance-20260607.json"
+    )
     if evidence_path.exists():
         try:
             evidence = json.loads(_read(evidence_path))
         except json.JSONDecodeError:
-            return GateResult("authenticated_dify_baseline", "NO_GO", "Dify baseline evidence is not valid JSON")
-        safe_flags = (
-            evidence.get("cookies_recorded") is False
-            and evidence.get("headers_recorded") is False
-            and evidence.get("local_storage_values_recorded") is False
-            and evidence.get("session_storage_values_recorded") is False
-            and evidence.get("tokens_recorded") is False
-            and evidence.get("passwords_recorded") is False
-        )
-        if (
-            evidence.get("schema") == "dify-authenticated-baseline-browser-acceptance.v1"
-            and evidence.get("status") == "PASS"
-            and evidence.get("authenticated_baseline") is True
-            and evidence.get("existing_app_message") is True
-            and evidence.get("streaming_reply") is True
-            and evidence.get("refresh") is True
-            and evidence.get("history") is True
-            and evidence.get("logout") is True
-            and evidence.get("profile_401") is True
-            and evidence.get("new_5xx_none") is True
-            and safe_flags
-        ):
-            return GateResult("authenticated_dify_baseline", "PASS", "authenticated Dify browser evidence passed")
-        return GateResult("authenticated_dify_baseline", "NO_GO", "authenticated Dify browser evidence did not pass required checks")
-
-    path = repo / "dify-public-baseline.md"
-    if not path.exists():
-        return GateResult("authenticated_dify_baseline", "NO_GO", f"missing {path}")
-    text = _read(path)
-    pass_markers = [
-        r"authenticated[_ -]?baseline:\s*PASS\b",
-        r"existing app message:\s*PASS\b",
-        r"streaming reply:\s*PASS\b",
-        r"refresh:\s*PASS\b",
-        r"history:\s*PASS\b",
-        r"logout:\s*PASS\b",
-        r"profile 401:\s*PASS\b",
-        r"new 5xx:\s*NONE\b",
-    ]
-    missing = [pattern for pattern in pass_markers if not re.search(pattern, text, re.IGNORECASE)]
-    if missing:
-        attempt_path = repo / "artifacts" / "evidence" / "phase4" / "dify-authenticated-baseline-attempt-20260607.json"
-        if attempt_path.exists():
-            try:
-                attempt = json.loads(_read(attempt_path))
-            except json.JSONDecodeError:
-                attempt = {}
-            reason = str(attempt.get("reason") or "authenticated baseline attempt exists but has not passed")
-            final_url = str(attempt.get("final_url") or "unknown")
+            return GateResult("authenticated_dify_baseline", "NO_GO", "OpenClaw standalone login evidence is not valid JSON")
+        if _openclaw_standalone_login_passed(evidence):
             return GateResult(
                 "authenticated_dify_baseline",
-                "NO_GO",
-                f"authenticated public Dify baseline blocked: {reason}; final_url={final_url}",
+                "PASS",
+                "OpenClaw standalone login baseline passed on Huahuo user web; Dify console login is not required",
             )
         return GateResult(
             "authenticated_dify_baseline",
             "NO_GO",
-            "authenticated public Dify baseline has not passed",
+            "OpenClaw standalone login evidence did not pass required checks",
         )
-    return GateResult("authenticated_dify_baseline", "PASS", "authenticated public Dify baseline passed")
+
+    return GateResult(
+        "authenticated_dify_baseline",
+        "NO_GO",
+        "missing OpenClaw standalone login evidence; legacy ai001 Dify console login evidence no longer satisfies this gate",
+    )
 
 
 def check_production_route_absent(repo: Path) -> GateResult:
