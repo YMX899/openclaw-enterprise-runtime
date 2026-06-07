@@ -31,6 +31,13 @@ review, Dify web login, Douyin account login, or
 
 - The OpenClaw page is the user's primary product surface, not just a test
   harness.
+- First entry to the OpenClaw page is a Chinese product-introduction page in the
+  style of a polished vendor/product site. The top-right navigation must expose
+  only one action: login.
+- After successful OpenClaw-owned login, the page switches to a Chinese chat
+  workspace with new conversation, historical conversation list, normal chat
+  composer, video link analysis controls, upload fallback, result status and
+  secondary diagnostics.
 - Login, chat/conversation, video-link submission, upload checks, post-login
   acceptance and diagnostic output must be visually coherent on the OpenClaw
   page itself.

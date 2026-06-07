@@ -235,7 +235,9 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
   await browser.tabs.new();
 }
 openclaw-ui-productized-root-acceptance.v1
-Post-Login Acceptance
+#openLogin
+landing_chinese_entry
+login_entry_text === "登录"
 PENDING_CREDENTIALS
 secrets_recorded: false
 headers_recorded: false

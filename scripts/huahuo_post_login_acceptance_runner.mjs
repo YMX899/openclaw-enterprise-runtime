@@ -39,11 +39,15 @@ async function captureUiState(tab) {
     const text = (selector) => document.querySelector(selector)?.innerText || "";
     const value = (selector) => document.querySelector(selector)?.value || "";
     const requiredIds = [
+      "openLogin",
+      "landingPage",
+      "chatApp",
       "loginAccount",
       "loginPassword",
       "loginButton",
       "logoutButton",
       "createSession",
+      "sessionList",
       "sessionId",
       "videoUrl",
       "readVideoLink",
@@ -63,6 +67,9 @@ async function captureUiState(tab) {
       result_card_count: document.querySelectorAll(".result-card").length,
       diagnostics_open: document.querySelector(".diagnostics-panel")?.open === true,
       raw_response_present: !!document.querySelector("#output"),
+      landing_present: !!document.querySelector("#landingPage"),
+      chat_app_present: !!document.querySelector("#chatApp"),
+      login_entry_text: text("#openLogin"),
       source_tabs_present: !!document.querySelector(".source-tabs"),
       link_active: document.querySelector("#linkSourcePanel")?.hidden === false,
       upload_hidden: document.querySelector("#uploadSourcePanel")?.hidden === true,
@@ -75,6 +82,7 @@ async function captureUiState(tab) {
         client_width: document.documentElement.clientWidth,
       },
       ui_text: {
+        landing_headline: text("#landingPage h2"),
         auth_status: text("#authStatus"),
         run_state: text("#runState"),
         auth_metric: text("#authMetric"),
@@ -113,7 +121,10 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
     await labTab.playwright.waitForTimeout(1200);
 
     const labText = await labTab.playwright.locator("body").innerText({ timeoutMs: 10000 });
-    const hasLoginForm = labText.includes("OpenClaw Login") && labText.includes("Post-Login Acceptance");
+    const hasLoginForm = await labTab.playwright.evaluate(() => {
+      const required = ["openLogin", "landingPage", "chatApp", "loginAccount", "loginPassword", "loginButton"];
+      return required.every((id) => !!document.querySelector(`#${id}`));
+    });
     if (!account || !password || !hasLoginForm) {
       finalReport = {
         schema: "openclaw-ui-productized-root-acceptance.v1",
@@ -151,6 +162,10 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
       return finalReport;
     }
 
+    const openLogin = labTab.playwright.locator("#openLogin");
+    if (await openLogin.count()) {
+      await openLogin.click({ timeoutMs: 10000 });
+    }
     await labTab.playwright.locator("#loginAccount").fill(account, { timeoutMs: 10000 });
     await labTab.playwright.locator("#loginPassword").fill(password, { timeoutMs: 10000 });
     await labTab.playwright.locator("#loginButton").click({ timeoutMs: 10000 });
@@ -163,6 +178,7 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
     }
     const authStatusText = await labTab.playwright.locator("#authStatus").innerText({ timeoutMs: 10000 });
 
+    await labTab.playwright.locator("#validationTools").evaluate((node) => { node.open = true; }).catch(() => {});
     await labTab.playwright.locator("#identityDiagnostics").click({ timeoutMs: 10000 });
     let diagnosticsOutput = null;
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -202,7 +218,9 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
         page_loaded: !!labText,
         workflow_present: hasLoginForm,
         source_tabs_present: uiState.source_tabs_present === true,
-        result_cards_present: uiState.result_card_count === 3,
+        landing_chinese_entry: uiState.login_entry_text === "登录",
+        chat_app_present: uiState.chat_app_present === true,
+        result_cards_present: uiState.result_card_count === 4,
         diagnostics_available: uiState.diagnostics_open === true,
         raw_json_secondary: uiState.raw_response_present === true,
         desktop_no_horizontal_overflow: uiState.horizontal_overflow === false,
