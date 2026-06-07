@@ -1,8 +1,8 @@
 # OpenClaw 2026.3.13 Security Decision
 
-Status: approved exception for Phase 1.5 isolated validation and controlled
-sidecar trials only. This is not a blanket approval to expose OpenClaw Gateway
-publicly or to bypass the remaining production readiness gates.
+Status: approved exception for the current OpenClaw sidecar boundary. This is
+not a blanket approval to expose OpenClaw Gateway publicly or to bypass the
+current production readiness gates.
 
 ## Decision
 
@@ -17,12 +17,12 @@ engineering_owner: Codex implementation gate with user authorization
 
 ```text
 openclaw_version: 2026.3.13
-allowed_scope: Phase 1.5 isolated Ubuntu 22.04 Docker validation and later private sidecar testing only
+allowed_scope: OpenClaw sidecar behind Bridge on the Huahuo domain
 gateway_exposure: private network only
 browser_exposure: Gateway token never sent to browser
 bridge_scopes: operator.read, operator.write
 operator_admin: forbidden
-dify_modification: forbidden before independent acceptance passes
+dify_modification: forbidden without explicit maintenance approval
 ```
 
 The pinned package still has known `npm audit --omit=dev --json` findings. The
@@ -30,17 +30,19 @@ exception relies on compensating controls documented in `SECURITY_TRIAGE.md`:
 private Gateway network, no public Gateway port, no Docker socket, no browser
 token exposure, Bridge ACL before Gateway calls, and no operator admin scope.
 
-## Remaining Production Conditions
+## Current Production Conditions
 
-Before root deployment, the following gates must still pass:
+The exception remains valid only while these conditions hold:
 
 ```text
-Phase 1.5 isolated Docker proof
-authenticated Dify public baseline
-OpenResty rollback route plan
-private Gateway exposure check
-Bridge/browser token leak checks
-douyin_chong artifact validation or explicit current-phase deferral
+Gateway and Postgres have no public browser route
+browser traffic reaches Bridge only
+Gateway token and device key stay server-side
+Bridge scopes stay operator.read, operator.write
+operator.admin remains forbidden
+Dify api/web/nginx containers are not restarted or rebuilt for OpenClaw work
+OpenClaw-owned login evidence passes
+video link-read mode and real-video analysis evidence pass
 ```
 
 This exception does not authorize exposing Gateway, Postgres, Docker Socket, or

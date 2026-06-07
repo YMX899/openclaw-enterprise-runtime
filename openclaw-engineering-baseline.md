@@ -16,8 +16,8 @@ review, Dify web login, Douyin account login, or
 - Direct root-server deployment and testing are allowed when the change is
   reversible and does not restart, rebuild, or recreate existing Dify
   containers.
-- Development gates are relaxed for root testing. Do not block on historical
-  Phase 1.5/Phase 4 wording when the current production audit and direct
+- Development gates are relaxed for root testing. Do not block on retired
+  historical phase-gate wording when the current production audit and direct
   browser/server checks prove the current scheme.
 - Use git for meaningful changes. A dirty worktree may exist during active
   development; a clean worktree is required only before claiming a final

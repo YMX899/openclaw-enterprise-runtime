@@ -1,7 +1,7 @@
 # douyin_chong Artifact Manifest
 
-Status: verified for current Phase 1.5 isolated validation with video link-read
-mode adopted. This file is a production gate, not a deployment approval.
+Status: verified for the current OpenClaw video link-read mode. This file is a
+production input record, not a deployment approval.
 
 A local candidate Python package was found at:
 
@@ -94,9 +94,10 @@ The committed decision record is:
 artifacts/douyin_chong/LINK_READ_DECISION.md
 ```
 
-The historical real-sample runner remains available as an optional diagnostic
-tool, but the production gate now validates link-read mode instead of requiring
-a committed sample evidence file.
+The historical real-sample runner has been removed so future work does not
+reintroduce the retired sample gate. The production gate now validates
+link-read mode and root OpenClaw evidence instead of requiring a committed
+sample evidence file.
 
 ## Required Evidence Before Phase 2
 
@@ -123,19 +124,15 @@ a committed sample evidence file.
 - CPU, memory and disk profile.
 - temporary file path.
 - cleanup behavior.
-- link-read success behavior through unit and browser acceptance coverage.
+- link-read success behavior through unit, root page/API and browser acceptance
+  coverage.
 - link-read failed behavior for rejected URLs and tool failures.
-- isolated Linux Docker validation through `scripts/verify_phase1_5_gates.sh`
-  without skipping Docker.
+- root OpenClaw page/API validation with sanitized real-video evidence.
 
-The committed helper for producing sanitized real-sample evidence is:
-
-```text
-scripts/run_douyin_real_sample.py
-```
-
-This helper is not itself production approval. It is a controlled optional
-diagnostic for schema, timing and resource evidence without recording secrets.
+The old committed helper for producing standalone real-sample evidence was
+deleted after the scheme change. Current real-video validation is performed
+through the deployed OpenClaw page/API and committed only as sanitized root
+evidence.
 
 ## Production Constraints
 

@@ -146,17 +146,17 @@ Current real video analysis root evidence:
 artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json
 ```
 
-This evidence proves a previous root real-model run, but its recorded release is
-`/app/bin/openclaw-video/releases/f1ba8273e7b6`. It must be refreshed on the
-currently deployed root release before the whole execution plan can be marked
-complete.
+This evidence has been refreshed on current root release
+`/app/bin/openclaw-video/releases/c9aaaa8c6655` by reusing the prior sanitized
+URL hash match inside root Postgres. The raw video link was not printed or
+committed.
 
 Current engineering baseline:
 
 ```text
 openclaw-engineering-baseline.md
 openclaw-video/README.md
-phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md
+artifacts/evidence/phase4/
 ```
 
 ## Current Status
@@ -172,19 +172,25 @@ Completed on 2026-06-07:
 - A Chrome read-only review confirms the current browser-facing page shows
   OpenClaw-owned login copy, Dify Web login independence, the Read Link entry
   and no page-level horizontal overflow.
-- The newest engineering commit `e24b2594be5679ef4624f08d0da1424ee2326800`
-  changes only evidence, tests, audit helpers and retired-file cleanup relative
-  to deployed release `c9aaaa8c6655`; it does not require a root Bridge restart
-  by itself.
+- The newest engineering commit `516b6b3e060e` changes only documentation and
+  sanitized Chrome review evidence relative to deployed release `c9aaaa8c6655`;
+  it does not require a root Bridge restart by itself.
+- The old standalone `run_douyin_real_sample` path and its tests have been
+  retired from the active engineering path. Real-video evidence must be
+  refreshed through the deployed OpenClaw page/API, not through
+  `REAL_SAMPLE_EVIDENCE.json`.
+- Real-video analysis evidence has been refreshed through the deployed
+  OpenClaw API on root release `c9aaaa8c6655`; job prefix `afa95a9f`
+  succeeded with `openclaw-video-result.v1`, request/usage metadata present,
+  and sanitized evidence committed in
+  `artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json`.
 
 ## Remaining Work
 
 1. Keep the productized UI aligned with the visual-review requirements during
    future feature changes.
-2. Re-run real video analysis on the latest deployed release after the user
-   provides a test video link or explicitly confirms which link to reuse.
-3. Commit, tag, push, and record sanitized final evidence after the real-video
-   analysis evidence has been refreshed.
+2. Commit, tag, push, and record sanitized final evidence after this cleanup
+   and real-video refresh pass all audits.
 
 ## Deletion Policy For Old Files
 

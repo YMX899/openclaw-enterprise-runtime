@@ -65,9 +65,10 @@ worker_concurrency_one: required
 approved_by_security_owner: <name>
 approved_by_engineering_owner: <name>
 approval_date: <YYYY-MM-DD>
-approval_scope: phase1.5 only | production phase2
+approval_scope: current OpenClaw sidecar behind Bridge | future production expansion
 ```
 
-Passing this triage is not enough by itself. Production also requires the real
-video artifact, real sample evidence, isolated Docker proof, authenticated Dify
-baseline, and production readiness audit to pass.
+Passing this triage is not enough by itself. Current release approval also
+requires OpenClaw-owned login evidence, sanitized root real-video analysis
+evidence, Dify core container invariants, public route checks and the production
+readiness audit to pass.

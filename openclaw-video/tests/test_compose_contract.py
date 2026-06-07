@@ -144,39 +144,31 @@ class ComposeContractTests(unittest.TestCase):
         self.assertNotIn("name: docker_default\n", compose)
 
     def test_compose_render_checks_avoid_writing_interpolated_secret_values(self):
-        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
         helper_script = (ROOT.parents[0] / "scripts" / "verify_compose_render.sh").read_text(encoding="utf-8")
 
-        for script in [gate_script, helper_script]:
-            with self.subTest(script=script[:40]):
-                self.assertIn("mktemp", script)
-                self.assertIn("config --no-interpolate", script)
-                self.assertIn("rm -f", script)
+        self.assertIn("mktemp", helper_script)
+        self.assertIn("config --no-interpolate", helper_script)
+        self.assertIn("rm -f", helper_script)
 
     def test_compose_render_checks_accept_compose_v5_normalized_port_shape(self):
-        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
         helper_script = (ROOT.parents[0] / "scripts" / "verify_compose_render.sh").read_text(encoding="utf-8")
 
-        for script in [gate_script, helper_script]:
-            with self.subTest(script=script[:40]):
-                self.assertIn("host_ip: 127.0.0.1", script)
-                self.assertIn('published: "18181"', script)
-                self.assertIn("target: 3000", script)
+        self.assertIn("host_ip: 127.0.0.1", helper_script)
+        self.assertIn('published: "18181"', helper_script)
+        self.assertIn("target: 3000", helper_script)
 
-    def test_worker_image_smoke_has_compose_v5_image_id_fallback(self):
-        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
-
-        self.assertIn("compose -f \"$compose_file\" images -q video-analysis-worker", gate_script)
-        self.assertIn("image inspect openclaw-video-video-analysis-worker:latest", gate_script)
-        self.assertIn("SKIP_SECRET_STAGING=1", gate_script)
-
-    def test_phase1_5_compose_up_waits_for_health_and_cleans_volumes(self):
-        gate_script = (ROOT.parents[0] / "scripts" / "verify_phase1_5_gates.sh").read_text(encoding="utf-8")
-
-        self.assertIn("down --remove-orphans --volumes", gate_script)
-        self.assertIn("for attempt in $(seq 1 30)", gate_script)
-        self.assertIn("healthz: PASS attempt=", gate_script)
-        self.assertIn("logs --tail=80 openclaw-bridge", gate_script)
+    def test_compose_render_rejects_current_forbidden_public_and_secret_surfaces(self):
+        helper_script = (ROOT.parents[0] / "scripts" / "verify_compose_render.sh").read_text(encoding="utf-8")
+        for forbidden in [
+            "0\\.0\\.0\\.0:18789",
+            "0\\.0\\.0\\.0:5432",
+            "/var/run/docker\\.sock",
+            "internal: true",
+            "--token",
+            "sk-[[:alnum:]_-]+",
+        ]:
+            with self.subTest(forbidden=forbidden):
+                self.assertIn(forbidden, helper_script)
 
     def test_worker_resource_and_filesystem_limits_are_declared(self):
         compose = COMPOSE.read_text(encoding="utf-8")

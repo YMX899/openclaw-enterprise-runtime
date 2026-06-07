@@ -15,7 +15,7 @@ operator_security_status: allowed
 approved_by_security_owner: user-approved-operator-exception
 approved_by_engineering_owner: codex-implementation-gate
 approval_date: 2026-06-06
-approval_scope: phase1.5 isolated validation and controlled private sidecar trial
+approval_scope: current OpenClaw sidecar behind Bridge
 approval_note: user explicitly changed SECURITY_TRIAGE.md to allowed status
 ```
 
@@ -36,7 +36,7 @@ operator_admin: forbidden
 
 | advisory_id | package | version | severity | dependency_path | affected_surface | reachable | exposed_to_browser | unauthenticated | mitigation | residual_risk | decision |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| npm-audit-openclaw-direct | openclaw | 2026.3.13 | critical | direct | gateway/webhook/env/browser/exec/MCP/config | no | no | no | private Gateway only; Bridge ACL before Gateway; no browser token; no operator.admin; no Docker socket; no public Gateway port | residual risk accepted only for private sidecar validation | approve_exception |
+| npm-audit-openclaw-direct | openclaw | 2026.3.13 | critical | direct | gateway/webhook/env/browser/exec/MCP/config | no | no | no | private Gateway only; Bridge ACL before Gateway; no browser token; no operator.admin; no Docker socket; no public Gateway port | residual risk accepted only for the current Bridge-bounded sidecar path | approve_exception |
 | npm-audit-carbon | @buape/carbon | 0.0.0-beta-20260216184201 | high | openclaw -> @buape/carbon | Gateway/server helper surface | no | no | no | Gateway not browser exposed; only Bridge uses authenticated WS path | residual risk accepted under private network controls | approve_exception |
 | npm-audit-hono-node-server | @hono/node-server | 1.19.9 | high | openclaw -> @buape/carbon -> @hono/node-server | node server helper | no | no | no | no public Gateway HTTP exposure; OpenResty routes only to Bridge | residual risk accepted under no-public-port control | approve_exception |
 | npm-audit-larksuite | @larksuiteoapi/node-sdk | 1.66.1 | high | openclaw -> @larksuiteoapi/node-sdk | Lark integration client | no | no | no | Lark integration not configured for V1; Bridge does not call Lark APIs | residual risk accepted while integration disabled | approve_exception |

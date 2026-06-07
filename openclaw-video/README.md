@@ -2,8 +2,7 @@
 
 Status: root-side OpenClaw sidecar is active for the current development and
 acceptance phase. The current execution baseline is
-`../openclaw-engineering-baseline.md`; older Phase 1/1.5 wording is historical
-unless the user explicitly asks to re-enable those gates.
+`../openclaw-engineering-baseline.md`.
 
 This directory defines the sidecar architecture for an independent
 `/openclaw-lab/` page and `/openclaw-api/` API in front of OpenClaw `2026.3.13`.
@@ -59,20 +58,13 @@ video URL candidates without a Douyin account login or browser storage state.
 Production readiness no longer depends on committing
 `artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json`.
 
-Run a real model-backed sample only when an explicit video URL is provided and
-the runtime secret file is already configured:
-
-```bash
-python scripts/run_douyin_real_sample.py \
-  --input-url '<douyin-single-video-url>' \
-  --env-file /path/to/douyin_chong.env \
-  --adapter-bin openclaw-douyin-adapter
-```
-
-The runner writes sanitized evidence under `tmp/douyin-real-samples/` by
-default. It records URL hash/host, timing, schema status and result hash/size;
-it does not record the secret file, raw stdout/stderr, cookies, tokens or full
-request headers.
+The old standalone real-sample runner has been retired. Refresh real
+model-backed evidence through the deployed OpenClaw page/API after an explicit
+test video URL is available. Committed evidence should record only sanitized
+metadata such as the URL hash/host, root release, worker image/container
+identity, schema status, result hash/size and safety flags. It must not record
+the secret file, raw stdout/stderr, cookies, tokens, full request headers or
+full model output.
 
 ## Unit Tests
 
@@ -85,21 +77,9 @@ $env:PYTHONPATH='openclaw-video\src'
 .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
 ```
 
-Historical Phase 1.5 development gate on Windows without Docker:
-
-```powershell
-.\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
-```
-
-Historical Phase 1.5 exit gate on an isolated Linux Docker host:
-
-```bash
-REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
-PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
-```
-
-The historical isolated-host gate is retained for reference, but it no longer
-blocks the current root-first OpenClaw UI/video-link phase.
+Historical Phase 1/1.5 local and isolated-host gates have been removed from the
+current engineering path. The active checks are the root-first production and
+Phase 4 audits plus direct root browser/API evidence.
 
 ## Current OpenClaw UI Verification Override
 

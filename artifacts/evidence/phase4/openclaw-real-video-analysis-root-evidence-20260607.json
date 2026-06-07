@@ -1,18 +1,19 @@
 {
   "schema_version": "openclaw-real-video-analysis-root-evidence.v1",
-  "created_at": "2026-06-07T07:20:00Z",
+  "created_at": "2026-06-07T18:33:00+08:00",
   "status": "PASS",
   "scope": {
     "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
-    "login_surface": "openclaw_standalone_login",
+    "login_surface": "openclaw_owned_session",
     "dify_web_login_required": false,
     "douyin_account_login_required": false,
     "real_model_analysis_invoked": true
   },
-  "runtime_secret_update": {
+  "runtime_secret_status": {
     "location": "root_runtime_secret_file",
-    "secret_file_backed_up_before_update": true,
-    "worker_recreated": true,
+    "secret_file_present": true,
+    "secret_file_mode": "600",
+    "worker_recreated_for_this_refresh": false,
     "secret_values_recorded": false,
     "keys_present_in_worker_container": {
       "ARK_API_KEY": true,
@@ -24,30 +25,46 @@
     }
   },
   "root_release": {
-    "current_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+    "current_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+    "build_info": {
+      "schema_version": "openclaw-build-info.v1",
+      "git_commit": "c9aaaa8c6655ebdb0bfec4632142a833f21be6f1",
+      "git_refs": "HEAD -> master"
+    },
+    "bridge_container_id_prefix": "e01e2c64fecc",
+    "bridge_started_at": "2026-06-07T09:23:38.064346066Z",
+    "bridge_status": "running",
     "worker_container_id_prefix": "427dacf8687e",
     "worker_started_at": "2026-06-07T07:12:53.344792096Z",
-    "worker_status": "running"
+    "worker_status": "running",
+    "postgres_container_id_prefix": "432d048ad168",
+    "postgres_started_at": "2026-06-06T14:09:18.362918881Z",
+    "postgres_status": "running"
   },
   "input": {
     "input_url_sha256": "abbaee0d3e4e136c4d3a082a18b4145da0f86f2b9f70db3a2899b71376163aca",
     "input_url_host": "www.douyin.com",
     "raw_input_url_recorded": false,
-    "direct_video_url_recorded": false
+    "direct_video_url_recorded": false,
+    "reused_prior_root_job_hash_match": true,
+    "matching_prior_jobs": 2,
+    "source_job_prefix": "6810fe25"
   },
   "openclaw_page_flow": {
     "login_status": 200,
     "authenticated": true,
     "account_recorded": false,
     "password_recorded": false,
+    "session_created": true,
+    "session_id_length": 36,
     "read_check_status": "PASS",
     "read_check_http_status": 200,
-    "read_check_direct_video_candidate_count": 2,
+    "read_check_direct_video_candidate_count": 0,
     "read_check_model_invoked": false,
     "submit_job_http_status": 202
   },
   "job": {
-    "job_id_prefix": "6810fe25",
+    "job_id_prefix": "afa95a9f",
     "status": "succeeded",
     "attempt_count": 1,
     "error_code": null,
@@ -61,7 +78,7 @@
     "schema_version": "openclaw-video-result.v1",
     "platform": "douyin",
     "duration_seconds_present": true,
-    "summary_chars": 377,
+    "summary_chars": 220,
     "signals_keys": [
       "audience",
       "hook",
@@ -85,7 +102,15 @@
     ],
     "request_id_present": true,
     "usage_present": true,
+    "result_json_bytes": 2381,
+    "result_json_sha256": "d26f9b8ce369c275e3c8e94f86bd8bcbbe75b4a5cc275dd312afb889925866eb",
     "model_output_recorded": false
+  },
+  "public_routes": {
+    "dify_root": 200,
+    "openclaw_lab": 200,
+    "openclaw_api_me_unauth": 401,
+    "bridge_healthz": 200
   },
   "dify_core_container_invariant": {
     "api": {

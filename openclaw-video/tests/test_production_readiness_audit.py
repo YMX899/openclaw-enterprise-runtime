@@ -144,6 +144,105 @@ OPENCLAW_PRODUCTIZED_ROUTE_PASS = """
 }
 """
 
+REAL_VIDEO_ANALYSIS_PASS = """
+{
+  "schema_version": "openclaw-real-video-analysis-root-evidence.v1",
+  "status": "PASS",
+  "scope": {
+    "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+    "dify_web_login_required": false,
+    "douyin_account_login_required": false,
+    "real_model_analysis_invoked": true
+  },
+  "runtime_secret_status": {
+    "secret_values_recorded": false,
+    "keys_present_in_worker_container": {
+      "ARK_API_KEY": true,
+      "MEDIAKIT_API_KEY": true,
+      "ARK_BASE_URL": true,
+      "MODEL": true,
+      "ARK_MODEL": true,
+      "MEDIAKIT_BASE_URL": true
+    }
+  },
+  "root_release": {
+    "current_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+    "worker_status": "running",
+    "bridge_status": "running"
+  },
+  "input": {
+    "input_url_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "raw_input_url_recorded": false,
+    "direct_video_url_recorded": false
+  },
+  "openclaw_page_flow": {
+    "session_created": true,
+    "read_check_http_status": 200,
+    "read_check_status": "PASS",
+    "read_check_model_invoked": false,
+    "submit_job_http_status": 202
+  },
+  "job": {
+    "status": "succeeded",
+    "attempt_count": 1,
+    "error_code": null,
+    "created_at_present": true,
+    "started_at_present": true,
+    "finished_at_present": true,
+    "result_schema_version": "openclaw-video-result.v1",
+    "result_location_present": true
+  },
+  "result_meta": {
+    "schema_version": "openclaw-video-result.v1",
+    "platform": "douyin",
+    "duration_seconds_present": true,
+    "summary_chars": 220,
+    "signals_keys": ["audience", "hook", "risk_notes", "structure", "topic", "visual_notes"],
+    "raw_tool_result_keys": ["request_id", "usage"],
+    "request_id_present": true,
+    "usage_present": true,
+    "model_output_recorded": false,
+    "result_json_bytes": 2381,
+    "result_json_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "public_routes": {
+    "dify_root": 200,
+    "openclaw_lab": 200,
+    "openclaw_api_me_unauth": 401,
+    "bridge_healthz": 200
+  },
+  "dify_core_container_invariant": {
+    "api": {
+      "container_id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+      "started_at": "2026-01-05T11:17:20.555976179Z",
+      "status": "running"
+    },
+    "web": {
+      "container_id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+      "started_at": "2026-01-05T11:17:19.85303869Z",
+      "status": "running"
+    },
+    "nginx": {
+      "container_id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+      "started_at": "2026-01-05T11:17:20.937420886Z",
+      "status": "running"
+    }
+  },
+  "sanitization": {
+    "raw_url_recorded": false,
+    "account_recorded": false,
+    "password_recorded": false,
+    "cookies_recorded": false,
+    "headers_recorded": false,
+    "tokens_recorded": false,
+    "secret_file_contents_recorded": false,
+    "model_key_recorded": false,
+    "model_output_recorded": false,
+    "database_url_recorded": false
+  }
+}
+"""
+
 
 LEGACY_BROWSER_LOGIN_BASELINE_PASS = """
 {
@@ -175,7 +274,7 @@ class ProductionReadinessAuditTests(unittest.TestCase):
         self.assertEqual(statuses["openclaw_security"], "PASS")
         self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["video_link_read_mode"], "PASS")
-        self.assertEqual(statuses["phase1_5_exit_proof"], "PASS")
+        self.assertEqual(statuses["real_video_analysis_root_evidence"], "PASS")
         self.assertEqual(statuses["openclaw_owned_login"], "PASS")
 
     def test_all_markers_present_is_go(self):
@@ -194,38 +293,16 @@ engineering_owner: bob
             write(repo / "artifacts/douyin_chong/LINK_READ_DECISION.md", LINK_READ_DECISION_PASS)
             write_link_read_runtime(repo)
             write(
-                repo / "phase1.5-exit-proof.md",
-                """
-status: PASS
-source: isolated-linux-docker-host
-production_host: NO
-host_os: Linux
-SKIP_DOCKER=0
-REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
-REQUIRE_DOUYIN_ARTIFACT=1
-RUN_COMPOSE_UP=1
-scripts/verify_phase1_5_gates.sh
-docker version
-docker compose version
-docker compose config
-docker compose build --no-cache
-docker compose up -d
-healthz
-port exposure check
-127.0.0.1:18181
-docker compose down --remove-orphans --volumes
-no 0.0.0.0 listener
-worker image
-video link-read mode gate: ADOPTED
-""",
-            )
-            write(
                 repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
                 OPENCLAW_PRODUCTIZED_UI_PASS,
             )
             write(
                 repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
                 OPENCLAW_PRODUCTIZED_ROUTE_PASS,
+            )
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json",
+                REAL_VIDEO_ANALYSIS_PASS,
             )
 
             report = audit_module.audit(repo)
@@ -246,32 +323,6 @@ engineering_owner: bob
             )
             write(repo / "artifacts/openclaw-2026.3.13/SECURITY_TRIAGE.md", SECURITY_TRIAGE_PASS)
             write(repo / "artifacts/douyin_chong/ARTIFACT_MANIFEST.md", "Status: verified\n")
-            write(
-                repo / "phase1.5-exit-proof.md",
-                """
-status: PASS
-source: isolated-linux-docker-host
-production_host: NO
-host_os: Linux
-SKIP_DOCKER=0
-REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
-REQUIRE_DOUYIN_ARTIFACT=1
-RUN_COMPOSE_UP=1
-scripts/verify_phase1_5_gates.sh
-docker version
-docker compose version
-docker compose config
-docker compose build --no-cache
-docker compose up -d
-healthz
-port exposure check
-127.0.0.1:18181
-docker compose down --remove-orphans --volumes
-no 0.0.0.0 listener
-worker image
-video link-read mode gate: ADOPTED
-""",
-            )
             write(
                 repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
                 OPENCLAW_PRODUCTIZED_UI_PASS,
@@ -307,6 +358,35 @@ video link-read mode gate: ADOPTED
 
         self.assertEqual(result.status, "PASS")
         self.assertIn("link-read mode", result.evidence)
+
+    def test_real_video_analysis_evidence_requires_current_release(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json",
+                REAL_VIDEO_ANALYSIS_PASS.replace(
+                    "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+                    "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+                ),
+            )
+
+            result = audit_module.check_real_video_analysis_root_evidence(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("current-release", result.evidence)
+
+    def test_real_video_analysis_evidence_passes_current_release(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json",
+                REAL_VIDEO_ANALYSIS_PASS,
+            )
+
+            result = audit_module.check_real_video_analysis_root_evidence(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("model-backed", result.evidence)
 
     def test_legacy_console_attempt_no_longer_satisfies_login_gate(self):
         with TemporaryDirectory() as tmp:
@@ -472,110 +552,6 @@ engineering_owner: bob
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("critical", result.evidence)
-
-    def test_real_sample_evidence_rejects_raw_url_leak(self):
-        with TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            write(
-                repo / "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json",
-                """
-{
-  "schema_version": "douyin-real-sample-evidence.v1",
-  "status": "succeeded",
-  "input_url_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "raw_url": "https://www.douyin.com/video/123",
-  "env_file_present": true,
-  "secret_file_contents_recorded": false,
-  "process": {
-    "returncode": 0,
-    "elapsed_seconds": 12.3,
-    "stdout_recorded": false,
-    "stderr_recorded": false
-  },
-  "result": {
-    "schema_version": "openclaw-video-result.v1",
-    "platform": "douyin",
-    "result_json_bytes": 1234,
-    "result_json_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  }
-}
-""",
-            )
-
-            result = audit_module.check_douyin_real_sample(repo)
-
-        self.assertEqual(result.status, "NO_GO")
-        self.assertIn("raw URL", result.evidence)
-
-    def test_phase1_5_exit_rejects_template_placeholders(self):
-        with TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            write(
-                repo / "phase1.5-exit-proof.md",
-                """
-status: PASS
-source: isolated-linux-docker-host
-production_host: NO
-host_os: Linux
-SKIP_DOCKER=0
-REQUIRE_OPENCLAW_SECURITY_APPROVAL=1
-REQUIRE_DOUYIN_ARTIFACT=1
-RUN_COMPOSE_UP=1
-scripts/verify_phase1_5_gates.sh
-docker version
-docker compose version
-docker compose config
-docker compose build --no-cache
-docker compose up -d
-healthz
-port exposure check
-127.0.0.1:18181
-docker compose down --remove-orphans --volumes
-no 0.0.0.0 listener
-worker image
-video link-read mode gate: ADOPTED
-operator: <fill-me>
-""",
-            )
-
-            result = audit_module.check_phase1_5_exit(repo)
-
-        self.assertEqual(result.status, "NO_GO")
-        self.assertIn("template placeholders", result.evidence)
-
-    def test_real_sample_evidence_rejects_http_raw_url_leak(self):
-        with TemporaryDirectory() as tmp:
-            repo = Path(tmp)
-            write(
-                repo / "artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json",
-                """
-{
-  "schema_version": "douyin-real-sample-evidence.v1",
-  "status": "succeeded",
-  "input_url_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "raw_url": "http://www.douyin.com/video/123",
-  "env_file_present": true,
-  "secret_file_contents_recorded": false,
-  "process": {
-    "returncode": 0,
-    "elapsed_seconds": 12.3,
-    "stdout_recorded": false,
-    "stderr_recorded": false
-  },
-  "result": {
-    "schema_version": "openclaw-video-result.v1",
-    "platform": "douyin",
-    "result_json_bytes": 1234,
-    "result_json_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  }
-}
-""",
-            )
-
-            result = audit_module.check_douyin_real_sample(repo)
-
-        self.assertEqual(result.status, "NO_GO")
-        self.assertIn("raw URL", result.evidence)
 
 
 if __name__ == "__main__":

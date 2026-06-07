@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass
 import importlib.util
 import json
 from pathlib import Path
-import re
 import subprocess
 import sys
 
@@ -74,42 +73,12 @@ def check_production_readiness(repo: Path) -> PreflightCheck:
     return PreflightCheck("production_readiness", "PASS", "production readiness audit is GO")
 
 
-def check_phase1_5_proof(repo: Path) -> PreflightCheck:
-    path = repo / "phase1.5-exit-proof.md"
-    if not path.exists():
-        return PreflightCheck("phase1_5_proof_source", "NO_GO", "missing phase1.5-exit-proof.md")
-    text = path.read_text(encoding="utf-8")
-    forbidden = [
-        r"production_host:\s*YES\b",
-        r"host_name:\s*AI-01\b",
-        r"target_host:\s*root\b",
-        r"source:\s*production",
-    ]
-    if any(re.search(pattern, text, re.IGNORECASE) for pattern in forbidden):
-        return PreflightCheck("phase1_5_proof_source", "NO_GO", "proof appears to come from production host")
-    required = [
-        r"status:\s*PASS\b",
-        r"source:\s*isolated-linux-docker-host\b",
-        r"production_host:\s*NO\b",
-        r"host_os:\s*Linux\b",
-        r"RUN_COMPOSE_UP=1",
-        r"docker compose up",
-        r"docker compose down --remove-orphans --volumes",
-        r"no 0\.0\.0\.0 listener",
-    ]
-    missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
-    if missing:
-        return PreflightCheck("phase1_5_proof_source", "NO_GO", "proof missing required isolated-host markers")
-    return PreflightCheck("phase1_5_proof_source", "PASS", "isolated non-production Phase 1.5 proof is present")
-
-
 def preflight(repo: Path, target_host: str) -> dict:
     checks = [
         check_target_host(target_host),
         check_git_clean(repo),
         check_git_tagged_head(repo),
         check_production_readiness(repo),
-        check_phase1_5_proof(repo),
     ]
     overall = "GO" if all(check.status == "PASS" for check in checks) else "NO_GO"
     return {

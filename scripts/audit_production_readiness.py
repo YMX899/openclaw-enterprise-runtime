@@ -12,6 +12,12 @@ from typing import Any, Callable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_CURRENT_RELEASE = "/app/bin/openclaw-video/releases/c9aaaa8c6655"
+EXPECTED_DIFY_CORE = {
+    "api": ("1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631", "2026-01-05T11:17:20.555976179Z"),
+    "web": ("62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36", "2026-01-05T11:17:19.85303869Z"),
+    "nginx": ("8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe", "2026-01-05T11:17:20.937420886Z"),
+}
 
 
 @dataclass(frozen=True)
@@ -188,94 +194,122 @@ def check_video_link_read_mode(repo: Path) -> GateResult:
     )
 
 
-def check_douyin_real_sample(repo: Path) -> GateResult:
-    path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
+def check_real_video_analysis_root_evidence(repo: Path) -> GateResult:
+    path = repo / "artifacts" / "evidence" / "phase4" / "openclaw-real-video-analysis-root-evidence-20260607.json"
     if not path.exists():
-        return GateResult(
-            "douyin_real_sample",
-            "WARN",
-            "REAL_SAMPLE_EVIDENCE.json is absent; this is optional diagnostic evidence under the current video link-read mode",
-        )
+        return GateResult("real_video_analysis_root_evidence", "NO_GO", f"missing {path.name}")
     try:
         evidence = json.loads(_read(path))
     except json.JSONDecodeError:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample evidence is not valid JSON")
+        return GateResult("real_video_analysis_root_evidence", "NO_GO", "real video analysis evidence is not valid JSON")
 
-    if evidence.get("schema_version") != "douyin-real-sample-evidence.v1":
-        return GateResult("douyin_real_sample", "NO_GO", "unexpected real sample evidence schema version")
-    if evidence.get("status") != "succeeded":
-        return GateResult("douyin_real_sample", "NO_GO", "real sample did not succeed")
-    if evidence.get("secret_file_contents_recorded") is not False:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample evidence may record secret file contents")
-    if evidence.get("env_file_present") is not True:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample did not use an explicit runtime env file")
-    if not _is_sha256(evidence.get("input_url_sha256")):
-        return GateResult("douyin_real_sample", "NO_GO", "real sample evidence is missing input URL hash")
-    if re.search(r"https?://", _json_text(evidence), re.IGNORECASE):
-        return GateResult("douyin_real_sample", "NO_GO", "real sample evidence contains a raw URL")
-
-    process = evidence.get("process") or {}
-    if process.get("returncode") != 0:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample adapter return code was not zero")
-    if not isinstance(process.get("elapsed_seconds"), (int, float)) or process["elapsed_seconds"] <= 0:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample elapsed time is missing")
-    if process.get("stdout_recorded") is not False or process.get("stderr_recorded") is not False:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample stdout/stderr contents must not be recorded")
-
-    result = evidence.get("result") or {}
-    if result.get("schema_version") != "openclaw-video-result.v1":
-        return GateResult("douyin_real_sample", "NO_GO", "real sample result schema was not validated")
-    if result.get("platform") != "douyin":
-        return GateResult("douyin_real_sample", "NO_GO", "real sample platform is not douyin")
-    if not _is_sha256(result.get("result_json_sha256")):
-        return GateResult("douyin_real_sample", "NO_GO", "real sample result hash is missing")
-    if not isinstance(result.get("result_json_bytes"), int) or result["result_json_bytes"] <= 0:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample result size is missing")
-    return GateResult("douyin_real_sample", "PASS", "sanitized real model-backed sample evidence is present")
-
-
-def check_phase1_5_exit(repo: Path) -> GateResult:
-    path = repo / "phase1.5-exit-proof.md"
-    if not path.exists():
-        return GateResult("phase1_5_exit_proof", "NO_GO", f"missing {path.name}")
-    text = _read(path)
-    placeholder_patterns = [
-        r"TEMPLATE_PENDING",
-        r"DO_NOT_USE",
-        r"<[^>\n]+>",
-        r"\bTODO\b",
-        r"\bTBD\b",
+    text = _json_text(evidence)
+    forbidden_fragments = [
+        "v.douyin.com/",
+        "www.douyin.com/video/",
+        "iesdouyin.com/share/video/",
+        "Cookie:",
+        "Authorization:",
+        "Bearer ",
     ]
-    placeholders = [pattern for pattern in placeholder_patterns if re.search(pattern, text, re.IGNORECASE)]
-    if placeholders:
-        return GateResult("phase1_5_exit_proof", "NO_GO", "exit proof still contains template placeholders")
-    required = [
-        r"status:\s*PASS\b",
-        r"source:\s*isolated-linux-docker-host\b",
-        r"production_host:\s*NO\b",
-        r"host_os:\s*Linux\b",
-        r"SKIP_DOCKER=0",
-        r"REQUIRE_OPENCLAW_SECURITY_APPROVAL=1",
-        r"REQUIRE_DOUYIN_ARTIFACT=1",
-        r"RUN_COMPOSE_UP=1",
-        r"scripts/verify_phase1_5_gates\.sh",
-        r"docker version",
-        r"docker compose version",
-        r"docker compose config",
-        r"docker compose build",
-        r"docker compose up",
-        r"healthz",
-        r"port exposure check",
-        r"127\.0\.0\.1:18181",
-        r"docker compose down --remove-orphans --volumes",
-        r"no 0\.0\.0\.0 listener",
-        r"worker image",
-        r"video link-read mode gate:\s*ADOPTED\b",
+    if any(fragment.lower() in text.lower() for fragment in forbidden_fragments):
+        return GateResult("real_video_analysis_root_evidence", "NO_GO", "real video evidence appears to contain raw URL or header material")
+
+    scope = evidence.get("scope") or {}
+    release = evidence.get("root_release") or {}
+    secret_status = evidence.get("runtime_secret_status") or evidence.get("runtime_secret_update") or {}
+    keys_present = secret_status.get("keys_present_in_worker_container") or {}
+    input_meta = evidence.get("input") or {}
+    flow = evidence.get("openclaw_page_flow") or {}
+    job = evidence.get("job") or {}
+    result = evidence.get("result_meta") or {}
+    dify_core = evidence.get("dify_core_container_invariant") or {}
+    routes = evidence.get("public_routes") or {}
+    sanitization = evidence.get("sanitization") or {}
+
+    dify_ok = True
+    for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
+        current = dify_core.get(name) or {}
+        dify_ok = dify_ok and current.get("container_id") == expected_id
+        dify_ok = dify_ok and current.get("started_at") == expected_started_at
+        dify_ok = dify_ok and current.get("status") == "running"
+
+    required_secret_keys = {
+        "ARK_API_KEY",
+        "MEDIAKIT_API_KEY",
+        "ARK_BASE_URL",
+        "MODEL",
+        "ARK_MODEL",
+        "MEDIAKIT_BASE_URL",
+    }
+    required_signals = {"audience", "hook", "risk_notes", "structure", "topic", "visual_notes"}
+    required_raw_keys = {"request_id", "usage"}
+    unsafe_flags = [
+        "raw_url_recorded",
+        "account_recorded",
+        "password_recorded",
+        "cookies_recorded",
+        "headers_recorded",
+        "tokens_recorded",
+        "secret_file_contents_recorded",
+        "model_key_recorded",
+        "model_output_recorded",
+        "database_url_recorded",
     ]
-    missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
-    if missing:
-        return GateResult("phase1_5_exit_proof", "NO_GO", f"exit proof missing markers: {', '.join(missing)}")
-    return GateResult("phase1_5_exit_proof", "PASS", "isolated Linux Docker exit proof markers present")
+
+    checks = [
+        evidence.get("schema_version") == "openclaw-real-video-analysis-root-evidence.v1",
+        evidence.get("status") == "PASS",
+        scope.get("page_url") == "https://www.huahuoai.com/ai/openclaw-lab/",
+        scope.get("dify_web_login_required") is False,
+        scope.get("douyin_account_login_required") is False,
+        scope.get("real_model_analysis_invoked") is True,
+        release.get("current_release") == EXPECTED_CURRENT_RELEASE,
+        release.get("worker_status") == "running",
+        release.get("bridge_status") == "running",
+        secret_status.get("secret_values_recorded") is False,
+        all(keys_present.get(key) is True for key in required_secret_keys),
+        _is_sha256(input_meta.get("input_url_sha256")),
+        input_meta.get("raw_input_url_recorded") is False,
+        input_meta.get("direct_video_url_recorded") is False,
+        flow.get("session_created") is True,
+        flow.get("read_check_http_status") == 200,
+        flow.get("read_check_status") == "PASS",
+        flow.get("read_check_model_invoked") is False,
+        flow.get("submit_job_http_status") == 202,
+        job.get("status") == "succeeded",
+        isinstance(job.get("attempt_count"), int) and job["attempt_count"] >= 1,
+        job.get("error_code") is None,
+        job.get("created_at_present") is True,
+        job.get("started_at_present") is True,
+        job.get("finished_at_present") is True,
+        job.get("result_schema_version") == "openclaw-video-result.v1",
+        job.get("result_location_present") is True,
+        result.get("schema_version") == "openclaw-video-result.v1",
+        result.get("platform") == "douyin",
+        result.get("duration_seconds_present") is True,
+        isinstance(result.get("summary_chars"), int) and result["summary_chars"] > 0,
+        required_signals.issubset(set(result.get("signals_keys") or [])),
+        required_raw_keys.issubset(set(result.get("raw_tool_result_keys") or [])),
+        result.get("request_id_present") is True,
+        result.get("usage_present") is True,
+        result.get("model_output_recorded") is False,
+        isinstance(result.get("result_json_bytes"), int) and result["result_json_bytes"] > 0,
+        _is_sha256(result.get("result_json_sha256")),
+        dify_ok,
+        routes.get("dify_root") == 200,
+        routes.get("openclaw_lab") == 200,
+        routes.get("openclaw_api_me_unauth") == 401,
+        routes.get("bridge_healthz") == 200,
+        all(sanitization.get(flag) is False for flag in unsafe_flags),
+    ]
+    if not all(checks):
+        return GateResult("real_video_analysis_root_evidence", "NO_GO", "real video analysis evidence failed current-release or sanitization checks")
+    return GateResult(
+        "real_video_analysis_root_evidence",
+        "PASS",
+        "current root release has sanitized model-backed real video analysis evidence",
+    )
 
 
 def _openclaw_productized_ui_login_passed(payload: dict[str, Any]) -> bool:
@@ -393,7 +427,7 @@ GATES: tuple[Callable[[Path], GateResult], ...] = (
     check_openclaw_security,
     check_douyin_artifact,
     check_video_link_read_mode,
-    check_phase1_5_exit,
+    check_real_video_analysis_root_evidence,
     check_openclaw_owned_login,
     check_production_route_absent,
 )

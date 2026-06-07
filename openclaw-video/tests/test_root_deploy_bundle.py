@@ -31,7 +31,6 @@ PASS_PREFLIGHT = {
         {"check_id": "git_clean", "status": "PASS", "evidence": "clean"},
         {"check_id": "git_tagged_head", "status": "PASS", "evidence": "tag"},
         {"check_id": "production_readiness", "status": "PASS", "evidence": "GO"},
-        {"check_id": "phase1_5_proof_source", "status": "PASS", "evidence": "proof"},
     ],
 }
 
@@ -55,7 +54,7 @@ class RootDeployBundleTests(unittest.TestCase):
             with mock.patch.object(bundle_module, "_load_preflight_module") as load_preflight:
                 load_preflight.return_value.preflight.return_value = {
                     "overall": "NO_GO",
-                    "checks": [{"check_id": "phase1_5_proof_source", "status": "NO_GO"}],
+                    "checks": [{"check_id": "production_readiness", "status": "NO_GO"}],
                 }
 
                 result = bundle_module.build_bundle(repo, output, "root")
@@ -69,7 +68,6 @@ class RootDeployBundleTests(unittest.TestCase):
             output = Path(tmp) / "out"
             write(repo / "openclaw-video/README.md", "safe")
             write(repo / "scripts/preflight_root_deploy.py", "safe")
-            write(repo / "phase1.5-exit-proof.md", "safe")
             write(repo / ".env", "secret")
             write(repo / "secrets/openclaw_gateway_token", "secret")
             write(repo / ".phase1-sandbox/runtime.log", "secret")
@@ -107,7 +105,6 @@ class RootDeployBundleTests(unittest.TestCase):
 
         self.assertIn("openclaw-video/README.md", names)
         self.assertIn("scripts/preflight_root_deploy.py", names)
-        self.assertIn("phase1.5-exit-proof.md", names)
         self.assertNotIn(".env", names)
         self.assertFalse(any(name.startswith("secrets/") for name in names))
         self.assertFalse(any(name.startswith(".phase1-sandbox/") for name in names))

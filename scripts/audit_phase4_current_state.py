@@ -13,9 +13,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PHASE4_EVIDENCE = REPO_ROOT / "phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md"
 RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
-REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
 PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
 CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES = (
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-productized-ui-root-deployment-evidence-20260607.json",
@@ -77,67 +75,45 @@ def check_git_clean(repo: Path) -> GateResult:
 
 def check_phase4_deployment_evidence(repo: Path) -> GateResult:
     productized_path = repo / CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES[0].relative_to(REPO_ROOT)
-    if productized_path.exists():
-        try:
-            payload = json.loads(_read(productized_path))
-        except json.JSONDecodeError:
-            return GateResult("phase4_deployment_evidence", "NO_GO", "productized root evidence is not valid JSON")
-        root = payload.get("root_runtime") or {}
-        public_routes = root.get("public_routes") or {}
-        policy = payload.get("policy") or {}
-        dify_core = root.get("dify_core") or {}
-        dify_ok = True
-        for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
-            current = dify_core.get(name) or {}
-            dify_ok = dify_ok and current.get("id") == expected_id
-            dify_ok = dify_ok and current.get("started_at") == expected_started_at
-            dify_ok = dify_ok and current.get("status") == "running"
-        checks = [
-            payload.get("schema") == "openclaw-productized-ui-root-deployment-evidence.v1",
-            payload.get("deployed_release") == EXPECTED_CURRENT_RELEASE,
-            payload.get("previous_release") == EXPECTED_PREVIOUS_RELEASE,
-            public_routes.get("dify_root") == 200,
-            public_routes.get("openclaw_lab") == 200,
-            public_routes.get("openclaw_api_me_unauth") == 401,
-            public_routes.get("bridge_healthz") == 200,
-            dify_ok,
-            policy.get("local_test_loop_used") is False,
-            policy.get("authoritative_environment") == "root",
-            policy.get("ui_debug_completed_before_root_testing") is True,
-            policy.get("dify_core_restarted") is False,
-            policy.get("dify_core_rebuilt") is False,
-            policy.get("secrets_recorded") is False,
-            policy.get("account_recorded") is False,
-            policy.get("password_recorded") is False,
-            policy.get("cookies_recorded") is False,
-            policy.get("headers_recorded") is False,
-        ]
-        if all(checks):
-            return GateResult("phase4_deployment_evidence", "PASS", "productized UI root deployment evidence is current and sanitized")
-        return GateResult("phase4_deployment_evidence", "NO_GO", "productized UI root deployment evidence failed required checks")
-
-    path = repo / PHASE4_EVIDENCE.relative_to(REPO_ROOT)
-    if not path.exists():
-        return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {path.name}")
-    text = _read(path)
-    required = [
-        rf"current={re.escape(EXPECTED_CURRENT_RELEASE)}",
-        r"tag:\s*phase4-openclaw-ui-workbench-20260607",
-        r"tag:\s*phase4-video-link-read-check-20260607",
-        r"ai_openclaw_lab=200",
-        r"openclaw_lab=200",
-        r"openclaw_api_me_unauth=401",
-        r"read_check_unauth_status=401",
-        r"video link read check PASS",
-        r"huahuo_ai=200",
-        r"docker-api-1\s+.*2026-01-05T11:17:20\.555976179Z\s+running",
-        r"docker-web-1\s+.*2026-01-05T11:17:19\.85303869Z\s+running",
-        r"docker-nginx-1\s+.*2026-01-05T11:17:20\.937420886Z\s+running",
+    if not productized_path.exists():
+        return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {productized_path.name}")
+    try:
+        payload = json.loads(_read(productized_path))
+    except json.JSONDecodeError:
+        return GateResult("phase4_deployment_evidence", "NO_GO", "productized root evidence is not valid JSON")
+    root = payload.get("root_runtime") or {}
+    public_routes = root.get("public_routes") or {}
+    policy = payload.get("policy") or {}
+    dify_core = root.get("dify_core") or {}
+    dify_ok = True
+    for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
+        current = dify_core.get(name) or {}
+        dify_ok = dify_ok and current.get("id") == expected_id
+        dify_ok = dify_ok and current.get("started_at") == expected_started_at
+        dify_ok = dify_ok and current.get("status") == "running"
+    checks = [
+        payload.get("schema") == "openclaw-productized-ui-root-deployment-evidence.v1",
+        payload.get("deployed_release") == EXPECTED_CURRENT_RELEASE,
+        payload.get("previous_release") == EXPECTED_PREVIOUS_RELEASE,
+        public_routes.get("dify_root") == 200,
+        public_routes.get("openclaw_lab") == 200,
+        public_routes.get("openclaw_api_me_unauth") == 401,
+        public_routes.get("bridge_healthz") == 200,
+        dify_ok,
+        policy.get("local_test_loop_used") is False,
+        policy.get("authoritative_environment") == "root",
+        policy.get("ui_debug_completed_before_root_testing") is True,
+        policy.get("dify_core_restarted") is False,
+        policy.get("dify_core_rebuilt") is False,
+        policy.get("secrets_recorded") is False,
+        policy.get("account_recorded") is False,
+        policy.get("password_recorded") is False,
+        policy.get("cookies_recorded") is False,
+        policy.get("headers_recorded") is False,
     ]
-    missing = [pattern for pattern in required if not re.search(pattern, text, re.IGNORECASE)]
-    if missing:
-        return GateResult("phase4_deployment_evidence", "NO_GO", "phase4 deployment evidence is incomplete")
-    return GateResult("phase4_deployment_evidence", "PASS", "same-origin Lab deployment and Dify container invariants recorded")
+    if all(checks):
+        return GateResult("phase4_deployment_evidence", "PASS", "productized UI root deployment evidence is current and sanitized")
+    return GateResult("phase4_deployment_evidence", "NO_GO", "productized UI root deployment evidence failed required checks")
 
 
 def check_current_root_chrome_evidence(repo: Path) -> GateResult:
@@ -334,21 +310,13 @@ def check_authenticated_browser_gate(repo: Path) -> GateResult:
     )
 
 
-def check_real_douyin_sample(repo: Path) -> GateResult:
-    path = repo / REAL_SAMPLE.relative_to(REPO_ROOT)
-    if not path.exists():
-        return GateResult("douyin_real_sample", "NO_GO", f"missing {path.name}")
-    try:
-        payload = json.loads(_read(path))
-    except json.JSONDecodeError:
-        return GateResult("douyin_real_sample", "NO_GO", "real sample evidence is not valid JSON")
-    if payload.get("schema_version") != "douyin-real-sample-evidence.v1" or payload.get("status") != "succeeded":
-        return GateResult("douyin_real_sample", "NO_GO", "real sample evidence did not succeed")
-    return GateResult("douyin_real_sample", "PASS", "real douyin sample evidence is present")
-
-
 def check_video_link_read_mode(repo: Path) -> GateResult:
     gate = _load_production_audit().check_video_link_read_mode(repo)
+    return GateResult(gate.gate_id, gate.status, gate.evidence)
+
+
+def check_real_video_analysis_root_evidence(repo: Path) -> GateResult:
+    gate = _load_production_audit().check_real_video_analysis_root_evidence(repo)
     return GateResult(gate.gate_id, gate.status, gate.evidence)
 
 
@@ -360,6 +328,7 @@ def audit(repo: Path, *, smoke_summary: Path | None = None, include_git_clean: b
         check_public_smoke_summary(smoke_summary),
         check_authenticated_browser_gate(repo),
         check_video_link_read_mode(repo),
+        check_real_video_analysis_root_evidence(repo),
     ]
     if include_git_clean:
         gates.append(check_git_clean(repo))

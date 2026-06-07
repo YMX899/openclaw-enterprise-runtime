@@ -76,42 +76,33 @@ temporary_storage_exhausted
 Internal stack traces, cookies, tokens, local filesystem paths and raw request
 headers must not be returned to users.
 
-## Optional Real Sample Evidence Runner
+## Current Real Analysis Evidence
 
 `REAL_SAMPLE_EVIDENCE.json` is no longer required by the production readiness
-gate after the 2026-06-07 link-read scheme change. If deeper diagnostics are
-needed, a real model-backed sample can still be run in an isolated environment
-with an explicit runtime secret file:
+gate after the 2026-06-07 link-read scheme change. The old standalone
+real-sample runner has been removed so future work does not reintroduce the
+retired sample gate. Refresh real model-backed evidence through the deployed
+OpenClaw page/API when an explicit test video URL is available.
 
-```bash
-python scripts/run_douyin_real_sample.py \
-  --input-url '<douyin-single-video-url>' \
-  --env-file /path/to/douyin_chong.env \
-  --adapter-bin openclaw-douyin-adapter \
-  --output-dir tmp/douyin-real-samples/<run-id>
-```
-
-The runner deliberately records only sanitized evidence:
+Committed evidence should record only sanitized metadata:
 
 ```text
 input_url_sha256
 input_url_host
-env_file_present = true/false
-secret_file_contents_recorded = false
-adapter return code
+root release
+worker image/container identity
 elapsed seconds
-stdout/stderr character counts only
 result schema version
 summary length
 result JSON SHA256
 result JSON size
-Linux child max_rss_kb when available
+model_invoked = true
+secret_file_contents_recorded = false
+stdout/stderr contents recorded = false
 ```
 
 It must not print or commit the runtime secret file, raw headers, cookies,
 Authorization values, CSRF values, or full model output. The generated output
-directory is under `tmp/` by default and is ignored by git.
-
-Keep troubleshooting output under `tmp/`. Do not promote it into a committed
-`REAL_SAMPLE_EVIDENCE.json` gate file; the current production path is the
-OpenClaw-owned login plus video link-read workflow.
+must stay under `tmp/` unless it is sanitized first. Do not promote evidence
+into a committed `REAL_SAMPLE_EVIDENCE.json` gate file; the current production
+path is the OpenClaw-owned login plus video link-read workflow.

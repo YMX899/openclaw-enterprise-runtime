@@ -130,22 +130,102 @@ PRODUCTIZED_UI_ROOT_PASS = {
     },
 }
 
-
-PHASE4_BASE = """
-current=/app/bin/openclaw-video/releases/c9aaaa8c6655
-tag: phase4-openclaw-ui-workbench-20260607
-tag: phase4-video-link-read-check-20260607
-ai_openclaw_lab=200
-openclaw_lab=200
-openclaw_api_me_unauth=401
-read_check_unauth_status=401
-video link read check PASS
-huahuo_ai=200
-/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
-/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
-/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
-"""
-
+REAL_VIDEO_ANALYSIS_PASS = {
+    "schema_version": "openclaw-real-video-analysis-root-evidence.v1",
+    "status": "PASS",
+    "scope": {
+        "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+        "dify_web_login_required": False,
+        "douyin_account_login_required": False,
+        "real_model_analysis_invoked": True,
+    },
+    "runtime_secret_status": {
+        "secret_values_recorded": False,
+        "keys_present_in_worker_container": {
+            "ARK_API_KEY": True,
+            "MEDIAKIT_API_KEY": True,
+            "ARK_BASE_URL": True,
+            "MODEL": True,
+            "ARK_MODEL": True,
+            "MEDIAKIT_BASE_URL": True,
+        },
+    },
+    "root_release": {
+        "current_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+        "worker_status": "running",
+        "bridge_status": "running",
+    },
+    "input": {
+        "input_url_sha256": "a" * 64,
+        "raw_input_url_recorded": False,
+        "direct_video_url_recorded": False,
+    },
+    "openclaw_page_flow": {
+        "session_created": True,
+        "read_check_http_status": 200,
+        "read_check_status": "PASS",
+        "read_check_model_invoked": False,
+        "submit_job_http_status": 202,
+    },
+    "job": {
+        "status": "succeeded",
+        "attempt_count": 1,
+        "error_code": None,
+        "created_at_present": True,
+        "started_at_present": True,
+        "finished_at_present": True,
+        "result_schema_version": "openclaw-video-result.v1",
+        "result_location_present": True,
+    },
+    "result_meta": {
+        "schema_version": "openclaw-video-result.v1",
+        "platform": "douyin",
+        "duration_seconds_present": True,
+        "summary_chars": 220,
+        "signals_keys": ["audience", "hook", "risk_notes", "structure", "topic", "visual_notes"],
+        "raw_tool_result_keys": ["request_id", "usage"],
+        "request_id_present": True,
+        "usage_present": True,
+        "model_output_recorded": False,
+        "result_json_bytes": 2381,
+        "result_json_sha256": "b" * 64,
+    },
+    "public_routes": {
+        "dify_root": 200,
+        "openclaw_lab": 200,
+        "openclaw_api_me_unauth": 401,
+        "bridge_healthz": 200,
+    },
+    "dify_core_container_invariant": {
+        "api": {
+            "container_id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+            "started_at": "2026-01-05T11:17:20.555976179Z",
+            "status": "running",
+        },
+        "web": {
+            "container_id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+            "started_at": "2026-01-05T11:17:19.85303869Z",
+            "status": "running",
+        },
+        "nginx": {
+            "container_id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+            "started_at": "2026-01-05T11:17:20.937420886Z",
+            "status": "running",
+        },
+    },
+    "sanitization": {
+        "raw_url_recorded": False,
+        "account_recorded": False,
+        "password_recorded": False,
+        "cookies_recorded": False,
+        "headers_recorded": False,
+        "tokens_recorded": False,
+        "secret_file_contents_recorded": False,
+        "model_key_recorded": False,
+        "model_output_recorded": False,
+        "database_url_recorded": False,
+    },
+}
 
 RUNNER = """
 export async function runHuahuoPostLoginAcceptance(browser, options = {}) {
@@ -183,12 +263,6 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
     def test_all_phase4_current_state_markers_can_pass(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            write(repo / "phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md", PHASE4_BASE)
-            write(
-                repo / "phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md",
-                PHASE4_BASE
-                + '\n"status": "PASS"\n',
-            )
             write(repo / "scripts/huahuo_post_login_acceptance_runner.mjs", RUNNER)
             write(
                 repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
@@ -197,6 +271,10 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
             write(
                 repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
                 json.dumps(PRODUCTIZED_UI_ROOT_PASS["ui_acceptance"]),
+            )
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json",
+                json.dumps(REAL_VIDEO_ANALYSIS_PASS),
             )
             write(
                 repo / "artifacts/douyin_chong/LINK_READ_DECISION.md",
@@ -235,6 +313,19 @@ no_browser_login_state: PASS
 
         self.assertEqual(result.status, "PASS")
         self.assertIn("productized", result.evidence)
+
+    def test_real_video_analysis_root_evidence_passes(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json",
+                json.dumps(REAL_VIDEO_ANALYSIS_PASS),
+            )
+
+            result = phase4_audit.check_real_video_analysis_root_evidence(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("model-backed", result.evidence)
 
     def test_current_root_chrome_evidence_passes(self):
         with TemporaryDirectory() as tmp:
