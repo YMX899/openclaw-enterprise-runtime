@@ -162,15 +162,30 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
       return finalReport;
     }
 
-    const alreadyAuthenticated = await labTab.playwright.locator("#chatApp").isVisible({ timeoutMs: 1000 }).catch(() => false);
-    if (alreadyAuthenticated) {
+    let loginUiState = await labTab.playwright.evaluate(() => ({
+      landingHidden: document.querySelector("#landingPage")?.hidden === true,
+      chatHidden: document.querySelector("#chatApp")?.hidden === true,
+      loginPanelHidden: document.querySelector("#loginPanel")?.hidden === true,
+    }));
+    if (loginUiState.chatHidden === false) {
       await labTab.playwright.locator("#logoutButton").click({ timeoutMs: 10000 });
-      await labTab.playwright.locator("#openLogin").waitFor({ state: "visible", timeoutMs: 10000 });
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await labTab.playwright.waitForTimeout(250);
+        loginUiState = await labTab.playwright.evaluate(() => ({
+          landingHidden: document.querySelector("#landingPage")?.hidden === true,
+          chatHidden: document.querySelector("#chatApp")?.hidden === true,
+          loginPanelHidden: document.querySelector("#loginPanel")?.hidden === true,
+        }));
+        if (loginUiState.landingHidden === false && loginUiState.loginPanelHidden === true) break;
+      }
     }
-    const openLogin = labTab.playwright.locator("#openLogin");
-    const openLoginVisible = await openLogin.isVisible({ timeoutMs: 2000 }).catch(() => false);
-    if (await openLogin.count() && openLoginVisible) {
-      await openLogin.click({ timeoutMs: 10000 });
+    if (loginUiState.loginPanelHidden !== false) {
+      await labTab.playwright.evaluate(() => document.querySelector("#openLogin")?.click());
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await labTab.playwright.waitForTimeout(250);
+        const panelOpen = await labTab.playwright.evaluate(() => document.querySelector("#loginPanel")?.hidden === false);
+        if (panelOpen) break;
+      }
     }
     await labTab.playwright.locator("#loginAccount").fill(account, { timeoutMs: 10000 });
     await labTab.playwright.locator("#loginPassword").fill(password, { timeoutMs: 10000 });
