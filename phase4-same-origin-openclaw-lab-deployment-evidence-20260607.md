@@ -1314,6 +1314,80 @@ Current remaining boundary:
 
 ```text
 The video link-read stage is now independently proven on root and Chrome.
-Deep model analysis was intentionally not invoked by read-check.
-The earlier Ark 401 remains an external model-credential/configuration gate for full analysis jobs, not a Douyin-login, Dify-Web-login, or REAL_SAMPLE_EVIDENCE blocker.
+Deep model analysis is validated separately below.
+The earlier Ark 401 model-credential blocker is no longer current after root runtime secret configuration.
+REAL_SAMPLE_EVIDENCE.json remains non-blocking diagnostic history.
+```
+
+## Phase 4 Real Video Analysis Root Check - 2026-06-07
+
+Scope:
+
+```text
+OpenClaw page: https://www.huahuoai.com/ai/openclaw-lab/
+login surface: OpenClaw standalone account/password form
+Dify Web login: not required
+Douyin account login: not required
+input mode: video link -> resolver -> model-backed worker analysis
+```
+
+Runtime configuration:
+
+```text
+Ark/Mediakit runtime secret file: updated on root and backed up first
+secret values recorded: false
+worker recreate: video-analysis-worker only
+worker container: 427dacf8687e...
+worker started_at: 2026-06-07T07:12:53.344792096Z
+current release: /app/bin/openclaw-video/releases/f1ba8273e7b6
+```
+
+Worker secret key presence:
+
+```text
+ARK_API_KEY=present
+MEDIAKIT_API_KEY=present
+ARK_BASE_URL=present
+MODEL=present
+ARK_MODEL=present
+MEDIAKIT_BASE_URL=present
+```
+
+Real analysis result:
+
+```text
+OpenClaw login status: 200
+auth_status: Authenticated
+video link read check: PASS
+read-check model_invoked: false
+submit job status: 202
+job prefix: 6810fe25
+job status: succeeded
+attempt_count: 1
+result_schema_version: openclaw-video-result.v1
+platform: douyin
+summary_chars: 377
+request_id_present: true
+usage_present: true
+model_output_recorded: false
+```
+
+Dify core container invariant after runtime secret update:
+
+```text
+docker-api-1 1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631 2026-01-05T11:17:20.555976179Z running
+docker-web-1 62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36 2026-01-05T11:17:19.85303869Z running
+docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe 2026-01-05T11:17:20.937420886Z running
+```
+
+Evidence:
+
+```text
+artifacts/evidence/phase4/openclaw-real-video-analysis-root-evidence-20260607.json
+raw URL recorded: false
+direct video URL recorded: false
+account/password recorded: false
+cookies/headers/tokens recorded: false
+secret values recorded: false
+model output recorded: false
 ```

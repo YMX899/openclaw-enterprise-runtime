@@ -81,9 +81,12 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 
 - `artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json` is optional diagnostic
   history, not a blocking gate.
-- Runtime model credentials and permissions still need to be valid for deep
-  analysis jobs to succeed, but this is a model-configuration concern, not a
-  Douyin-login or sample-evidence blocker.
+- Runtime model credentials and permissions are configured through root runtime
+  secret files, not committed environment files. Keep Ark/Mediakit keys,
+  database URLs and model outputs out of docs, logs and evidence.
+- As of 2026-06-07, root-side OpenClaw standalone login plus a real Douyin
+  video-link analysis job has succeeded with `doubao-seed-2-0-pro`; this
+  replaces the earlier Ark 401 blocker.
 - OpenClaw may expose a logged-in `video-link/read-check` preflight that proves
   URL validation, redirect revalidation, direct candidate resolution, sanitized
   metadata and `model_invoked=false` before a user submits a full analysis job.
@@ -113,8 +116,8 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 6. Log in through the OpenClaw login UI and run post-login acceptance.
 7. Run security negative tests for rejected URLs and inaccessible random
    resources.
-8. Run video link-read testing with an explicit video URL when a valid sample
-   URL and runtime model configuration are available.
+8. Run video link-read testing with an explicit video URL, then run a real
+   model-backed analysis job when validating the full pipeline.
 9. Confirm Dify public pages still load and no new obvious 5xx appears in
    checked routes.
 10. Commit, push and record sanitized deployment/test evidence.
