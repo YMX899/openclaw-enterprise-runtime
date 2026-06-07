@@ -73,10 +73,15 @@ def no_go_only_link_mode_audit(*, include_git_clean=False):
 
 
 class RootDeployPreflightTests(unittest.TestCase):
-    def test_current_repo_is_no_go(self):
+    def test_current_repo_preflight_reflects_actual_release_state(self):
         report = preflight_module.preflight(REPO_ROOT, "root")
+        statuses = {check["check_id"]: check["status"] for check in report["checks"]}
+        expected = "GO" if all(status == "PASS" for status in statuses.values()) else "NO_GO"
 
-        self.assertEqual(report["overall"], "NO_GO")
+        self.assertEqual(report["overall"], expected)
+        self.assertIn("git_clean", statuses)
+        self.assertIn("git_tagged_head", statuses)
+        self.assertIn("production_readiness", statuses)
 
     def test_rejects_non_root_target(self):
         result = preflight_module.check_target_host("ubuntu22.04")

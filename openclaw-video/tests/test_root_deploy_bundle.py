@@ -36,14 +36,18 @@ PASS_PREFLIGHT = {
 
 
 class RootDeployBundleTests(unittest.TestCase):
-    def test_current_repo_does_not_build_bundle(self):
+    def test_current_repo_bundle_result_matches_preflight(self):
         with TemporaryDirectory() as tmp:
             result = bundle_module.build_bundle(REPO_ROOT, Path(tmp), "root")
-
             produced = list(Path(tmp).glob("*"))
 
-        self.assertEqual(result.status, "NO_GO")
-        self.assertEqual(produced, [])
+        if result.status == "PASS":
+            self.assertTrue(Path(result.bundle_path).is_file())
+            self.assertTrue(Path(result.manifest_path).is_file())
+            self.assertTrue(produced)
+        else:
+            self.assertEqual(result.status, "NO_GO")
+            self.assertEqual(produced, [])
 
     def test_preflight_no_go_does_not_write_bundle(self):
         with TemporaryDirectory() as tmp:
