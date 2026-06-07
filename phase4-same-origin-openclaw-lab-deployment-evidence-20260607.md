@@ -723,3 +723,78 @@ The automated Chrome runner is ready for the post-login gate.
 The current browser still lacks a Huahuo user-web login session, so it correctly stops before running jobs.
 After the user logs in at https://www.huahuoai.com/ai/?id=4, the same runner can execute the full OpenClaw browser gate and return PASS/FAIL.
 ```
+
+## Standalone OpenClaw Login Acceptance
+
+Date: 2026-06-07T10:19+08:00.
+
+Deployment:
+
+```text
+current=/app/bin/openclaw-video/releases/db58a8ba6741
+tag: phase4-openclaw-huahuo-login-header-20260607
+ai_openclaw_lab=200
+openclaw_lab=200
+openclaw_api_me_unauth=401
+huahuo_ai=200
+```
+
+Dify core containers after the standalone login deployment:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z  running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Chrome standalone login acceptance:
+
+```json
+{
+  "schema": "openclaw-standalone-login-browser-acceptance.v1",
+  "status": "PASS",
+  "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "login_status": 200,
+  "auth_status_text": "Authenticated",
+  "login_authenticated": true,
+  "login_principal_len": 64,
+  "diagnostics": {
+    "status": 200,
+    "authenticated": true,
+    "login_material_present": true,
+    "openclaw_session_present": true,
+    "auth_mode": "openclaw_session",
+    "huahuo_access_token_present": false,
+    "huahuo_app_uuid_present": false,
+    "profile_ok": true,
+    "workspace_ok": true,
+    "access_ok": true,
+    "current_workspace_count": 1,
+    "principal_len": 64,
+    "provider_probe_present": false,
+    "failure_stage": null
+  },
+  "post_login_acceptance": {
+    "overall": "PASS",
+    "step_count": 16,
+    "failed_steps": []
+  },
+  "console_error_count": 0,
+  "account_recorded": false,
+  "password_recorded": false,
+  "cookies_recorded": false,
+  "headers_recorded": false,
+  "secrets_recorded": false,
+  "local_storage_values_recorded": false
+}
+```
+
+Interpretation:
+
+```text
+The OpenClaw Lab now has its own password login flow. Browser authentication no
+longer depends on Huahuo front-end localStorage or Dify web-page login state.
+The Bridge validates the submitted account/password server-side, issues an
+OpenClaw-only HttpOnly session cookie, and the browser subsequently uses only
+same-origin credentials for OpenClaw API calls.
+```

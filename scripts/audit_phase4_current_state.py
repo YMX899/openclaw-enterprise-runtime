@@ -14,6 +14,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PHASE4_EVIDENCE = REPO_ROOT / "phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md"
 RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
 REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
+STANDALONE_LOGIN_EVIDENCE = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json"
+)
 
 
 @dataclass(frozen=True)
@@ -47,11 +50,12 @@ def check_phase4_deployment_evidence(repo: Path) -> GateResult:
         return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {path.name}")
     text = _read(path)
     required = [
-        r"current=/app/bin/openclaw-video/releases/85685dc463a1",
-        r"previous_marker=/app/bin/openclaw-video/releases/84e13d007d33",
-        r"same_origin_lab=200",
-        r"post_login_button=present",
-        r"same_origin_me_unauth=401",
+        r"current=/app/bin/openclaw-video/releases/db58a8ba6741",
+        r"tag:\s*phase4-openclaw-huahuo-login-header-20260607",
+        r"ai_openclaw_lab=200",
+        r"openclaw_lab=200",
+        r"openclaw_api_me_unauth=401",
+        r"huahuo_ai=200",
         r"docker-api-1\s+.*2026-01-05T11:17:20\.555976179Z\s+running",
         r"docker-web-1\s+.*2026-01-05T11:17:19\.85303869Z\s+running",
         r"docker-nginx-1\s+.*2026-01-05T11:17:20\.937420886Z\s+running",
@@ -69,7 +73,9 @@ def check_chrome_runner_ready(repo: Path) -> GateResult:
     text = _read(path)
     required = [
         "openclaw-chrome-post-login-acceptance.v1",
+        "openclaw-standalone-login-browser-acceptance.v1",
         "runHuahuoPostLoginAcceptance",
+        "runOpenClawStandaloneLoginAcceptance",
         "Post-Login Acceptance",
         "PENDING_LOGIN",
         "secrets_recorded: false",
@@ -92,6 +98,17 @@ def check_chrome_runner_ready(repo: Path) -> GateResult:
     if found_forbidden:
         return GateResult("chrome_post_login_runner", "NO_GO", "runner contains forbidden browser/session access")
     return GateResult("chrome_post_login_runner", "PASS", "Chrome helper is present and sanitized")
+
+
+def _json_has_safe_flags(payload: dict[str, Any]) -> bool:
+    return (
+        payload.get("secrets_recorded") is False
+        and payload.get("headers_recorded") is False
+        and payload.get("cookies_recorded") is False
+        and payload.get("local_storage_values_recorded") is False
+        and payload.get("account_recorded") is False
+        and payload.get("password_recorded") is False
+    )
 
 
 def check_public_smoke_summary(path: Path | None) -> GateResult:
@@ -132,6 +149,42 @@ def check_public_smoke_summary(path: Path | None) -> GateResult:
 
 
 def check_authenticated_browser_gate(repo: Path) -> GateResult:
+    standalone_path = repo / STANDALONE_LOGIN_EVIDENCE.relative_to(REPO_ROOT)
+    if standalone_path.exists():
+        try:
+            payload = json.loads(_read(standalone_path))
+        except json.JSONDecodeError:
+            return GateResult("authenticated_browser_gate", "NO_GO", "standalone login evidence is not valid JSON")
+        diagnostics = payload.get("diagnostics") or {}
+        acceptance = payload.get("post_login_acceptance") or {}
+        if (
+            payload.get("schema") == "openclaw-standalone-login-browser-acceptance.v1"
+            and payload.get("status") == "PASS"
+            and payload.get("login_status") == 200
+            and payload.get("login_authenticated") is True
+            and payload.get("login_principal_len") == 64
+            and diagnostics.get("authenticated") is True
+            and diagnostics.get("openclaw_session_present") is True
+            and diagnostics.get("auth_mode") == "openclaw_session"
+            and diagnostics.get("huahuo_access_token_present") is False
+            and diagnostics.get("huahuo_app_uuid_present") is False
+            and diagnostics.get("profile_ok") is True
+            and diagnostics.get("workspace_ok") is True
+            and diagnostics.get("access_ok") is True
+            and diagnostics.get("provider_probe_present") is False
+            and acceptance.get("overall") == "PASS"
+            and acceptance.get("step_count") == 16
+            and acceptance.get("failed_steps") == []
+            and payload.get("console_error_count") == 0
+            and _json_has_safe_flags(payload)
+        ):
+            return GateResult(
+                "authenticated_browser_gate",
+                "PASS",
+                "OpenClaw standalone password login and post-login Chrome acceptance passed",
+            )
+        return GateResult("authenticated_browser_gate", "NO_GO", "standalone login evidence did not pass required checks")
+
     path = repo / PHASE4_EVIDENCE.relative_to(REPO_ROOT)
     if not path.exists():
         return GateResult("authenticated_browser_gate", "NO_GO", f"missing {path.name}")
