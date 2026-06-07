@@ -49,6 +49,7 @@ USER root
 WORKDIR /app
 COPY pyproject.toml /app/
 COPY src /app/src
+COPY vendor/douyin_chong /app/vendor/douyin_chong
 RUN pip install --no-cache-dir --no-deps /app
 EOF
 

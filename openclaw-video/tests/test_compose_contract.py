@@ -238,6 +238,14 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
         self.assertIn("openclaw-douyin-adapter", (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
+    def test_bridge_image_includes_vendor_resolver_for_link_read_checks(self):
+        dockerfile = BRIDGE_DOCKERFILE.read_text(encoding="utf-8")
+        compose = COMPOSE.read_text(encoding="utf-8")
+
+        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
+        self.assertIn('MAX_DOWNLOAD_BYTES: "536870912"', compose)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS: "60"', compose)
+
     def test_base_images_default_to_official_and_can_be_overridden_for_isolated_hosts(self):
         compose = COMPOSE.read_text(encoding="utf-8")
         bridge = BRIDGE_DOCKERFILE.read_text(encoding="utf-8")

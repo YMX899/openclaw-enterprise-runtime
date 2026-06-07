@@ -57,6 +57,11 @@ link-read mode through URL allowlist, redirect revalidation, private-IP
 blocking, worker resolution and model analysis. `REAL_SAMPLE_EVIDENCE.json` is
 optional diagnostic history, not a production/development blocker.
 
+OpenClaw can validate the link-read stage independently from deep model
+analysis with a logged-in read-check endpoint/UI action. This read-check must
+not require Dify Web login, must not use Douyin account cookies/storage, must
+not create analysis jobs, and must return sanitized metadata only.
+
 ## Required Browser Tests
 
 Every externally visible OpenClaw UI/API change must be tested through real Chrome against the public server.

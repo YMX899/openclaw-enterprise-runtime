@@ -94,6 +94,49 @@ class FakeGateway:
         return GatewayChatResult(content=f"reply to {request.content}", raw={"content": request.content})
 
 
+def video_link_read_check_fixture():
+    return {
+        "schema_version": "openclaw-video-link-read-check.v1",
+        "status": "PASS",
+        "checked_at": "2026-06-07T00:00:00+00:00",
+        "input_url_sha256": "a" * 64,
+        "canonical_url_sha256": "b" * 64,
+        "source_url_sha256": None,
+        "share_url_sha256": None,
+        "canonical_host": "www.douyin.com",
+        "redirect_hop_count": 1,
+        "redirect_chain_hosts": ["v.douyin.com", "www.douyin.com"],
+        "resolved_ip_count": 1,
+        "resolver": "douyin_chong.UniversalVideoResolver",
+        "video_id_present": True,
+        "video_id_sha256": "c" * 64,
+        "direct_video_candidate_count": 2,
+        "direct_video_host": "v3-dy-o.zjcdn.com",
+        "playwm_host": "v26-dy.ixigua.com",
+        "content_type_present": True,
+        "content_type": "video/mp4",
+        "duration_seconds": 12.345,
+        "size_bytes": 2_621_440,
+        "video_url_source": "direct",
+        "limits": {
+            "max_duration_seconds": 60,
+            "max_download_bytes": 512 * 1024 * 1024,
+            "duration_known": True,
+            "size_known": True,
+            "duration_ok": True,
+            "size_ok": True,
+            "eligible_for_model_analysis": True,
+        },
+        "elapsed_ms": 123,
+        "raw_url_recorded": False,
+        "direct_video_url_recorded": False,
+        "cookies_recorded": False,
+        "headers_recorded": False,
+        "tokens_recorded": False,
+        "model_invoked": False,
+    }
+
+
 @unittest.skipIf(Draft202012Validator is None, "jsonschema is not installed")
 class SchemaFileTests(unittest.TestCase):
     def test_all_schema_files_have_unique_ids_and_are_valid_draft_2020_12(self):
@@ -153,6 +196,19 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
         self.assertNotIn("tenant-a", diagnostics_response.text)
         self.assertNotIn("account-a", diagnostics_response.text)
         self.assertNotIn("secret", diagnostics_response.text)
+
+        fixture = video_link_read_check_fixture()
+        raw_url = "https://v.douyin.com/abc"
+        with mock.patch("openclaw_video.bridge_app.probe_video_link", return_value=fixture):
+            read_check_response = self.client.post(
+                "/openclaw-api/video-link/read-check",
+                json={"video_url": raw_url},
+                headers=self.auth(),
+            )
+        self.assertEqual(read_check_response.status_code, 200, read_check_response.text)
+        validate_schema(read_check_response.json(), "video-link-read-check-response.schema.json")
+        self.assertNotIn(raw_url, read_check_response.text)
+        self.assertFalse(read_check_response.json()["model_invoked"])
 
         session = self.create_session()
 

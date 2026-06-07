@@ -56,6 +56,8 @@ from .session_store import (
     SessionOwnershipError,
 )
 from .upload_store import UploadStoreError, delete_upload_uri, store_upload_fileobj
+from .url_guard import UrlRejected
+from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_video_link
 
 
 def _serialize_dt(value: Any) -> str | None:
@@ -645,6 +647,7 @@ LAB_PAGE_HTML = """<!doctype html>
           <label for="prompt">Prompt</label>
           <textarea id="prompt">Analyze this video.</textarea>
           <div class="actions">
+            <button id="readVideoLink" class="secondary">Read Link</button>
             <button id="submitJob">Submit Job</button>
             <button id="pollJob" class="secondary">Poll Job</button>
           </div>
@@ -743,6 +746,12 @@ LAB_PAGE_HTML = """<!doctype html>
         const last = steps.length ? steps[steps.length - 1] : null;
         const tone = last && last.ok === false ? 'fail' : 'warn';
         return { tone, text: 'Tiny upload smoke: ' + steps.length + ' steps captured.' };
+      }
+      if (value.video_link_read_check) {
+        const payload = value.video_link_read_check;
+        const tone = payload.status === 'PASS' ? 'ok' : 'warn';
+        const count = payload.direct_video_candidate_count || 0;
+        return { tone, text: 'Video link read check ' + payload.status + ': ' + count + ' direct candidates, model not invoked.' };
       }
       const status = typeof value.status === 'number' ? value.status : null;
       const job = value.job || (value.body && value.body.job) || null;
@@ -1188,6 +1197,22 @@ LAB_PAGE_HTML = """<!doctype html>
       show(result);
       });
     }
+    async function readVideoLink() {
+      return withBusy('Reading link', async () => {
+      const videoUrl = document.getElementById('videoUrl').value;
+      const result = await api(apiPrefix + '/video-link/read-check', {
+        method: 'POST',
+        body: JSON.stringify({ video_url: videoUrl })
+      });
+      show({ status: result.status, video_link_read_check: result.body });
+      if (result.status === 200 && result.body.status === 'PASS') {
+        setRunState('Link readable', 'ok');
+        pushMessage('assistant', 'Video link is readable. Direct candidates were found without invoking the model.');
+      } else {
+        setRunState('Link check ended', result.status >= 400 ? 'fail' : 'warn');
+      }
+      });
+    }
     async function uploadJob() {
       return withBusy('Uploading video', async () => {
       const fileInput = document.getElementById('videoFile');
@@ -1306,6 +1331,7 @@ LAB_PAGE_HTML = """<!doctype html>
     document.getElementById('runSecurityTest').addEventListener('click', runSecurityTest);
     document.getElementById('runPostLoginAcceptance').addEventListener('click', runPostLoginAcceptance);
     document.getElementById('createSession').addEventListener('click', createSession);
+    document.getElementById('readVideoLink').addEventListener('click', readVideoLink);
     document.getElementById('submitJob').addEventListener('click', submitJob);
     document.getElementById('uploadJob').addEventListener('click', uploadJob);
     document.getElementById('uploadSmoke').addEventListener('click', uploadTinySmoke);
@@ -1753,6 +1779,31 @@ def create_app(
             job_id=job.job_id,
         )
         return JSONResponse(status_code=202, content={"job": _serialize_job(job)})
+
+    @app.post("/openclaw-api/video-link/read-check")
+    @app.post("/ai/openclaw-api/video-link/read-check")
+    @app.post("/api/openclaw-api/video-link/read-check")
+    @app.post("/console/api/openclaw-api/video-link/read-check")
+    async def video_link_read_check(request: Request) -> dict[str, Any]:
+        await current_principal(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be an object")
+        video_url = str(payload.get("video_url") or "").strip()
+        if not video_url:
+            raise HTTPException(status_code=400, detail="video_url is required")
+        try:
+            return probe_video_link(
+                video_url,
+                config=VideoLinkProbeConfig(
+                    max_duration_seconds=positive_int_from_env("MAX_VIDEO_DURATION_SECONDS", 60),
+                    max_download_bytes=positive_int_from_env("MAX_DOWNLOAD_BYTES", 512 * 1024 * 1024),
+                ),
+            )
+        except UrlRejected as exc:
+            raise HTTPException(status_code=400, detail=safe_error_message(str(exc))) from exc
+        except VideoLinkProbeError as exc:
+            raise HTTPException(status_code=502, detail=safe_error_message(str(exc))) from exc
 
     @app.post("/openclaw-api/uploads")
     @app.post("/ai/openclaw-api/uploads")

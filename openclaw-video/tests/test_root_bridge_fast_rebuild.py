@@ -13,6 +13,7 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
 
         self.assertIn("OPENCLAW_BRIDGE_BASE_IMAGE:-openclaw-video-openclaw-bridge", text)
         self.assertIn("OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast", text)
+        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", text)
         self.assertIn("pip install --no-cache-dir --no-deps /app", text)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET", text)
@@ -36,6 +37,8 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("image: ${OPENCLAW_BRIDGE_IMAGE:-openclaw-video-openclaw-bridge}", text)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: ${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET: ${BRIDGE_TEST_IDENTITY_SECRET:-}", text)
+        self.assertIn('MAX_DOWNLOAD_BYTES: "536870912"', text)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS: "60"', text)
         self.assertIn("DIFY_AUTH_DB_HOST: ${DIFY_AUTH_DB_HOST:-}", text)
         self.assertIn("DIFY_AUTH_DB_PASSWORD: ${DIFY_AUTH_DB_PASSWORD:-}", text)
         self.assertIn("OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN: ${OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN:-1}", text)

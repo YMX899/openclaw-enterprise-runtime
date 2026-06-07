@@ -153,6 +153,49 @@ class FakeGateway:
         return GatewayChatResult(content=f"reply to {request.content}", raw={"content": f"reply to {request.content}"})
 
 
+def video_link_read_check_fixture():
+    return {
+        "schema_version": "openclaw-video-link-read-check.v1",
+        "status": "PASS",
+        "checked_at": "2026-06-07T00:00:00+00:00",
+        "input_url_sha256": "a" * 64,
+        "canonical_url_sha256": "b" * 64,
+        "source_url_sha256": None,
+        "share_url_sha256": None,
+        "canonical_host": "www.douyin.com",
+        "redirect_hop_count": 1,
+        "redirect_chain_hosts": ["v.douyin.com", "www.douyin.com"],
+        "resolved_ip_count": 1,
+        "resolver": "douyin_chong.UniversalVideoResolver",
+        "video_id_present": True,
+        "video_id_sha256": "c" * 64,
+        "direct_video_candidate_count": 2,
+        "direct_video_host": "v3-dy-o.zjcdn.com",
+        "playwm_host": "v26-dy.ixigua.com",
+        "content_type_present": True,
+        "content_type": "video/mp4",
+        "duration_seconds": 12.345,
+        "size_bytes": 2_621_440,
+        "video_url_source": "direct",
+        "limits": {
+            "max_duration_seconds": 60,
+            "max_download_bytes": 512 * 1024 * 1024,
+            "duration_known": True,
+            "size_known": True,
+            "duration_ok": True,
+            "size_ok": True,
+            "eligible_for_model_analysis": True,
+        },
+        "elapsed_ms": 123,
+        "raw_url_recorded": False,
+        "direct_video_url_recorded": False,
+        "cookies_recorded": False,
+        "headers_recorded": False,
+        "tokens_recorded": False,
+        "model_invoked": False,
+    }
+
+
 @unittest.skipIf(TestClient is None, "fastapi test client is not installed")
 class BridgeAppTests(unittest.TestCase):
     def setUp(self):
@@ -217,6 +260,11 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("apiPrefix + '/me'", response.text)
         self.assertIn("apiPrefix + '/identity/diagnostics'", response.text)
         self.assertIn("apiPrefix + '/jobs'", response.text)
+        self.assertIn("readVideoLink", response.text)
+        self.assertIn("Read Link", response.text)
+        self.assertIn("apiPrefix + '/video-link/read-check'", response.text)
+        self.assertIn("Video link read check", response.text)
+        self.assertIn("model not invoked", response.text)
         self.assertIn("apiPrefix + '/uploads'", response.text)
         self.assertIn("apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result", response.text)
         self.assertIn("Upload Video", response.text)
@@ -729,6 +777,74 @@ class BridgeAppTests(unittest.TestCase):
         read_response = self.client.get(f"/openclaw-api/jobs/{job['job_id']}", headers=self.auth("account-a"))
         self.assertEqual(read_response.status_code, 200, read_response.text)
         self.assertEqual(read_response.json()["job"]["job_id"], job["job_id"])
+
+    def test_video_link_read_check_requires_login_and_does_not_create_job(self):
+        fixture = video_link_read_check_fixture()
+        raw_url = "https://v.douyin.com/abc"
+        with mock.patch("openclaw_video.bridge_app.probe_video_link", return_value=fixture) as probe:
+            unauthenticated = self.client.post(
+                "/openclaw-api/video-link/read-check",
+                json={"video_url": raw_url},
+            )
+            self.assertEqual(unauthenticated.status_code, 401)
+            self.assertEqual(probe.call_count, 0)
+
+            response = self.client.post(
+                "/openclaw-api/video-link/read-check",
+                json={"video_url": raw_url},
+                headers=self.auth("account-a"),
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json(), fixture)
+        self.assertEqual(len(self.jobs._jobs), 0)
+        self.assertEqual(probe.call_count, 1)
+        self.assertEqual(probe.call_args.args[0], raw_url)
+        self.assertFalse(response.json()["model_invoked"])
+        self.assertFalse(response.json()["raw_url_recorded"])
+        self.assertFalse(response.json()["direct_video_url_recorded"])
+        self.assertNotIn(raw_url, response.text)
+        self.assertNotIn("token=", response.text)
+
+    def test_video_link_read_check_validates_body_and_sanitizes_failures(self):
+        from openclaw_video.url_guard import UrlRejected
+        from openclaw_video.video_link_probe import VideoLinkProbeError
+
+        missing = self.client.post(
+            "/openclaw-api/video-link/read-check",
+            json={},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(missing.status_code, 400)
+        self.assertIn("video_url is required", missing.text)
+
+        raw_url = "https://v.douyin.com/abc?secret=value"
+        with mock.patch(
+            "openclaw_video.bridge_app.probe_video_link",
+            side_effect=UrlRejected("host is not in the Douyin allowlist"),
+        ):
+            rejected = self.client.post(
+                "/openclaw-api/video-link/read-check",
+                json={"video_url": raw_url},
+                headers=self.auth("account-a"),
+            )
+        self.assertEqual(rejected.status_code, 400, rejected.text)
+        self.assertIn("host is not in the Douyin allowlist", rejected.text)
+        self.assertNotIn(raw_url, rejected.text)
+        self.assertNotIn("secret=value", rejected.text)
+
+        with mock.patch(
+            "openclaw_video.bridge_app.probe_video_link",
+            side_effect=VideoLinkProbeError("douyin_chong resolver failed"),
+        ):
+            failed = self.client.post(
+                "/openclaw-api/video-link/read-check",
+                json={"video_url": raw_url},
+                headers=self.auth("account-a"),
+            )
+        self.assertEqual(failed.status_code, 502, failed.text)
+        self.assertIn("douyin_chong resolver failed", failed.text)
+        self.assertNotIn(raw_url, failed.text)
 
     def test_upload_job_returns_202_and_records_private_upload_uri(self):
         session = self.create_session("account-a")

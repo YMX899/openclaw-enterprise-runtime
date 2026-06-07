@@ -48,8 +48,8 @@ review, Dify web login, Douyin account login, or
   element IDs include `loginAccount`, `loginPassword`, `loginButton`,
   `authStatus`, `identityDiagnostics`, `runPostLoginAcceptance`, `runSelfTest`,
   `runSecurityTest`, `createSession`, `sessionId`, `videoUrl`, `prompt`,
-  `submitJob`, `pollJob`, `videoFile`, `uploadJob`, `uploadSmoke` and
-  `output`.
+  `readVideoLink`, `submitJob`, `pollJob`, `videoFile`, `uploadJob`,
+  `uploadSmoke` and `output`.
 
 ## OpenClaw Login Boundary
 
@@ -84,6 +84,9 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 - Runtime model credentials and permissions still need to be valid for deep
   analysis jobs to succeed, but this is a model-configuration concern, not a
   Douyin-login or sample-evidence blocker.
+- OpenClaw may expose a logged-in `video-link/read-check` preflight that proves
+  URL validation, redirect revalidation, direct candidate resolution, sanitized
+  metadata and `model_invoked=false` before a user submits a full analysis job.
 
 ## Root Deployment Baseline
 

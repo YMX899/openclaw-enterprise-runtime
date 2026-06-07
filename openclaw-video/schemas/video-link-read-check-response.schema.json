@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://huahuoai.local/schemas/openclaw-video/video-link-read-check-response.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "checked_at",
+    "input_url_sha256",
+    "canonical_url_sha256",
+    "source_url_sha256",
+    "share_url_sha256",
+    "canonical_host",
+    "redirect_hop_count",
+    "redirect_chain_hosts",
+    "resolved_ip_count",
+    "resolver",
+    "video_id_present",
+    "video_id_sha256",
+    "direct_video_candidate_count",
+    "direct_video_host",
+    "playwm_host",
+    "content_type_present",
+    "content_type",
+    "duration_seconds",
+    "size_bytes",
+    "video_url_source",
+    "limits",
+    "elapsed_ms",
+    "raw_url_recorded",
+    "direct_video_url_recorded",
+    "cookies_recorded",
+    "headers_recorded",
+    "tokens_recorded",
+    "model_invoked"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "openclaw-video-link-read-check.v1"},
+    "status": {"enum": ["PASS", "WARN"]},
+    "checked_at": {"type": "string", "minLength": 1},
+    "input_url_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "canonical_url_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_url_sha256": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "share_url_sha256": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "canonical_host": {"type": "string", "minLength": 1, "maxLength": 253},
+    "redirect_hop_count": {"type": "integer", "minimum": 0},
+    "redirect_chain_hosts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1, "maxLength": 253}
+    },
+    "resolved_ip_count": {"type": "integer", "minimum": 1},
+    "resolver": {"const": "douyin_chong.UniversalVideoResolver"},
+    "video_id_present": {"type": "boolean"},
+    "video_id_sha256": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "direct_video_candidate_count": {"type": "integer", "minimum": 0, "maximum": 2},
+    "direct_video_host": {
+      "oneOf": [
+        {"type": "string", "minLength": 1, "maxLength": 253},
+        {"type": "null"}
+      ]
+    },
+    "playwm_host": {
+      "oneOf": [
+        {"type": "string", "minLength": 1, "maxLength": 253},
+        {"type": "null"}
+      ]
+    },
+    "content_type_present": {"type": "boolean"},
+    "content_type": {
+      "oneOf": [
+        {"type": "string", "minLength": 1, "maxLength": 120},
+        {"type": "null"}
+      ]
+    },
+    "duration_seconds": {
+      "oneOf": [
+        {"type": "number", "minimum": 0},
+        {"type": "null"}
+      ]
+    },
+    "size_bytes": {
+      "oneOf": [
+        {"type": "integer", "minimum": 0},
+        {"type": "null"}
+      ]
+    },
+    "video_url_source": {"type": "string", "maxLength": 120},
+    "limits": {
+      "type": "object",
+      "required": [
+        "max_duration_seconds",
+        "max_download_bytes",
+        "duration_known",
+        "size_known",
+        "duration_ok",
+        "size_ok",
+        "eligible_for_model_analysis"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_duration_seconds": {"type": "integer", "minimum": 1},
+        "max_download_bytes": {"type": "integer", "minimum": 1},
+        "duration_known": {"type": "boolean"},
+        "size_known": {"type": "boolean"},
+        "duration_ok": {"type": "boolean"},
+        "size_ok": {"type": "boolean"},
+        "eligible_for_model_analysis": {"type": "boolean"}
+      }
+    },
+    "elapsed_ms": {"type": "integer", "minimum": 0},
+    "raw_url_recorded": {"const": false},
+    "direct_video_url_recorded": {"const": false},
+    "cookies_recorded": {"const": false},
+    "headers_recorded": {"const": false},
+    "tokens_recorded": {"const": false},
+    "model_invoked": {"const": false}
+  }
+}
