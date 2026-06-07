@@ -109,6 +109,22 @@ def check_douyin_artifact(repo: Path) -> GateResult:
 def check_douyin_real_sample(repo: Path) -> GateResult:
     path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
     if not path.exists():
+        attempt_path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_ATTEMPT_20260607.json"
+        if attempt_path.exists():
+            try:
+                attempt = json.loads(_read(attempt_path))
+            except json.JSONDecodeError:
+                attempt = {}
+            categories = []
+            for item in attempt.get("attempts") or []:
+                categories.extend(item.get("error_categories") or [])
+            category_text = ",".join(sorted(set(str(item) for item in categories))) or "unknown"
+            reason = str(attempt.get("reason") or "real sample attempt exists but has not succeeded")
+            return GateResult(
+                "douyin_real_sample",
+                "NO_GO",
+                f"missing {path}; latest attempt blocked: {reason}; categories={category_text}",
+            )
         if os.environ.get("ALLOW_DOUYIN_SAMPLE_DEFERRED") == "1":
             return GateResult(
                 "douyin_real_sample",

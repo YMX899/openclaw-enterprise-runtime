@@ -26,6 +26,22 @@ if str(SRC_ROOT) not in sys.path:
 from openclaw_video.result_schema import ResultSchemaError, validate_result_payload  # noqa: E402
 
 
+FAILURE_CATEGORY_PATTERNS: tuple[tuple[str, str], ...] = (
+    ("duration exceeds", "duration_limit"),
+    ("size exceeds", "size_limit"),
+    ("router data", "douyin_router_data"),
+    ("could not extract", "douyin_extract"),
+    ("arkauthentication", "ark_authentication"),
+    ("authentication", "authentication"),
+    ("empty analysis", "empty_analysis"),
+    ("timed out", "timeout"),
+    ("403", "http_403"),
+    ("401", "http_401"),
+    ("captcha", "captcha"),
+    ("verify", "verify"),
+)
+
+
 def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -75,6 +91,16 @@ def _rusage_snapshot() -> dict[str, int | None]:
         return {"max_rss_kb": None}
     usage = resource.getrusage(resource.RUSAGE_CHILDREN)
     return {"max_rss_kb": int(getattr(usage, "ru_maxrss", 0))}
+
+
+def classify_adapter_failure(*, stdout: str, stderr: str) -> list[str]:
+    combined = f"{stderr or ''}\n{stdout or ''}".lower()
+    categories = {
+        label
+        for marker, label in FAILURE_CATEGORY_PATTERNS
+        if marker in combined
+    }
+    return sorted(categories)
 
 
 def _build_summary_base(args: argparse.Namespace, output_dir: Path, result_json: Path) -> dict:
@@ -177,6 +203,10 @@ def run(args: argparse.Namespace) -> tuple[int, dict]:
     if completed.returncode != 0:
         summary["status"] = "failed"
         summary["error_code"] = "adapter_nonzero_exit"
+        summary["error_categories"] = classify_adapter_failure(
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
         evidence_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return completed.returncode or 1, summary
 

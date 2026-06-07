@@ -1,0 +1,71 @@
+{
+  "schema_version": "douyin-real-sample-attempt.v1",
+  "created_at": "2026-06-07T02:43:40.158718+00:00",
+  "status": "blocked",
+  "blocking_gate": "douyin_real_sample",
+  "reason": "Ark model authentication returned HTTP 401 during real model-backed adapter execution.",
+  "input_url_sha256": "b451de0278744cba7d7c8ed24c969761b9c56acb169086c3bded03a26337a65b",
+  "input_url_host": "www.douyin.com",
+  "resolver_prefilter": {
+    "status": "resolved",
+    "duration_ms": 20134,
+    "size_mb": 2.348,
+    "content_type_present": true,
+    "video_url_source": "direct",
+    "eligible_for_production_limits": true
+  },
+  "env_file_present": true,
+  "env_key_shape": {
+    "ARK_API_KEY_nonempty": true,
+    "ARK_BASE_URL_nonempty": true,
+    "ARK_MODEL_nonempty": true,
+    "MODEL_nonempty": true,
+    "volcengine_ark_runtime_importable": true
+  },
+  "attempts": [
+    {
+      "base_url_variant": "configured_env",
+      "status": "failed",
+      "error_code": "adapter_nonzero_exit",
+      "error_categories": [
+        "authentication",
+        "http_401"
+      ],
+      "process": {
+        "returncode": 2,
+        "elapsed_seconds": 2.286,
+        "stdout_chars": 0,
+        "stderr_chars": 300,
+        "stdout_recorded": false,
+        "stderr_recorded": false
+      }
+    },
+    {
+      "base_url_variant": "api_v3_temp_env",
+      "status": "failed",
+      "error_code": "adapter_nonzero_exit",
+      "error_categories": [
+        "authentication",
+        "http_401"
+      ],
+      "process": {
+        "returncode": 2,
+        "elapsed_seconds": 2.004,
+        "stdout_chars": 0,
+        "stderr_chars": 300,
+        "stdout_recorded": false,
+        "stderr_recorded": false
+      }
+    }
+  ],
+  "raw_url_recorded": false,
+  "secret_file_contents_recorded": false,
+  "stdout_recorded": false,
+  "stderr_recorded": false,
+  "headers_recorded": false,
+  "cookies_recorded": false,
+  "tokens_recorded": false,
+  "model_output_recorded": false,
+  "production_pass_evidence_created": false,
+  "next_action": "Provision a valid Ark API key/model permission for the configured video-capable model, then rerun scripts/run_douyin_real_sample.py and promote the sanitized success evidence to artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json."
+}

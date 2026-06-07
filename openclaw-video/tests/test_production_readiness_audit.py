@@ -243,6 +243,32 @@ new 5xx: NONE
         self.assertEqual(result.status, "PASS")
         self.assertIn("deferred", result.evidence)
 
+    def test_real_sample_attempt_is_reported_but_not_passed(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/douyin_chong/REAL_SAMPLE_ATTEMPT_20260607.json",
+                """
+{
+  "schema_version": "douyin-real-sample-attempt.v1",
+  "status": "blocked",
+  "reason": "Ark model authentication returned HTTP 401.",
+  "attempts": [
+    {
+      "status": "failed",
+      "error_categories": ["authentication", "http_401"]
+    }
+  ]
+}
+""",
+            )
+
+            result = audit_module.check_douyin_real_sample(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("latest attempt blocked", result.evidence)
+        self.assertIn("http_401", result.evidence)
+
     def test_openclaw_security_requires_triage_when_decision_approved(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)

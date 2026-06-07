@@ -43,6 +43,14 @@ Path(args.output_json).write_text(json.dumps({
 """
 
 
+FAKE_FAILING_ADAPTER = r"""
+import sys
+
+print("ArkAuthenticationError: status_code: 401 authentication failed", file=sys.stderr)
+raise SystemExit(2)
+"""
+
+
 class DouyinRealSampleRunnerTests(unittest.TestCase):
     def test_success_writes_sanitized_evidence_without_secret_contents(self):
         with TemporaryDirectory() as tmp:
@@ -92,6 +100,37 @@ class DouyinRealSampleRunnerTests(unittest.TestCase):
             self.assertEqual(summary["status"], "failed")
             self.assertEqual(summary["error_code"], "env_file_missing")
             self.assertTrue((output_dir / "sanitized-run.json").exists())
+
+    def test_adapter_failure_records_only_sanitized_error_categories(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            adapter = root / "failing_adapter.py"
+            adapter.write_text(textwrap.dedent(FAKE_FAILING_ADAPTER), encoding="utf-8")
+            env_file = root / "douyin.env"
+            env_file.write_text("ARK_API_KEY=secret-value-that-must-not-appear\n", encoding="utf-8")
+            output_dir = root / "out"
+
+            args = real_sample.build_parser().parse_args(
+                [
+                    "--input-url", "https://www.douyin.com/video/123",
+                    "--env-file", str(env_file),
+                    "--adapter-bin", str(adapter),
+                    "--output-dir", str(output_dir),
+                ]
+            )
+            exit_code, summary = real_sample.run(args)
+
+            self.assertEqual(exit_code, 2)
+            self.assertEqual(summary["status"], "failed")
+            self.assertEqual(summary["error_code"], "adapter_nonzero_exit")
+            self.assertIn("http_401", summary["error_categories"])
+            self.assertIn("authentication", summary["error_categories"])
+            evidence = json.loads((output_dir / "sanitized-run.json").read_text(encoding="utf-8"))
+            evidence_text = json.dumps(evidence, ensure_ascii=False)
+            self.assertNotIn("secret-value-that-must-not-appear", evidence_text)
+            self.assertNotIn("ArkAuthenticationError", evidence_text)
+            self.assertFalse(evidence["process"]["stdout_recorded"])
+            self.assertFalse(evidence["process"]["stderr_recorded"])
 
 
 if __name__ == "__main__":
