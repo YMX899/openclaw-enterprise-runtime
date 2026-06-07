@@ -162,8 +162,14 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
       return finalReport;
     }
 
+    const alreadyAuthenticated = await labTab.playwright.locator("#chatApp").isVisible({ timeoutMs: 1000 }).catch(() => false);
+    if (alreadyAuthenticated) {
+      await labTab.playwright.locator("#logoutButton").click({ timeoutMs: 10000 });
+      await labTab.playwright.locator("#openLogin").waitFor({ state: "visible", timeoutMs: 10000 });
+    }
     const openLogin = labTab.playwright.locator("#openLogin");
-    if (await openLogin.count()) {
+    const openLoginVisible = await openLogin.isVisible({ timeoutMs: 2000 }).catch(() => false);
+    if (await openLogin.count() && openLoginVisible) {
       await openLogin.click({ timeoutMs: 10000 });
     }
     await labTab.playwright.locator("#loginAccount").fill(account, { timeoutMs: 10000 });
