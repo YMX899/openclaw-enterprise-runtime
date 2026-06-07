@@ -2419,6 +2419,7 @@ LAB_PAGE_HTML = """<!doctype html>
     uploadSourceTab.addEventListener('click', () => setSourceMode('upload'));
     document.getElementById('openLogin').addEventListener('click', openLoginPanel);
     document.getElementById('closeLogin').addEventListener('click', closeLoginPanel);
+    window.addEventListener('openclaw:open-login', openLoginPanel);
     loginPanel.addEventListener('click', event => {
       if (event.target === loginPanel) closeLoginPanel();
     });

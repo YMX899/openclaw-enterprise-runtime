@@ -180,10 +180,7 @@ export async function runOpenClawProductizedLoginAcceptance(browser, options = {
       }
     }
     if (loginUiState.loginPanelHidden !== false) {
-      await labTab.playwright.evaluate(() => {
-        const panel = document.querySelector("#loginPanel");
-        if (panel) panel.hidden = false;
-      });
+      await labTab.playwright.evaluate(() => window.dispatchEvent(new Event("openclaw:open-login")));
       for (let attempt = 0; attempt < 20; attempt += 1) {
         await labTab.playwright.waitForTimeout(250);
         const panelOpen = await labTab.playwright.evaluate(() => document.querySelector("#loginPanel")?.hidden === false);
