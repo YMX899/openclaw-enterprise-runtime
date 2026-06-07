@@ -24,6 +24,12 @@ SMOKE_PASS = {
     "schema": "openclaw-public-browser-smoke.v1",
     "status": "PASS",
     "targets": [
+        {
+            "name": "openclaw-standalone-lab",
+            "http_5xx_count": 0,
+            "gateway_direct_request_count": 0,
+            "token_url_leak_count": 0,
+        },
         {"name": "openclaw-lab", "http_5xx_count": 0, "gateway_direct_request_count": 0, "token_url_leak_count": 0},
         {
             "name": "openclaw-api-me-unauthenticated",
@@ -46,8 +52,8 @@ SMOKE_PASS = {
 
 
 PHASE4_BASE = """
-current=/app/bin/openclaw-video/releases/db58a8ba6741
-tag: phase4-openclaw-huahuo-login-header-20260607
+current=/app/bin/openclaw-video/releases/14722e96e130
+tag: phase4-relaxed-root-testing-baseline-20260607
 ai_openclaw_lab=200
 openclaw_lab=200
 openclaw_api_me_unauth=401
@@ -109,7 +115,7 @@ STANDALONE_LOGIN_PASS = {
 
 class Phase4CurrentStateAuditTests(unittest.TestCase):
     def test_current_repo_reports_current_gates_pass(self):
-        smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260606T195713Z" / "summary.json"
+        smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260607T052339Z" / "summary.json"
         report = phase4_audit.audit(REPO_ROOT, smoke_summary=smoke, include_git_clean=True)
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
 

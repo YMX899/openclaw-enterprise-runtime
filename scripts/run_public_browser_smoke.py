@@ -16,6 +16,13 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "tmp" / "playwright-public-browser"
 
 
 TARGETS = {
+    "openclaw-standalone-lab": {
+        "url": "https://www.huahuoai.com/ai/openclaw-lab/",
+        "wait_ms": "1500",
+        "expected_statuses": {
+            "GET https://www.huahuoai.com/ai/openclaw-lab/": 200,
+        },
+    },
     "openclaw-lab": {
         "url": "https://www.huahuoai.com/openclaw-lab/",
         "wait_ms": "1500",

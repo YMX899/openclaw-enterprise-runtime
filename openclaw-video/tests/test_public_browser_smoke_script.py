@@ -23,6 +23,7 @@ class PublicBrowserSmokeScriptTests(unittest.TestCase):
     def test_script_checks_openclaw_and_dify_public_baselines(self):
         text = SCRIPT.read_text(encoding="utf-8")
 
+        self.assertIn("https://www.huahuoai.com/ai/openclaw-lab/", text)
         self.assertIn("https://www.huahuoai.com/openclaw-lab/", text)
         self.assertIn("https://www.huahuoai.com/openclaw-api/me", text)
         self.assertIn("https://www.huahuoai.com/ai/?id=4", text)

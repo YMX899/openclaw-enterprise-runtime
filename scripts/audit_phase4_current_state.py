@@ -17,8 +17,9 @@ PHASE4_EVIDENCE = REPO_ROOT / "phase4-same-origin-openclaw-lab-deployment-eviden
 RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
 REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
 PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
-STANDALONE_LOGIN_EVIDENCE = (
-    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json"
+STANDALONE_LOGIN_EVIDENCE_CANDIDATES = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-root-20260607.json",
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json",
 )
 
 
@@ -62,8 +63,8 @@ def check_phase4_deployment_evidence(repo: Path) -> GateResult:
         return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {path.name}")
     text = _read(path)
     required = [
-        r"current=/app/bin/openclaw-video/releases/db58a8ba6741",
-        r"tag:\s*phase4-openclaw-huahuo-login-header-20260607",
+        r"current=/app/bin/openclaw-video/releases/14722e96e130",
+        r"tag:\s*phase4-relaxed-root-testing-baseline-20260607",
         r"ai_openclaw_lab=200",
         r"openclaw_lab=200",
         r"openclaw_api_me_unauth=401",
@@ -134,6 +135,7 @@ def check_public_smoke_summary(path: Path | None) -> GateResult:
         return GateResult("public_smoke_latest", "NO_GO", "smoke summary is not valid JSON")
     target_names = {target.get("name") for target in payload.get("targets") or []}
     required_targets = {
+        "openclaw-standalone-lab",
         "openclaw-lab",
         "openclaw-api-me-unauthenticated",
         "huahuo-user-web",
@@ -161,8 +163,15 @@ def check_public_smoke_summary(path: Path | None) -> GateResult:
 
 
 def check_authenticated_browser_gate(repo: Path) -> GateResult:
-    standalone_path = repo / STANDALONE_LOGIN_EVIDENCE.relative_to(REPO_ROOT)
-    if standalone_path.exists():
+    standalone_path = next(
+        (
+            repo / path.relative_to(REPO_ROOT)
+            for path in STANDALONE_LOGIN_EVIDENCE_CANDIDATES
+            if (repo / path.relative_to(REPO_ROOT)).exists()
+        ),
+        None,
+    )
+    if standalone_path is not None and standalone_path.exists():
         try:
             payload = json.loads(_read(standalone_path))
         except json.JSONDecodeError:

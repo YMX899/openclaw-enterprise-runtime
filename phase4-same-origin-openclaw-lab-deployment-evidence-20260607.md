@@ -798,3 +798,158 @@ The Bridge validates the submitted account/password server-side, issues an
 OpenClaw-only HttpOnly session cookie, and the browser subsequently uses only
 same-origin credentials for OpenClaw API calls.
 ```
+
+## Relaxed Root Testing Baseline Deployment
+
+Date: 2026-06-07T13:18-13:26+08:00.
+
+Scope:
+
+```text
+Mandatory web GPT review: not required.
+Dify Web/admin login for OpenClaw: not required.
+Douyin account login / browser storage state: retired.
+REAL_SAMPLE_EVIDENCE.json: optional diagnostic history only.
+Root deployment/testing: allowed under relaxed development gates.
+OpenClaw entry: https://www.huahuoai.com/ai/openclaw-lab/
+```
+
+Git and bundle:
+
+```text
+commit=14722e96e130fc974218a57b635ea421769f05d1
+tag: phase4-relaxed-root-testing-baseline-20260607
+bundle: tmp\root-private-sidecar-bundles\openclaw-root-private-sidecar-14722e96e130.tar.gz
+bundle_sha256: 5e65369f0da96bc4128122c0c4b4579a7e863436ab1fd30f886ef77c0ab2689a
+```
+
+Deployment:
+
+```text
+previous=/app/bin/openclaw-video/releases/db58a8ba6741
+current=/app/bin/openclaw-video/releases/14722e96e130
+previous_marker=/app/bin/openclaw-video/releases/db58a8ba6741
+bridge_fast_rebuild=PASS
+local_health=200
+local_lab=200
+ai_openclaw_lab=200
+openclaw_lab=200
+openclaw_api_me_unauth=401
+huahuo_ai=200
+```
+
+Dify core containers after deployment:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z  running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Resource snapshot after browser acceptance and public smoke:
+
+```text
+openclaw-video-openclaw-bridge-1         0.09% CPU  53.87 MiB  5 PIDs
+openclaw-video-video-analysis-worker-1   0.00% CPU  33.64 MiB  1 PID
+openclaw-video-openclaw-gateway-1        0.00% CPU  405.4 MiB  18 PIDs
+openclaw-video-bridge-postgres-1         0.00% CPU  22.17 MiB  6 PIDs
+docker-api-1                             0.76% CPU  4.298 GiB  61 PIDs
+docker-web-1                             2.52% CPU  386.1 MiB  34 PIDs
+docker-nginx-1                           0.00% CPU  14.57 MiB  10 PIDs
+```
+
+Chrome standalone login acceptance:
+
+```json
+{
+  "schema": "openclaw-standalone-login-browser-acceptance.v1",
+  "status": "PASS",
+  "lab_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "login_status": 200,
+  "auth_status_text": "Authenticated",
+  "login_authenticated": true,
+  "login_principal_len": 64,
+  "diagnostics": {
+    "status": 200,
+    "authenticated": true,
+    "login_material_present": true,
+    "openclaw_session_present": true,
+    "auth_mode": "openclaw_session",
+    "huahuo_access_token_present": false,
+    "huahuo_app_uuid_present": false,
+    "profile_ok": true,
+    "workspace_ok": true,
+    "access_ok": true,
+    "current_workspace_count": 1,
+    "principal_len": 64,
+    "provider_probe_present": false,
+    "failure_stage": null
+  },
+  "post_login_acceptance": {
+    "overall": "PASS",
+    "step_count": 16,
+    "failed_steps": []
+  },
+  "console_error_count": 0,
+  "account_recorded": false,
+  "password_recorded": false,
+  "cookies_recorded": false,
+  "headers_recorded": false,
+  "secrets_recorded": false,
+  "local_storage_values_recorded": false
+}
+```
+
+Post-login acceptance covered:
+
+```text
+identity_diagnostics
+me
+random_session_404
+random_job_404
+random_result_404
+create_session
+non_allowlisted_domain_submitted
+non_allowlisted_domain_terminal
+localhost_blocked_submitted
+localhost_blocked_terminal
+cloud_metadata_blocked_submitted
+cloud_metadata_blocked_terminal
+tiny_upload_submitted
+tiny_upload_terminal
+tiny_upload_result
+messages_visible_to_owner
+```
+
+Public browser smoke:
+
+```text
+Command: python scripts\run_public_browser_smoke.py --timeout-seconds 90
+Run dir: tmp\playwright-public-browser\20260607T052339Z
+Overall: PASS
+Targets: openclaw-standalone-lab, openclaw-lab, openclaw-api-me-unauthenticated,
+huahuo-user-web, huahuo-admin-configuration
+http_5xx_count: 0
+gateway_direct_request_count: 0
+token_url_leak_count: 0
+headers_recorded: false
+bodies_recorded: false
+secrets_recorded: false
+```
+
+Server-side bare `curl` to `https://ai001.huahuoai.com/signin` and
+`https://ai001.huahuoai.com/apps` returned `403` from root, while the real
+browser smoke reached the configured admin route and passed. This is recorded as
+an access-policy difference between bare server-side curl and browser
+navigation; the OpenClaw user-facing route is independent from Dify Web login.
+
+Safety notes:
+
+```text
+No Dify compose file was modified.
+No Dify api/web/nginx container was restarted, rebuilt or recreated.
+OpenClaw Gateway and Bridge Postgres remained internal-only.
+No Cookie, Authorization header, CSRF value, browser storage value, account,
+password, model key, database URL, private key, .env content or full request
+header was recorded.
+```
