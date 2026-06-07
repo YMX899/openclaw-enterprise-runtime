@@ -2500,6 +2500,11 @@ def create_app(
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
     enable_test_identity_headers = os.environ.get("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", "").lower() in {"1", "true", "yes"}
     test_identity_secret = os.environ.get("BRIDGE_TEST_IDENTITY_SECRET", "")
+    enable_dify_provider_identity = os.environ.get("OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY", "0").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     phase4_config = load_phase4_config()
     rate_limiter = SlidingWindowRateLimiter()
     login_limiter = SlidingWindowRateLimiter()
@@ -2691,6 +2696,8 @@ def create_app(
                 profile = {"id": request.headers["x-test-account"]}
                 tenant_id = request.headers.get("x-test-tenant", "test-tenant")
                 workspaces = {"data": [{"id": tenant_id, "current": True}]}
+            elif not enable_dify_provider_identity:
+                raise PermissionError("login required")
             elif hasattr(dify, "resolve_identity"):
                 identity_context = await dify.resolve_identity(request.headers)
                 remember_dify_set_cookie_headers(request, getattr(identity_context, "set_cookie_headers", ()))
@@ -2771,6 +2778,9 @@ def create_app(
                 result["authenticated"] = True
                 result["principal_id"] = principal.principal_id
                 result["auth_mode"] = "test_identity_headers"
+                return result
+            if not enable_dify_provider_identity:
+                result["failure_stage"] = "profile"
                 return result
             if hasattr(dify, "safe_identity_probe"):
                 try:

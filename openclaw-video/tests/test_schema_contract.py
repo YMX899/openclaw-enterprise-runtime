@@ -158,6 +158,12 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
 
         self.sessions = InMemorySessionStore()
         self.jobs = InMemoryJobStore()
+        self.env_patch = mock.patch.dict(
+            os.environ,
+            {"BRIDGE_ENABLE_TEST_IDENTITY_HEADERS": "1", "BRIDGE_TEST_IDENTITY_SECRET": "test-mode-secret"},
+        )
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
         self.client = TestClient(
             create_app(
                 dify=FakeDifyClient(),
@@ -169,7 +175,11 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
         )
 
     def auth(self, account="account-a", tenant="tenant-a"):
-        return {"x-test-account": account, "x-test-tenant": tenant}
+        return {
+            "x-openclaw-test-identity-secret": "test-mode-secret",
+            "x-test-account": account,
+            "x-test-tenant": tenant,
+        }
 
     def create_session(self):
         payload = {"title": "Video analysis"}

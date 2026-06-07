@@ -56,23 +56,9 @@ class CompositeOpenClawAuthenticator:
 
 
 def default_openclaw_authenticator() -> Any | None:
-    authenticators = []
-    dify_database = DifyDatabasePasswordAuthenticator.from_environment()
-    if dify_database is not None:
-        authenticators.append(dify_database)
-    enable_huahuo = os.environ.get("OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN", "1").lower() in {"1", "true", "yes"}
-    if enable_huahuo:
-        authenticators.append(
-            HuahuoPasswordAuthenticator(
-                os.environ.get("HUAHUO_FRONT_BASE", "https://www.huahuoai.com"),
-                tenant_id=os.environ.get("HUAHUO_FRONT_TENANT_ID", "huahuo-front"),
-            )
-        )
-    if not authenticators:
-        return None
-    if len(authenticators) == 1:
-        return authenticators[0]
-    return CompositeOpenClawAuthenticator(*authenticators)
+    """Use Dify's database as the only password-login authority."""
+
+    return DifyDatabasePasswordAuthenticator.from_environment()
 
 
 def compare_dify_password(password: str, password_hashed_base64: str | None, salt_base64: str | None) -> bool:

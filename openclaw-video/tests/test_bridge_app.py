@@ -203,6 +203,12 @@ class BridgeAppTests(unittest.TestCase):
 
         self.sessions = InMemorySessionStore()
         self.jobs = InMemoryJobStore()
+        self.env_patch = mock.patch.dict(
+            os.environ,
+            {"BRIDGE_ENABLE_TEST_IDENTITY_HEADERS": "1", "BRIDGE_TEST_IDENTITY_SECRET": "test-mode-secret"},
+        )
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
         self.client = TestClient(
             create_app(
                 dify=FakeDifyClient(),
@@ -213,7 +219,11 @@ class BridgeAppTests(unittest.TestCase):
         )
 
     def auth(self, account="account-a", tenant="tenant-a"):
-        return {"x-test-account": account, "x-test-tenant": tenant}
+        return {
+            "x-openclaw-test-identity-secret": "test-mode-secret",
+            "x-test-account": account,
+            "x-test-tenant": tenant,
+        }
 
     def create_session(self, account="account-a", tenant="tenant-a"):
         response = self.client.post(
@@ -376,6 +386,31 @@ class BridgeAppTests(unittest.TestCase):
         response = self.client.get("/openclaw-api/me")
         self.assertEqual(response.status_code, 401)
 
+    def test_dify_cookie_or_header_does_not_bypass_openclaw_login_by_default(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=FakeDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+
+        response = client.get(
+            "/openclaw-api/me",
+            headers={
+                "x-test-account": "account-a",
+                "x-test-tenant": "tenant-a",
+                "Authorization": "Bearer dify-web-token",
+                "Cookie": "access_token=dify-web-token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn("dify-web-token", response.text)
+
     def test_identity_diagnostics_reports_missing_login_without_secrets(self):
         response = self.client.get("/openclaw-api/identity/diagnostics")
         self.assertEqual(response.status_code, 200, response.text)
@@ -404,7 +439,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["authenticated"], True)
         self.assertEqual(body["login_material_present"], True)
         self.assertEqual(body["openclaw_session_present"], False)
-        self.assertEqual(body["auth_mode"], "dify")
+        self.assertEqual(body["auth_mode"], "test_identity_headers")
         self.assertEqual(body["huahuo_access_token_present"], False)
         self.assertEqual(body["huahuo_app_uuid_present"], False)
         self.assertEqual(body["profile_ok"], True)
@@ -616,14 +651,15 @@ class BridgeAppTests(unittest.TestCase):
     def test_huahuo_front_identity_provider_accepts_frontend_token_without_raw_ids(self):
         from openclaw_video.bridge_app import create_app
 
-        client = TestClient(
-            create_app(
-                dify=FakeHuahuoClient(),
-                session_store=InMemorySessionStore(),
-                job_store=InMemoryJobStore(),
-                identity_secret="test-secret",
+        with mock.patch.dict(os.environ, {"OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FakeHuahuoClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
             )
-        )
         response = client.get("/openclaw-api/me", headers={"X-Huahuo-Access-Token": "HUAHUO-access"})
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
@@ -636,14 +672,15 @@ class BridgeAppTests(unittest.TestCase):
     def test_huahuo_identity_diagnostics_reports_presence_without_values(self):
         from openclaw_video.bridge_app import create_app
 
-        client = TestClient(
-            create_app(
-                dify=FakeHuahuoClient(),
-                session_store=InMemorySessionStore(),
-                job_store=InMemoryJobStore(),
-                identity_secret="test-secret",
+        with mock.patch.dict(os.environ, {"OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FakeHuahuoClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
             )
-        )
         response = client.get(
             "/openclaw-api/identity/diagnostics",
             headers={
@@ -666,14 +703,15 @@ class BridgeAppTests(unittest.TestCase):
     def test_huahuo_identity_diagnostics_accepts_cookie_only_without_echoing_cookie(self):
         from openclaw_video.bridge_app import create_app
 
-        client = TestClient(
-            create_app(
-                dify=FakeHuahuoClient(),
-                session_store=InMemorySessionStore(),
-                job_store=InMemoryJobStore(),
-                identity_secret="test-secret",
+        with mock.patch.dict(os.environ, {"OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FakeHuahuoClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
             )
-        )
         response = client.get("/openclaw-api/identity/diagnostics", headers={"Cookie": "huahuo_session=secret"})
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
@@ -714,14 +752,15 @@ class BridgeAppTests(unittest.TestCase):
     def test_dify_refresh_cookies_are_forwarded_without_echoing_values(self):
         from openclaw_video.bridge_app import create_app
 
-        client = TestClient(
-            create_app(
-                dify=RefreshingDifyClient(),
-                session_store=InMemorySessionStore(),
-                job_store=InMemoryJobStore(),
-                identity_secret="test-secret",
+        with mock.patch.dict(os.environ, {"OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=RefreshingDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
             )
-        )
         response = client.get(
             "/console/api/openclaw-api/me",
             headers={"Cookie": "refresh_token=stale-refresh"},
@@ -739,14 +778,15 @@ class BridgeAppTests(unittest.TestCase):
     def test_identity_diagnostics_can_resolve_after_dify_refresh(self):
         from openclaw_video.bridge_app import create_app
 
-        client = TestClient(
-            create_app(
-                dify=RefreshingDifyClient(),
-                session_store=InMemorySessionStore(),
-                job_store=InMemoryJobStore(),
-                identity_secret="test-secret",
+        with mock.patch.dict(os.environ, {"OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=RefreshingDifyClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
             )
-        )
         response = client.get(
             "/console/api/openclaw-api/identity/diagnostics",
             headers={"Cookie": "refresh_token=stale-refresh"},
@@ -765,14 +805,15 @@ class BridgeAppTests(unittest.TestCase):
     def test_huahuo_identity_diagnostics_probe_is_safe_when_profile_fails(self):
         from openclaw_video.bridge_app import create_app
 
-        client = TestClient(
-            create_app(
-                dify=FailingProbeHuahuoClient(),
-                session_store=InMemorySessionStore(),
-                job_store=InMemoryJobStore(),
-                identity_secret="test-secret",
+        with mock.patch.dict(os.environ, {"OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY": "1"}):
+            client = TestClient(
+                create_app(
+                    dify=FailingProbeHuahuoClient(),
+                    session_store=InMemorySessionStore(),
+                    job_store=InMemoryJobStore(),
+                    identity_secret="test-secret",
+                )
             )
-        )
         response = client.get(
             "/openclaw-api/identity/diagnostics",
             headers={

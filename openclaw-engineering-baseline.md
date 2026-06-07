@@ -72,13 +72,17 @@ https://www.huahuoai.com/ai/openclaw-lab/
 
 - Users log in on the OpenClaw page with an OpenClaw-owned account/password
   form.
-- Bridge validates submitted account/password server-side against the configured
-  business/Dify database identity source.
+- Bridge validates submitted account/password server-side against Dify's
+  database account record and password hash. It must fail closed when the Dify
+  database lookup is missing, inactive, has no workspace, or the password hash
+  comparison fails.
 - Successful login issues only an OpenClaw-owned HttpOnly session.
 - Users do not need to log in to Dify Web or Dify admin for this integration.
 - The Dify Web user page, when discussed separately, is
   `https://www.huahuoai.com/?id=4`. Its browser login state is independent from
   OpenClaw and must not be reintroduced as an OpenClaw gate.
+- Huahuo frontend password APIs, Dify Web cookies, Dify Web headers and browser
+  login state are not OpenClaw login gates.
 
 ## Video Link Boundary
 

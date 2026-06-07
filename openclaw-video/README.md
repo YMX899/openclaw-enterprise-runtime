@@ -26,6 +26,9 @@ For the current OpenClaw page phase, the live gate is root-first OpenClaw
 acceptance:
 
 - OpenClaw-owned login on `/ai/openclaw-lab/` passes.
+- OpenClaw-owned password login is authorized only by Dify database account
+  lookup and Dify password hash comparison; Huahuo frontend login API, Dify Web
+  cookies, Dify Web headers and Dify Web login state are not login gates.
 - Dify Web login is not required.
 - Douyin account login, cookies and browser storage state are retired.
 - video link-read mode is adopted.
