@@ -1391,3 +1391,82 @@ cookies/headers/tokens recorded: false
 secret values recorded: false
 model output recorded: false
 ```
+
+## Phase 4 Productized UI Root Deployment - 2026-06-07
+
+Scope:
+
+```text
+OpenClaw page: https://www.huahuoai.com/ai/openclaw-lab/
+deployment mode: root-first UI verification
+local UI test loop used: false
+Dify Web login: not required
+Dify api/web/nginx restart: false
+```
+
+Release:
+
+```text
+commit=94fdd79b29a0
+previous=/app/bin/openclaw-video/releases/f1ba8273e7b6
+current=/app/bin/openclaw-video/releases/94fdd79b29a0
+BUILD_INFO git_commit: 94fdd79b29a0
+```
+
+UI changes deployed:
+
+```text
+guided workflow: Login -> Session -> Source -> Analyze -> Result
+video source selector: Link / Upload
+primary actions: Check Link, Analyze Video, Refresh Status, Analyze Upload
+diagnostics: collapsed Diagnostics & Acceptance drawer
+result presentation: summary cards plus secondary Sanitized JSON response
+automation selectors preserved: true
+```
+
+Root UI acceptance:
+
+```text
+page_loaded: true
+workflow_present: true
+source_tabs_present: true
+result_cards_present: true
+raw_json_secondary: true
+desktop_no_horizontal_overflow: true
+mobile_no_horizontal_overflow: true
+required_ids_present: true
+login_authenticated: true
+session_created: true
+post_login_acceptance_all_pass: true
+post_login_acceptance_overall: PASS
+post_login_acceptance_check_count: 16
+```
+
+Root public route checks:
+
+```text
+https://www.huahuoai.com/                  -> 200
+https://www.huahuoai.com/ai/openclaw-lab/ -> 200
+https://www.huahuoai.com/api/openclaw-api/me unauthenticated -> 401
+http://127.0.0.1:18181/healthz on root -> 200
+```
+
+Dify core container invariant after productized UI deployment:
+
+```text
+docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
+docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Evidence:
+
+```text
+artifacts/evidence/phase4/openclaw-ui-productized-root-desktop-20260607.png
+artifacts/evidence/phase4/openclaw-ui-productized-root-mobile-20260607.png
+artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json
+artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json
+account/password recorded: false
+cookies/headers/tokens recorded: false
+secret values recorded: false
+```

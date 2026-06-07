@@ -18,9 +18,11 @@ RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
 REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
 PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
 CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-productized-ui-root-deployment-evidence-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-current-root-chrome-evidence-20260607.json",
 )
 STANDALONE_LOGIN_EVIDENCE_CANDIDATES = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-productized-root-acceptance-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-workbench-login-acceptance-root-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-root-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json",
@@ -31,7 +33,8 @@ EXPECTED_DIFY_CORE = {
     "web": ("62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36", "2026-01-05T11:17:19.85303869Z"),
     "nginx": ("8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe", "2026-01-05T11:17:20.937420886Z"),
 }
-EXPECTED_CURRENT_RELEASE = "/app/bin/openclaw-video/releases/f1ba8273e7b6"
+EXPECTED_CURRENT_RELEASE = "/app/bin/openclaw-video/releases/94fdd79b29a0"
+EXPECTED_PREVIOUS_RELEASE = "/app/bin/openclaw-video/releases/f1ba8273e7b6"
 
 
 @dataclass(frozen=True)
@@ -77,12 +80,52 @@ def check_git_clean(repo: Path) -> GateResult:
 
 
 def check_phase4_deployment_evidence(repo: Path) -> GateResult:
+    productized_path = repo / CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES[0].relative_to(REPO_ROOT)
+    if productized_path.exists():
+        try:
+            payload = json.loads(_read(productized_path))
+        except json.JSONDecodeError:
+            return GateResult("phase4_deployment_evidence", "NO_GO", "productized root evidence is not valid JSON")
+        root = payload.get("root_runtime") or {}
+        public_routes = root.get("public_routes") or {}
+        policy = payload.get("policy") or {}
+        dify_core = root.get("dify_core") or {}
+        dify_ok = True
+        for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
+            current = dify_core.get(name) or {}
+            dify_ok = dify_ok and current.get("id") == expected_id
+            dify_ok = dify_ok and current.get("started_at") == expected_started_at
+            dify_ok = dify_ok and current.get("status") == "running"
+        checks = [
+            payload.get("schema") == "openclaw-productized-ui-root-deployment-evidence.v1",
+            payload.get("deployed_release") == EXPECTED_CURRENT_RELEASE,
+            payload.get("previous_release") == EXPECTED_PREVIOUS_RELEASE,
+            public_routes.get("dify_root") == 200,
+            public_routes.get("openclaw_lab") == 200,
+            public_routes.get("openclaw_api_me_unauth") == 401,
+            public_routes.get("bridge_healthz") == 200,
+            dify_ok,
+            policy.get("local_test_loop_used") is False,
+            policy.get("authoritative_environment") == "root",
+            policy.get("ui_debug_completed_before_root_testing") is True,
+            policy.get("dify_core_restarted") is False,
+            policy.get("dify_core_rebuilt") is False,
+            policy.get("secrets_recorded") is False,
+            policy.get("account_recorded") is False,
+            policy.get("password_recorded") is False,
+            policy.get("cookies_recorded") is False,
+            policy.get("headers_recorded") is False,
+        ]
+        if all(checks):
+            return GateResult("phase4_deployment_evidence", "PASS", "productized UI root deployment evidence is current and sanitized")
+        return GateResult("phase4_deployment_evidence", "NO_GO", "productized UI root deployment evidence failed required checks")
+
     path = repo / PHASE4_EVIDENCE.relative_to(REPO_ROOT)
     if not path.exists():
         return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {path.name}")
     text = _read(path)
     required = [
-        r"current=/app/bin/openclaw-video/releases/f1ba8273e7b6",
+        rf"current={re.escape(EXPECTED_CURRENT_RELEASE)}",
         r"tag:\s*phase4-openclaw-ui-workbench-20260607",
         r"tag:\s*phase4-video-link-read-check-20260607",
         r"ai_openclaw_lab=200",
@@ -109,6 +152,67 @@ def check_current_root_chrome_evidence(repo: Path) -> GateResult:
         payload = json.loads(_read(path))
     except json.JSONDecodeError:
         return GateResult("current_root_chrome_evidence", "NO_GO", "current root/Chrome evidence is not valid JSON")
+    if payload.get("schema") == "openclaw-productized-ui-root-deployment-evidence.v1":
+        root = payload.get("root_runtime") or {}
+        ui = payload.get("ui_acceptance") or {}
+        assertions = ui.get("assertions") or {}
+        acceptance = ui.get("post_login_acceptance") or {}
+        login = ui.get("login") or {}
+        session = ui.get("session") or {}
+        public_routes = root.get("public_routes") or {}
+        dify_core = root.get("dify_core") or {}
+        policy = payload.get("policy") or {}
+        dify_ok = True
+        for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
+            current = dify_core.get(name) or {}
+            dify_ok = dify_ok and current.get("id") == expected_id
+            dify_ok = dify_ok and current.get("started_at") == expected_started_at
+            dify_ok = dify_ok and current.get("status") == "running"
+        safe_flags = (
+            policy.get("secrets_recorded") is False
+            and policy.get("account_recorded") is False
+            and policy.get("password_recorded") is False
+            and policy.get("cookies_recorded") is False
+            and policy.get("headers_recorded") is False
+            and login.get("accountRecorded") is False
+        )
+        checks = [
+            payload.get("deployed_release") == EXPECTED_CURRENT_RELEASE,
+            payload.get("previous_release") == EXPECTED_PREVIOUS_RELEASE,
+            root.get("current_release") == EXPECTED_CURRENT_RELEASE,
+            public_routes.get("dify_root") == 200,
+            public_routes.get("openclaw_lab") == 200,
+            public_routes.get("openclaw_api_me_unauth") == 401,
+            public_routes.get("bridge_healthz") == 200,
+            dify_ok,
+            assertions.get("page_loaded") is True,
+            assertions.get("workflow_present") is True,
+            assertions.get("source_tabs_present") is True,
+            assertions.get("result_cards_present") is True,
+            assertions.get("diagnostics_available") is True,
+            assertions.get("raw_json_secondary") is True,
+            assertions.get("desktop_no_horizontal_overflow") is True,
+            assertions.get("mobile_no_horizontal_overflow") is True,
+            assertions.get("required_ids_present") is True,
+            assertions.get("login_authenticated") is True,
+            assertions.get("session_created") is True,
+            assertions.get("post_login_acceptance_all_pass") is True,
+            acceptance.get("overall") == "PASS",
+            acceptance.get("checkCount") == 16,
+            acceptance.get("allPass") is True,
+            login.get("authenticated") is True,
+            login.get("passwordCleared") is True,
+            session.get("created") is True,
+            session.get("idLength") == 36,
+            safe_flags,
+        ]
+        if not all(checks):
+            return GateResult("current_root_chrome_evidence", "NO_GO", "productized root UI evidence failed required checks")
+        return GateResult(
+            "current_root_chrome_evidence",
+            "PASS",
+            "root runtime proves productized OpenClaw UI, standalone login, Dify invariants and sanitized acceptance",
+        )
 
     root = payload.get("root_runtime") or {}
     chrome = payload.get("chrome_visible_acceptance") or {}
@@ -310,6 +414,27 @@ def check_authenticated_browser_gate(repo: Path) -> GateResult:
             payload = json.loads(_read(standalone_path))
         except json.JSONDecodeError:
             return GateResult("authenticated_browser_gate", "NO_GO", "standalone login evidence is not valid JSON")
+        if payload.get("schema") == "openclaw-ui-productized-root-acceptance.v1":
+            assertions = payload.get("assertions") or {}
+            acceptance = payload.get("post_login_acceptance") or {}
+            login = payload.get("login") or {}
+            if (
+                assertions.get("login_authenticated") is True
+                and assertions.get("session_created") is True
+                and assertions.get("post_login_acceptance_all_pass") is True
+                and acceptance.get("overall") == "PASS"
+                and acceptance.get("checkCount") == 16
+                and acceptance.get("allPass") is True
+                and login.get("authenticated") is True
+                and login.get("passwordCleared") is True
+                and login.get("accountRecorded") is False
+            ):
+                return GateResult(
+                    "authenticated_browser_gate",
+                    "PASS",
+                    "OpenClaw productized UI standalone login and post-login acceptance passed on root",
+                )
+            return GateResult("authenticated_browser_gate", "NO_GO", "productized UI login evidence did not pass required checks")
         diagnostics = payload.get("diagnostics") or {}
         acceptance = payload.get("post_login_acceptance") or {}
         if (

@@ -1,0 +1,198 @@
+﻿{
+    "schema":  "openclaw-ui-productized-root-acceptance.v1",
+    "captured_at":  "2026-06-07T08:08:47.931Z",
+    "target_url":  "https://www.huahuoai.com/ai/openclaw-lab/",
+    "deployed_release":  "94fdd79b29a0",
+    "screenshots":  {
+                        "desktop":  "artifacts/evidence/phase4/openclaw-ui-productized-root-desktop-20260607.png",
+                        "mobile":  "artifacts/evidence/phase4/openclaw-ui-productized-root-mobile-20260607.png"
+                    },
+    "desktop":  {
+                    "title":  "OpenClaw Lab",
+                    "url":  "https://www.huahuoai.com/ai/openclaw-lab/",
+                    "flowCount":  5,
+                    "panelCount":  6,
+                    "resultCardCount":  3,
+                    "diagnosticsOpen":  true,
+                    "diagnosticsCollapsed":  false,
+                    "rawResponsePresent":  true,
+                    "sourceTabsPresent":  true,
+                    "linkActive":  true,
+                    "uploadHidden":  true,
+                    "missingIds":  [
+
+                                   ],
+                    "horizontalOverflow":  false,
+                    "overflowing":  [
+
+                                    ],
+                    "viewport":  {
+                                     "width":  1440,
+                                     "height":  1100,
+                                     "scrollWidth":  1440,
+                                     "clientWidth":  1440
+                                 },
+                    "uiText":  {
+                                   "authStatus":  "Authenticated",
+                                   "runState":  "Acceptance PASS",
+                                   "authMetric":  "Authenticated",
+                                   "jobMetric":  "redacted",
+                                   "outputMetric":  "Acceptance PASS",
+                                   "analysisMetric":  "Acceptance PASS",
+                                   "sourceMetric":  "No source",
+                                   "resultMetric":  "Session ready",
+                                   "outputSummary":  "Post-login acceptance PASS: 16 checks, 0 failed."
+                               },
+                    "flow":  {
+                                 "loginDone":  true,
+                                 "sessionActive":  false,
+                                 "sourceActive":  true,
+                                 "analyzeActive":  false,
+                                 "resultActive":  false
+                             }
+                },
+    "mobile":  {
+                   "title":  "OpenClaw Lab",
+                   "url":  "https://www.huahuoai.com/ai/openclaw-lab/",
+                   "flowCount":  5,
+                   "panelCount":  6,
+                   "resultCardCount":  3,
+                   "diagnosticsOpen":  true,
+                   "diagnosticsCollapsed":  false,
+                   "rawResponsePresent":  true,
+                   "sourceTabsPresent":  true,
+                   "linkActive":  true,
+                   "uploadHidden":  true,
+                   "missingIds":  [
+
+                                  ],
+                   "horizontalOverflow":  false,
+                   "overflowing":  [
+
+                                   ],
+                   "viewport":  {
+                                    "width":  390,
+                                    "height":  900,
+                                    "scrollWidth":  390,
+                                    "clientWidth":  390
+                                },
+                   "uiText":  {
+                                  "authStatus":  "Authenticated",
+                                  "runState":  "Acceptance PASS",
+                                  "authMetric":  "Authenticated",
+                                  "jobMetric":  "redacted",
+                                  "outputMetric":  "Acceptance PASS",
+                                  "analysisMetric":  "Acceptance PASS",
+                                  "sourceMetric":  "No source",
+                                  "resultMetric":  "Session ready",
+                                  "outputSummary":  "Post-login acceptance PASS: 16 checks, 0 failed."
+                              },
+                   "flow":  {
+                                "loginDone":  true,
+                                "sessionActive":  false,
+                                "sourceActive":  true,
+                                "analyzeActive":  false,
+                                "resultActive":  false
+                            }
+               },
+    "login":  {
+                  "authenticated":  true,
+                  "runState":  "Acceptance PASS",
+                  "passwordCleared":  true,
+                  "accountRecorded":  false
+              },
+    "session":  {
+                    "created":  true,
+                    "idLength":  36
+                },
+    "post_login_acceptance":  {
+                                  "overall":  "PASS",
+                                  "checkCount":  16,
+                                  "checks":  [
+                                                 {
+                                                     "name":  "identity_diagnostics",
+                                                     "status":  200
+                                                 },
+                                                 {
+                                                     "name":  "me",
+                                                     "status":  200
+                                                 },
+                                                 {
+                                                     "name":  "random_session_404",
+                                                     "status":  404
+                                                 },
+                                                 {
+                                                     "name":  "random_job_404",
+                                                     "status":  404
+                                                 },
+                                                 {
+                                                     "name":  "random_result_404",
+                                                     "status":  404
+                                                 },
+                                                 {
+                                                     "name":  "create_session",
+                                                     "status":  201
+                                                 },
+                                                 {
+                                                     "name":  "non_allowlisted_domain_submitted",
+                                                     "status":  202
+                                                 },
+                                                 {
+                                                     "name":  "non_allowlisted_domain_terminal",
+                                                     "status":  "failed"
+                                                 },
+                                                 {
+                                                     "name":  "localhost_blocked_submitted",
+                                                     "status":  202
+                                                 },
+                                                 {
+                                                     "name":  "localhost_blocked_terminal",
+                                                     "status":  "failed"
+                                                 },
+                                                 {
+                                                     "name":  "cloud_metadata_blocked_submitted",
+                                                     "status":  202
+                                                 },
+                                                 {
+                                                     "name":  "cloud_metadata_blocked_terminal",
+                                                     "status":  "failed"
+                                                 },
+                                                 {
+                                                     "name":  "tiny_upload_submitted",
+                                                     "status":  202
+                                                 },
+                                                 {
+                                                     "name":  "tiny_upload_terminal",
+                                                     "status":  "succeeded"
+                                                 },
+                                                 {
+                                                     "name":  "tiny_upload_result",
+                                                     "status":  200
+                                                 },
+                                                 {
+                                                     "name":  "messages_visible_to_owner",
+                                                     "status":  200
+                                                 }
+                                             ],
+                                  "allPass":  true
+                              },
+    "console_observed":  {
+                             "expected_unauth_refresh_401":  true,
+                             "favicon_404_seen":  true,
+                             "page_js_error_seen":  false
+                         },
+    "assertions":  {
+                       "page_loaded":  true,
+                       "workflow_present":  true,
+                       "source_tabs_present":  true,
+                       "result_cards_present":  true,
+                       "diagnostics_available":  true,
+                       "raw_json_secondary":  true,
+                       "desktop_no_horizontal_overflow":  true,
+                       "mobile_no_horizontal_overflow":  true,
+                       "required_ids_present":  true,
+                       "login_authenticated":  true,
+                       "session_created":  true,
+                       "post_login_acceptance_all_pass":  true
+                   }
+}

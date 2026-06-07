@@ -164,9 +164,70 @@ CURRENT_ROOT_CHROME_PASS = {
     },
 }
 
+PRODUCTIZED_UI_ROOT_PASS = {
+    "schema": "openclaw-productized-ui-root-deployment-evidence.v1",
+    "deployed_commit": "94fdd79b29a0",
+    "deployed_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
+    "previous_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+    "root_runtime": {
+        "current_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
+        "previous_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+        "dify_core": CURRENT_ROOT_CHROME_PASS["root_runtime"]["dify_core"],
+        "public_routes": {
+            "dify_root": 200,
+            "openclaw_lab": 200,
+            "openclaw_api_me_unauth": 401,
+            "bridge_healthz": 200,
+        },
+    },
+    "ui_acceptance": {
+        "schema": "openclaw-ui-productized-root-acceptance.v1",
+        "assertions": {
+            "page_loaded": True,
+            "workflow_present": True,
+            "source_tabs_present": True,
+            "result_cards_present": True,
+            "diagnostics_available": True,
+            "raw_json_secondary": True,
+            "desktop_no_horizontal_overflow": True,
+            "mobile_no_horizontal_overflow": True,
+            "required_ids_present": True,
+            "login_authenticated": True,
+            "session_created": True,
+            "post_login_acceptance_all_pass": True,
+        },
+        "login": {
+            "authenticated": True,
+            "passwordCleared": True,
+            "accountRecorded": False,
+        },
+        "session": {
+            "created": True,
+            "idLength": 36,
+        },
+        "post_login_acceptance": {
+            "overall": "PASS",
+            "checkCount": 16,
+            "allPass": True,
+        },
+    },
+    "policy": {
+        "local_test_loop_used": False,
+        "authoritative_environment": "root",
+        "ui_debug_completed_before_root_testing": True,
+        "dify_core_restarted": False,
+        "dify_core_rebuilt": False,
+        "secrets_recorded": False,
+        "account_recorded": False,
+        "password_recorded": False,
+        "cookies_recorded": False,
+        "headers_recorded": False,
+    },
+}
+
 
 PHASE4_BASE = """
-current=/app/bin/openclaw-video/releases/f1ba8273e7b6
+current=/app/bin/openclaw-video/releases/94fdd79b29a0
 tag: phase4-openclaw-ui-workbench-20260607
 tag: phase4-video-link-read-check-20260607
 ai_openclaw_lab=200
@@ -257,8 +318,12 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
             )
             write(repo / "scripts/huahuo_post_login_acceptance_runner.mjs", RUNNER)
             write(
-                repo / "artifacts/evidence/phase4/openclaw-current-root-chrome-evidence-20260607.json",
-                json.dumps(CURRENT_ROOT_CHROME_PASS),
+                repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
+                json.dumps(PRODUCTIZED_UI_ROOT_PASS),
+            )
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
+                json.dumps(PRODUCTIZED_UI_ROOT_PASS["ui_acceptance"]),
             )
             write(
                 repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
@@ -306,29 +371,29 @@ no_browser_login_state: PASS
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "artifacts/evidence/phase4/openclaw-current-root-chrome-evidence-20260607.json",
-                json.dumps(CURRENT_ROOT_CHROME_PASS),
+                repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
+                json.dumps(PRODUCTIZED_UI_ROOT_PASS),
             )
 
             result = phase4_audit.check_current_root_chrome_evidence(repo)
 
         self.assertEqual(result.status, "PASS")
-        self.assertIn("2026.3.13", result.evidence)
+        self.assertIn("productized", result.evidence)
 
     def test_current_root_chrome_evidence_rejects_public_gateway_port(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            payload = json.loads(json.dumps(CURRENT_ROOT_CHROME_PASS))
-            payload["root_runtime"]["openclaw_ports"]["gateway"] = "18789/tcp -> 0.0.0.0:18789"
+            payload = json.loads(json.dumps(PRODUCTIZED_UI_ROOT_PASS))
+            payload["ui_acceptance"]["assertions"]["mobile_no_horizontal_overflow"] = False
             write(
-                repo / "artifacts/evidence/phase4/openclaw-current-root-chrome-evidence-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
                 json.dumps(payload),
             )
 
             result = phase4_audit.check_current_root_chrome_evidence(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("root/Chrome", result.evidence)
+        self.assertIn("productized", result.evidence)
 
     def test_standalone_login_evidence_rejects_sensitive_recording(self):
         with TemporaryDirectory() as tmp:
