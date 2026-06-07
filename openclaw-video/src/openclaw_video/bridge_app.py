@@ -238,142 +238,548 @@ LAB_PAGE_HTML = """<!doctype html>
     :root {
       color-scheme: light;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f7f8fa;
-      color: #1d2433;
+      background: #f4f6f8;
+      color: #111827;
+      --page: #f4f6f8;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --border: #d6dde8;
+      --border-strong: #b9c4d3;
+      --text: #111827;
+      --muted: #5e6a7d;
+      --faint: #eef2f7;
+      --primary: #1f5eff;
+      --primary-strong: #174bd4;
+      --ink: #172033;
+      --success: #147a4b;
+      --success-bg: #e5f8ef;
+      --danger: #b42318;
+      --danger-bg: #ffe8e5;
+      --warning: #9a5b00;
+      --warning-bg: #fff3d7;
+      --info: #076678;
+      --info-bg: #e1f5f8;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: #f7f8fa; }
-    main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 40px; }
-    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-    h1 { font-size: 28px; line-height: 1.1; margin: 0; font-weight: 700; }
-    .status { min-width: 128px; border-radius: 8px; padding: 8px 10px; background: #e9edf3; color: #364153; font-size: 14px; text-align: center; }
-    .status.ok { background: #d9f7e7; color: #145a32; }
-    .status.fail { background: #ffe2df; color: #8a1f17; }
-    section { border: 1px solid #dce2ea; border-radius: 8px; background: #ffffff; padding: 16px; margin-top: 14px; }
-    h2 { font-size: 16px; line-height: 1.25; margin: 0 0 12px; }
-    label { display: block; font-size: 13px; color: #596579; margin: 10px 0 6px; }
+    html { min-height: 100%; background: var(--page); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, #fbfcfe 0, var(--page) 240px, #edf2f7 100%);
+      color: var(--text);
+    }
+    main.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 36px; }
+    header.topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      flex: 0 0 auto;
+      border-radius: 8px;
+      background: var(--ink);
+      color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 12px 30px rgba(23, 32, 51, .16);
+    }
+    .eyebrow { margin: 0 0 3px; color: var(--muted); font-size: 13px; font-weight: 650; }
+    h1 { font-size: 30px; line-height: 1.08; margin: 0; font-weight: 760; }
+    h2 { font-size: 16px; line-height: 1.25; margin: 0; font-weight: 760; }
+    h3 { font-size: 15px; line-height: 1.25; margin: 0; font-weight: 730; }
+    .top-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .status,
+    .run-state,
+    .panel-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      border-radius: 8px;
+      padding: 7px 10px;
+      border: 1px solid transparent;
+      background: var(--faint);
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status::before,
+    .run-state::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      margin-right: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status.ok,
+    .run-state.ok { background: var(--success-bg); color: var(--success); border-color: #bdebd2; }
+    .status.fail,
+    .run-state.fail { background: var(--danger-bg); color: var(--danger); border-color: #ffc9c3; }
+    .run-state.busy { background: var(--info-bg); color: var(--info); border-color: #b9e8ef; }
+    .run-state.warn { background: var(--warning-bg); color: var(--warning); border-color: #f4d18f; }
+    .panel-badge { background: #f2f6fb; border-color: var(--border); color: #445166; }
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .96);
+      padding: 16px;
+      box-shadow: 0 14px 34px rgba(18, 31, 52, .055);
+    }
+    .panel + .panel { margin-top: 12px; }
+    .section-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+    .section-note { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 640px; }
+    label { display: block; font-size: 13px; color: #475569; margin: 10px 0 6px; font-weight: 650; }
     input, textarea {
       width: 100%;
-      border: 1px solid #c7d0dd;
-      border-radius: 6px;
+      border: 1px solid var(--border-strong);
+      border-radius: 7px;
       min-height: 40px;
-      padding: 9px 10px;
+      padding: 9px 11px;
       font: inherit;
-      color: #1d2433;
-      background: #fff;
+      color: var(--text);
+      background: #fbfcfe;
+      box-shadow: inset 0 1px 0 rgba(17, 24, 39, .03);
     }
-    textarea { min-height: 92px; resize: vertical; }
-    button {
-      border: 0;
+    input::placeholder, textarea::placeholder { color: #8a96a8; }
+    input:focus-visible,
+    textarea:focus-visible,
+    button:focus-visible {
+      outline: 3px solid rgba(31, 94, 255, .18);
+      outline-offset: 2px;
+      border-color: var(--primary);
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    input[type="file"] { padding: 8px; background: var(--surface); }
+    input[type="file"]::file-selector-button {
+      min-height: 32px;
+      margin-right: 10px;
+      border: 1px solid var(--border);
       border-radius: 6px;
-      min-height: 40px;
-      padding: 0 14px;
+      padding: 0 10px;
+      background: #eef4ff;
+      color: #1d4ed8;
       font: inherit;
-      font-weight: 600;
-      color: #fff;
-      background: #2563eb;
+      font-weight: 700;
       cursor: pointer;
     }
-    button.secondary { background: #334155; }
+    button {
+      border: 1px solid transparent;
+      border-radius: 6px;
+      min-height: 40px;
+      padding: 0 15px;
+      font: inherit;
+      font-weight: 760;
+      color: #fff;
+      background: var(--primary);
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(31, 94, 255, .16);
+      transition: transform .14s ease, box-shadow .14s ease, background .14s ease, border-color .14s ease;
+    }
+    button:hover { background: var(--primary-strong); transform: translateY(-1px); box-shadow: 0 14px 24px rgba(31, 94, 255, .2); }
+    button.secondary {
+      color: #243044;
+      background: #f6f8fb;
+      border-color: var(--border);
+      box-shadow: none;
+    }
+    button.secondary:hover { background: #edf2f8; border-color: #c6d1df; box-shadow: none; }
     button:disabled { opacity: .55; cursor: not-allowed; }
+    button:disabled:hover { transform: none; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-    pre {
-      min-height: 180px;
-      max-height: 420px;
+    .field-row { display: grid; grid-template-columns: minmax(190px, .72fr) minmax(0, 1fr); gap: 14px; }
+    .session-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+    }
+    .session-actions {
+      align-self: end;
+      min-width: 360px;
+    }
+    .session-actions .actions { margin-top: 0; }
+    .session-actions .validation-actions {
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(390px, .92fr);
+      gap: 16px;
+      align-items: start;
+      margin-top: 14px;
+    }
+    .control-stack { display: grid; gap: 12px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+    .validation-actions {
+      padding-top: 10px;
+      margin-top: 10px;
+      border-top: 1px solid var(--faint);
+    }
+    .field-help { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .divider { height: 1px; background: var(--faint); margin: 16px 0; }
+    .conversation {
+      display: grid;
+      gap: 8px;
+      min-height: 86px;
+      max-height: 190px;
       overflow: auto;
-      margin: 0;
-      padding: 12px;
+      border: 1px solid var(--border);
       border-radius: 8px;
-      background: #101827;
-      color: #e5eefc;
+      padding: 10px;
+      background: linear-gradient(180deg, #fbfdff, #f6f9fc);
+    }
+    .message {
+      width: fit-content;
+      max-width: min(100%, 620px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      background: var(--surface);
+      color: var(--ink);
       font-size: 13px;
       line-height: 1.45;
+      box-shadow: 0 8px 18px rgba(18, 31, 52, .05);
+    }
+    .message.user {
+      justify-self: end;
+      border-color: #bfd0ff;
+      background: #eef4ff;
+    }
+    .message.assistant {
+      justify-self: start;
+      border-color: #c8e6d8;
+      background: #f0faf5;
+    }
+    .output-panel {
+      position: sticky;
+      top: 14px;
+      overflow: hidden;
+    }
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--border);
+      margin: 4px 0 12px;
+    }
+    .status-strip div { min-width: 0; padding: 10px; background: var(--surface-soft); }
+    .metric-label { display: block; color: var(--muted); font-size: 11px; font-weight: 720; margin-bottom: 4px; }
+    .status-strip strong {
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .output-summary {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      border-left: 4px solid #8aa2c5;
+      border-radius: 8px;
+      padding: 9px 11px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .output-summary.ok { border-left-color: var(--success); background: var(--success-bg); color: var(--success); }
+    .output-summary.fail { border-left-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
+    .output-summary.warn { border-left-color: #d68a00; background: var(--warning-bg); color: var(--warning); }
+    pre {
+      min-height: 330px;
+      max-height: 520px;
+      overflow: auto;
+      margin: 0;
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #0f172a;
+      background: #121a2b;
+      color: #e8f0fb;
+      font-size: 12.5px;
+      line-height: 1.55;
       white-space: pre-wrap;
       word-break: break-word;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+    }
+    @media (max-width: 960px) {
+      .workbench { grid-template-columns: 1fr; }
+      .output-panel { position: static; }
+      pre { min-height: 320px; }
     }
     @media (max-width: 760px) {
-      main { width: min(100% - 20px, 1080px); padding-top: 16px; }
-      header { align-items: flex-start; flex-direction: column; }
-      .status { width: 100%; text-align: left; }
+      main.shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
+      header.topbar { align-items: flex-start; flex-direction: column; }
+      .top-status { width: 100%; justify-content: stretch; }
+      .status, .run-state { flex: 1 1 auto; }
       .grid { grid-template-columns: 1fr; }
+      .field-row { grid-template-columns: 1fr; }
+      .session-layout { grid-template-columns: 1fr; }
+      .session-actions { min-width: 0; }
+      .session-actions .actions { margin-top: 11px; }
+      .status-strip { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .brand-mark { width: 40px; height: 40px; }
+      h1 { font-size: 26px; }
+      .panel { padding: 15px; }
+      .section-heading { flex-direction: column; }
+      .actions { display: grid; grid-template-columns: 1fr; }
+      button { width: 100%; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <header>
-      <h1>OpenClaw Lab</h1>
-      <div id="authStatus" class="status">Checking</div>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">OC</div>
+        <div>
+          <p class="eyebrow">Short video analysis workbench</p>
+          <h1>OpenClaw Lab</h1>
+        </div>
+      </div>
+      <div class="top-status" aria-label="OpenClaw runtime status">
+        <div id="runState" class="run-state busy">Ready</div>
+        <div id="authStatus" class="status">Checking</div>
+      </div>
     </header>
-    <section>
-      <h2>OpenClaw Login</h2>
-      <div class="grid">
-        <div>
-          <label for="loginAccount">Account</label>
-          <input id="loginAccount" autocomplete="username" inputmode="text">
-        </div>
-        <div>
-          <label for="loginPassword">Password</label>
-          <input id="loginPassword" type="password" autocomplete="current-password">
-        </div>
+
+    <div class="workbench">
+      <div class="control-stack">
+        <section class="panel" aria-labelledby="loginHeading">
+          <div class="section-heading">
+            <div>
+              <h2 id="loginHeading">OpenClaw Login</h2>
+              <p class="section-note">Use the standalone OpenClaw session for analysis jobs and acceptance checks.</p>
+            </div>
+            <span class="panel-badge">Private session</span>
+          </div>
+          <div class="grid">
+            <div>
+              <label for="loginAccount">Account</label>
+              <input id="loginAccount" autocomplete="username" inputmode="text" placeholder="OpenClaw account">
+            </div>
+            <div>
+              <label for="loginPassword">Password</label>
+              <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Password">
+            </div>
+          </div>
+          <div class="actions">
+            <button id="loginButton">Login</button>
+            <button id="logoutButton" class="secondary">Logout</button>
+            <button id="refreshMe" class="secondary">Refresh Login</button>
+            <button id="identityDiagnostics" class="secondary">Identity Check</button>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="sessionHeading">
+          <div class="section-heading">
+            <div>
+              <h2 id="sessionHeading">Session</h2>
+              <p class="section-note">Create a workspace before submitting a link or upload.</p>
+            </div>
+          </div>
+          <div class="session-layout">
+            <div>
+              <label for="sessionTitle">Title</label>
+              <input id="sessionTitle" value="Video analysis">
+            </div>
+            <div class="session-actions">
+              <div class="actions">
+                <button id="createSession">Create Session</button>
+                <button id="runSelfTest" class="secondary">Self Test</button>
+              </div>
+              <div class="actions validation-actions" aria-label="Acceptance and safety checks">
+                <button id="runSecurityTest" class="secondary">Security Test</button>
+                <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="videoHeading">
+          <div class="section-heading">
+            <div>
+              <h2 id="videoHeading">Video Job</h2>
+              <p class="section-note">Analyze an allowlisted video link or upload a compact video file for the same session.</p>
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <label for="sessionId">Session ID</label>
+              <input id="sessionId" autocomplete="off" placeholder="Created session id">
+            </div>
+            <div>
+              <label for="videoUrl">Video URL</label>
+              <input id="videoUrl" placeholder="https://v.douyin.com/...">
+            </div>
+          </div>
+          <p class="field-help">Links are validated by the server before a worker reads the media.</p>
+          <label>Conversation</label>
+          <div id="conversation" class="conversation" aria-live="polite">
+            <div class="message assistant">Log in, create a session, then send a video link for OpenClaw to analyze.</div>
+          </div>
+          <label for="prompt">Prompt</label>
+          <textarea id="prompt">Analyze this video.</textarea>
+          <div class="actions">
+            <button id="submitJob">Submit Job</button>
+            <button id="pollJob" class="secondary">Poll Job</button>
+          </div>
+          <div class="divider"></div>
+          <h3>Upload Video</h3>
+          <label for="videoFile">Video File</label>
+          <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
+          <p class="field-help">Supported local checks use MP4, MOV, and WebM within the configured upload limit.</p>
+          <div class="actions">
+            <button id="uploadJob">Upload Job</button>
+            <button id="uploadSmoke" class="secondary">Tiny Upload</button>
+          </div>
+        </section>
       </div>
-      <div class="actions">
-        <button id="loginButton">Login</button>
-        <button id="logoutButton" class="secondary">Logout</button>
-        <button id="refreshMe" class="secondary">Refresh Login</button>
-        <button id="identityDiagnostics" class="secondary">Identity Check</button>
-      </div>
-    </section>
-    <section>
-      <h2>Session</h2>
-      <label for="sessionTitle">Title</label>
-      <input id="sessionTitle" value="Video analysis">
-      <div class="actions">
-        <button id="createSession">Create Session</button>
-        <button id="runSelfTest" class="secondary">Self Test</button>
-        <button id="runSecurityTest" class="secondary">Security Test</button>
-        <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
-      </div>
-    </section>
-    <section class="grid">
-      <div>
-        <h2>Video Job</h2>
-        <label for="sessionId">Session ID</label>
-        <input id="sessionId" autocomplete="off">
-        <label for="videoUrl">Video URL</label>
-        <input id="videoUrl" placeholder="https://v.douyin.com/...">
-        <label for="prompt">Prompt</label>
-        <textarea id="prompt">Analyze this video.</textarea>
-        <div class="actions">
-          <button id="submitJob">Submit Job</button>
-          <button id="pollJob" class="secondary">Poll Job</button>
+
+      <section class="panel output-panel" aria-labelledby="outputHeading">
+        <div class="section-heading">
+          <div>
+            <h2 id="outputHeading">Job Result & Status</h2>
+            <p class="section-note">Responses are shown as sanitized JSON for review, acceptance, and support handoff.</p>
+          </div>
         </div>
-        <h2 style="margin-top:18px">Upload Video</h2>
-        <label for="videoFile">Video File</label>
-        <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
-        <div class="actions">
-          <button id="uploadJob">Upload Job</button>
-          <button id="uploadSmoke" class="secondary">Tiny Upload</button>
+        <div class="status-strip" aria-label="Current job summary">
+          <div>
+            <span class="metric-label">Auth</span>
+            <strong id="authMetric">Checking</strong>
+          </div>
+          <div>
+            <span class="metric-label">Job</span>
+            <strong id="jobMetric">No job yet</strong>
+          </div>
+          <div>
+            <span class="metric-label">Output</span>
+            <strong id="outputMetric">Idle</strong>
+          </div>
         </div>
-      </div>
-      <div>
-        <h2>Output</h2>
+        <div id="outputSummary" class="output-summary">Waiting for a login refresh, session action, job, or safety test.</div>
         <pre id="output">{}</pre>
-      </div>
-    </section>
+      </section>
+    </div>
   </main>
   <script>
     const output = document.getElementById('output');
     const authStatus = document.getElementById('authStatus');
+    const runState = document.getElementById('runState');
+    const authMetric = document.getElementById('authMetric');
+    const jobMetric = document.getElementById('jobMetric');
+    const outputMetric = document.getElementById('outputMetric');
+    const outputSummary = document.getElementById('outputSummary');
+    const conversation = document.getElementById('conversation');
     let currentJobId = '';
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
       : (window.location.pathname.startsWith('/ai/openclaw-lab') ? '/api/openclaw-api' : '/openclaw-api');
     const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
 
+    function setRunState(text, tone = 'busy') {
+      runState.textContent = text;
+      runState.className = 'run-state ' + tone;
+      outputMetric.textContent = text;
+    }
+    function setAuthState(text, tone) {
+      authStatus.textContent = text;
+      authStatus.className = 'status ' + tone;
+      authMetric.textContent = text;
+    }
+    function setCurrentJob(jobId) {
+      currentJobId = jobId || '';
+      jobMetric.textContent = currentJobId ? currentJobId.slice(0, 8) + '...' : 'No job yet';
+    }
+    function summarizeOutput(value) {
+      if (typeof value === 'string') {
+        return { tone: 'warn', text: value || 'No output text.' };
+      }
+      if (!value || typeof value !== 'object') {
+        return { tone: 'warn', text: 'No structured response yet.' };
+      }
+      if (value.post_login_acceptance) {
+        const payload = value.post_login_acceptance;
+        const steps = Array.isArray(payload.steps) ? payload.steps : [];
+        const failed = steps.filter(step => step.ok === false).length;
+        const tone = payload.overall === 'PASS' ? 'ok' : (payload.overall === 'FAIL' ? 'fail' : 'warn');
+        return { tone, text: 'Post-login acceptance ' + payload.overall + ': ' + steps.length + ' checks, ' + failed + ' failed.' };
+      }
+      if (value.security_test) {
+        const steps = Array.isArray(value.security_test) ? value.security_test : [];
+        const failed = steps.filter(step => step.ok === false).length;
+        return { tone: failed ? 'fail' : 'warn', text: 'Security test running: ' + steps.length + ' checks captured, ' + failed + ' failed.' };
+      }
+      if (value.self_test) {
+        const steps = Array.isArray(value.self_test) ? value.self_test : [];
+        return { tone: 'warn', text: 'Self test running: ' + steps.length + ' checks captured.' };
+      }
+      if (value.upload_smoke) {
+        const steps = Array.isArray(value.upload_smoke) ? value.upload_smoke : [];
+        const last = steps.length ? steps[steps.length - 1] : null;
+        const tone = last && last.ok === false ? 'fail' : 'warn';
+        return { tone, text: 'Tiny upload smoke: ' + steps.length + ' steps captured.' };
+      }
+      const status = typeof value.status === 'number' ? value.status : null;
+      const job = value.job || (value.body && value.body.job) || null;
+      if (job && job.job_id) {
+        setCurrentJob(job.job_id);
+        const tone = job.status === 'succeeded' ? 'ok' : (terminalStatuses.has(job.status) ? 'fail' : 'warn');
+        return { tone, text: 'Job ' + job.status + ': ' + job.job_id.slice(0, 8) + '...' };
+      }
+      if (status) {
+        const tone = status >= 200 && status < 300 ? 'ok' : (status === 401 || status === 403 || status >= 500 ? 'fail' : 'warn');
+        return { tone, text: 'HTTP ' + status + ' response captured.' };
+      }
+      return { tone: 'warn', text: 'Structured response captured.' };
+    }
     function show(value) {
       output.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+      const summary = summarizeOutput(value);
+      outputSummary.textContent = summary.text;
+      outputSummary.className = 'output-summary ' + summary.tone;
+    }
+    function pushMessage(role, text) {
+      const node = document.createElement('div');
+      node.className = 'message ' + role;
+      node.textContent = text;
+      conversation.appendChild(node);
+      conversation.scrollTop = conversation.scrollHeight;
+    }
+    async function withBusy(label, task) {
+      setRunState(label, 'busy');
+      try {
+        const result = await task();
+        return result;
+      } catch (error) {
+        setRunState('Error', 'fail');
+        show({ error: String(error && error.message || error) });
+        throw error;
+      }
     }
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     async function pollTerminalJob(jobId, attempts = 40) {
@@ -399,6 +805,7 @@ LAB_PAGE_HTML = """<!doctype html>
       return { status: response.status, body };
     }
     async function login() {
+      return withBusy('Logging in', async () => {
       const result = await api(apiPrefix + '/auth/login', {
         method: 'POST',
         body: JSON.stringify({
@@ -408,45 +815,59 @@ LAB_PAGE_HTML = """<!doctype html>
       });
       if (result.status === 200) {
         document.getElementById('loginPassword').value = '';
-        authStatus.textContent = 'Authenticated';
-        authStatus.className = 'status ok';
+        setAuthState('Authenticated', 'ok');
+        setRunState('Ready', 'ok');
       } else {
-        authStatus.textContent = result.status === 429 ? 'Rate Limited' : 'Login Failed';
-        authStatus.className = 'status fail';
+        setAuthState(result.status === 429 ? 'Rate Limited' : 'Login Failed', 'fail');
+        setRunState('Needs attention', 'fail');
       }
       show(result);
+      });
     }
     async function logout() {
+      return withBusy('Logging out', async () => {
       const result = await api(apiPrefix + '/auth/logout', { method: 'POST', body: JSON.stringify({}) });
-      authStatus.textContent = 'Login Required';
-      authStatus.className = 'status fail';
+      setAuthState('Login Required', 'fail');
+      setRunState('Ready', 'busy');
       show(result);
+      });
     }
-    async function refreshMe() {
+    async function refreshMe(options = {}) {
+      return withBusy('Refreshing', async () => {
       const result = await api(apiPrefix + '/me');
       if (result.status === 200) {
-        authStatus.textContent = 'Authenticated';
-        authStatus.className = 'status ok';
+        setAuthState('Authenticated', 'ok');
+        setRunState('Ready', 'ok');
       } else {
-        authStatus.textContent = 'Login Required';
-        authStatus.className = 'status fail';
+        setAuthState('Login Required', 'fail');
+        setRunState('Login required', 'fail');
       }
-      show(result);
+      if (!options.quiet) show(result);
+      });
     }
     async function createSession() {
+      return withBusy('Creating session', async () => {
       const result = await api(apiPrefix + '/sessions', {
         method: 'POST',
         body: JSON.stringify({ title: document.getElementById('sessionTitle').value || 'Video analysis' })
       });
       if (result.body.session && result.body.session.id) {
         document.getElementById('sessionId').value = result.body.session.id;
+        setRunState('Session ready', 'ok');
+      } else {
+        setRunState('Needs attention', 'fail');
       }
       show(result);
+      });
     }
     async function identityDiagnostics() {
+      return withBusy('Checking identity', async () => {
       show(await api(apiPrefix + '/identity/diagnostics'));
+      setRunState('Diagnostics done', 'ok');
+      });
     }
     async function runSelfTest() {
+      return withBusy('Self test running', async () => {
       const steps = [];
       const add = (name, result) => {
         steps.push({ name, ...result });
@@ -454,11 +875,17 @@ LAB_PAGE_HTML = """<!doctype html>
       };
       const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
-      if (!diagnostics.body.authenticated) return;
+      if (!diagnostics.body.authenticated) {
+        setRunState('Login required', 'fail');
+        return;
+      }
 
       const me = await api(apiPrefix + '/me');
       add('me', { status: me.status, body: me.body });
-      if (me.status !== 200) return;
+      if (me.status !== 200) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
 
       const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
       const missing = await api(apiPrefix + '/sessions/' + encodeURIComponent(randomId) + '/messages');
@@ -470,7 +897,10 @@ LAB_PAGE_HTML = """<!doctype html>
       });
       add('create_session', { status: sessionResult.status, body: sessionResult.body });
       const sessionId = sessionResult.body.session && sessionResult.body.session.id;
-      if (!sessionId) return;
+      if (!sessionId) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
       document.getElementById('sessionId').value = sessionId;
 
       const jobResult = await api(apiPrefix + '/jobs', {
@@ -483,8 +913,11 @@ LAB_PAGE_HTML = """<!doctype html>
         })
       });
       add('submit_invalid_url_job', { status: jobResult.status, body: jobResult.body });
-      currentJobId = jobResult.body.job && jobResult.body.job.job_id || '';
-      if (!currentJobId) return;
+      setCurrentJob(jobResult.body.job && jobResult.body.job.job_id || '');
+      if (!currentJobId) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
 
       let lastJob = null;
       for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -500,8 +933,11 @@ LAB_PAGE_HTML = """<!doctype html>
         status: messages.status,
         count: messages.body.messages ? messages.body.messages.length : 0
       });
+      setRunState('Self test done', 'ok');
+      });
     }
     async function runSecurityTest() {
+      return withBusy('Security test running', async () => {
       const steps = [];
       const add = (name, result) => {
         steps.push({ name, ...result });
@@ -509,11 +945,17 @@ LAB_PAGE_HTML = """<!doctype html>
       };
       const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
-      if (!diagnostics.body.authenticated) return;
+      if (!diagnostics.body.authenticated) {
+        setRunState('Login required', 'fail');
+        return;
+      }
 
       const me = await api(apiPrefix + '/me');
       add('me', { status: me.status, authenticated: me.body.authenticated === true });
-      if (me.status !== 200) return;
+      if (me.status !== 200) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
 
       const randomId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
       const randomMessages = await api(apiPrefix + '/sessions/' + encodeURIComponent(randomId) + '/messages');
@@ -529,7 +971,10 @@ LAB_PAGE_HTML = """<!doctype html>
       });
       add('create_session', { status: sessionResult.status, body: sessionResult.body });
       const sessionId = sessionResult.body.session && sessionResult.body.session.id;
-      if (!sessionId) return;
+      if (!sessionId) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
       document.getElementById('sessionId').value = sessionId;
 
       const negativeCases = [
@@ -550,7 +995,7 @@ LAB_PAGE_HTML = """<!doctype html>
         add(caseName + '_submitted', { status: created.status, body: created.body });
         const jobId = created.body.job && created.body.job.job_id || '';
         if (!jobId) continue;
-        currentJobId = jobId;
+        setCurrentJob(jobId);
         let lastJob = null;
         for (let attempt = 0; attempt < 30; attempt += 1) {
           await delay(1000);
@@ -571,8 +1016,12 @@ LAB_PAGE_HTML = """<!doctype html>
         status: messages.status,
         count: messages.body.messages ? messages.body.messages.length : 0
       });
+      const failed = steps.filter(step => step.ok === false).length;
+      setRunState(failed ? 'Security issues' : 'Security done', failed ? 'fail' : 'ok');
+      });
     }
     async function runPostLoginAcceptance() {
+      return withBusy('Acceptance running', async () => {
       const steps = [];
       const render = (overall = 'RUNNING') => show({ post_login_acceptance: { overall, steps } });
       const add = (name, result) => {
@@ -581,7 +1030,9 @@ LAB_PAGE_HTML = """<!doctype html>
       };
       const finish = () => {
         const failed = steps.filter(step => step.ok === false);
-        render(failed.length ? 'FAIL' : 'PASS');
+        const overall = failed.length ? 'FAIL' : 'PASS';
+        render(overall);
+        setRunState(overall === 'PASS' ? 'Acceptance PASS' : 'Acceptance FAIL', overall === 'PASS' ? 'ok' : 'fail');
       };
 
       const diagnostics = await api(apiPrefix + '/identity/diagnostics');
@@ -654,7 +1105,7 @@ LAB_PAGE_HTML = """<!doctype html>
         const jobId = created.body.job && created.body.job.job_id || '';
         add(caseName + '_submitted', { status: created.status, ok: created.status === 202 && !!jobId });
         if (!jobId) continue;
-        currentJobId = jobId;
+        setCurrentJob(jobId);
         const terminal = await pollTerminalJob(jobId, 30);
         const terminalJob = terminal.job;
         add(caseName + '_terminal', {
@@ -684,7 +1135,7 @@ LAB_PAGE_HTML = """<!doctype html>
       const uploadJobId = uploadBody.job && uploadBody.job.job_id || '';
       add('tiny_upload_submitted', { status: uploadResponse.status, ok: uploadResponse.status === 202 && !!uploadJobId });
       if (uploadJobId) {
-        currentJobId = uploadJobId;
+        setCurrentJob(uploadJobId);
         const uploadTerminal = await pollTerminalJob(uploadJobId, 40);
         const uploadJob = uploadTerminal.job;
         add('tiny_upload_terminal', {
@@ -712,25 +1163,39 @@ LAB_PAGE_HTML = """<!doctype html>
         ok: messages.status === 200 && !!messages.body.messages && messages.body.messages.length >= 1
       });
       finish();
+      });
     }
     async function submitJob() {
+      return withBusy('Submitting job', async () => {
+      const promptText = document.getElementById('prompt').value || 'Analyze this video.';
+      const videoUrl = document.getElementById('videoUrl').value;
       const result = await api(apiPrefix + '/jobs', {
         method: 'POST',
         body: JSON.stringify({
           session_id: document.getElementById('sessionId').value,
-          video_url: document.getElementById('videoUrl').value,
-          content: document.getElementById('prompt').value
+          video_url: videoUrl,
+          content: promptText
         })
       });
-      if (result.body.job && result.body.job.job_id) currentJobId = result.body.job.job_id;
+      if (result.body.job && result.body.job.job_id) {
+        setCurrentJob(result.body.job.job_id);
+        setRunState('Job submitted', 'ok');
+        pushMessage('user', 'Submitted a video link for analysis.');
+        pushMessage('assistant', 'Job submitted. Poll the job when the worker has progressed.');
+      } else {
+        setRunState('Needs attention', 'fail');
+      }
       show(result);
+      });
     }
     async function uploadJob() {
+      return withBusy('Uploading video', async () => {
       const fileInput = document.getElementById('videoFile');
       const file = fileInput.files && fileInput.files[0];
       const sessionId = document.getElementById('sessionId').value;
       if (!file || !sessionId) {
         show('Select a video file and session first.');
+        setRunState('Needs input', 'fail');
         return;
       }
       const form = new FormData();
@@ -745,10 +1210,19 @@ LAB_PAGE_HTML = """<!doctype html>
       const text = await response.text();
       let body;
       try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
-      if (body.job && body.job.job_id) currentJobId = body.job.job_id;
+      if (body.job && body.job.job_id) {
+        setCurrentJob(body.job.job_id);
+        setRunState('Upload submitted', 'ok');
+        pushMessage('user', 'Uploaded a video file for analysis.');
+        pushMessage('assistant', 'Upload accepted. Poll the job for worker status and result.');
+      } else {
+        setRunState('Needs attention', 'fail');
+      }
       show({ status: response.status, body });
+      });
     }
     async function uploadTinySmoke() {
+      return withBusy('Tiny upload running', async () => {
       let sessionId = document.getElementById('sessionId').value;
       const steps = [];
       const add = (name, result) => {
@@ -764,7 +1238,10 @@ LAB_PAGE_HTML = """<!doctype html>
         sessionId = sessionResult.body.session && sessionResult.body.session.id || '';
         document.getElementById('sessionId').value = sessionId;
       }
-      if (!sessionId) return;
+      if (!sessionId) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
       const fileBytes = new Uint8Array([
         0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109,
         0, 0, 0, 0, 105, 115, 111, 109, 109, 112, 52, 49
@@ -782,8 +1259,11 @@ LAB_PAGE_HTML = """<!doctype html>
       let body;
       try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
       add('upload_job', { status: response.status, body });
-      currentJobId = body.job && body.job.job_id || '';
-      if (!currentJobId) return;
+      setCurrentJob(body.job && body.job.job_id || '');
+      if (!currentJobId) {
+        setRunState('Needs attention', 'fail');
+        return;
+      }
       let lastJob = null;
       for (let attempt = 0; attempt < 40; attempt += 1) {
         await delay(1000);
@@ -795,20 +1275,28 @@ LAB_PAGE_HTML = """<!doctype html>
       if (lastJob && lastJob.status === 'succeeded') {
         add('job_result', await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result'));
       }
+      setRunState(lastJob && lastJob.status === 'succeeded' ? 'Tiny upload done' : 'Tiny upload ended', lastJob && lastJob.status === 'succeeded' ? 'ok' : 'fail');
+      });
     }
     async function pollJob() {
+      return withBusy('Polling job', async () => {
       if (!currentJobId) {
         show('No job_id is available yet.');
+        setRunState('No job selected', 'fail');
         return;
       }
       const jobResult = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId));
       const job = jobResult.body.job;
       if (job && job.status === 'succeeded') {
         const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result');
+        pushMessage('assistant', 'Analysis result is ready. Review the structured output panel.');
         show({ job: jobResult, result });
+        setRunState('Result ready', 'ok');
         return;
       }
       show(jobResult);
+      setRunState(job && terminalStatuses.has(job.status) ? 'Job ended' : 'Job running', job && terminalStatuses.has(job.status) ? 'fail' : 'busy');
+      });
     }
     document.getElementById('loginButton').addEventListener('click', login);
     document.getElementById('logoutButton').addEventListener('click', logout);
@@ -822,7 +1310,7 @@ LAB_PAGE_HTML = """<!doctype html>
     document.getElementById('uploadJob').addEventListener('click', uploadJob);
     document.getElementById('uploadSmoke').addEventListener('click', uploadTinySmoke);
     document.getElementById('pollJob').addEventListener('click', pollJob);
-    refreshMe();
+    refreshMe({ quiet: true });
   </script>
 </body>
 </html>"""

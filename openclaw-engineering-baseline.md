@@ -22,6 +22,34 @@ review, Dify web login, Douyin account login, or
 - Use git for meaningful changes. A dirty worktree may exist during active
   development; a clean worktree is required only before claiming a final
   release checkpoint.
+- When work is broad enough to benefit from parallel execution, create or reuse
+  focused agents for UI design, implementation, exploration, or verification.
+  Agents must receive bounded ownership, must not revert other changes, and
+  their results must be reviewed by the root thread before release.
+
+## OpenClaw UI Baseline
+
+- The OpenClaw page is the user's primary product surface, not just a test
+  harness.
+- Login, chat/conversation, video-link submission, upload checks, post-login
+  acceptance and diagnostic output must be visually coherent on the OpenClaw
+  page itself.
+- Treat UI work as a senior product-design task. The default design standard is
+  a polished professional tool surface with at least iOS-level visual care:
+  restrained color, clear spacing, readable hierarchy, responsive layout,
+  visible state feedback and no awkward overlapping text.
+- The page should be screenshot-tested after significant visual changes on both
+  desktop and mobile widths.
+- A UI/design agent may be asked to act as a top-tier software-company visual
+  communication design director: inspect screenshots, critique the product
+  purpose, raise 20 UI/visual-design questions, score the interface, iterate,
+  and only exit once its internal review is satisfied.
+- Preserve automation selectors and API behavior when redesigning UI. Important
+  element IDs include `loginAccount`, `loginPassword`, `loginButton`,
+  `authStatus`, `identityDiagnostics`, `runPostLoginAcceptance`, `runSelfTest`,
+  `runSecurityTest`, `createSession`, `sessionId`, `videoUrl`, `prompt`,
+  `submitJob`, `pollJob`, `videoFile`, `uploadJob`, `uploadSmoke` and
+  `output`.
 
 ## OpenClaw Login Boundary
 
@@ -87,4 +115,3 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 9. Confirm Dify public pages still load and no new obvious 5xx appears in
    checked routes.
 10. Commit, push and record sanitized deployment/test evidence.
-
