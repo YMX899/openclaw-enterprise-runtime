@@ -6,6 +6,7 @@ PROJECT="${OPENCLAW_COMPOSE_PROJECT:-openclaw-video}"
 ENV_FILE="${OPENCLAW_ENV_FILE:-/app/bin/openclaw-video/shared/openclaw-video.env}"
 FAST_IMAGE="${OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast}"
 SHARED_SECRETS_DIR="${OPENCLAW_SHARED_SECRETS_DIR:-/app/bin/openclaw-video/shared/secrets}"
+DIFY_API_CONTAINER="${DIFY_API_CONTAINER:-docker-api-1}"
 
 cd "$ROOT"
 
@@ -37,7 +38,29 @@ if [ ! -e secrets ]; then
   ln -s "$SHARED_SECRETS_DIR" secrets
 fi
 
-OPENCLAW_BRIDGE_IMAGE="$FAST_IMAGE" docker compose \
+DIFY_AUTH_DB_HOST_VALUE="${DIFY_AUTH_DB_HOST:-}"
+DIFY_AUTH_DB_PORT_VALUE="${DIFY_AUTH_DB_PORT:-}"
+DIFY_AUTH_DB_NAME_VALUE="${DIFY_AUTH_DB_NAME:-}"
+DIFY_AUTH_DB_USER_VALUE="${DIFY_AUTH_DB_USER:-}"
+DIFY_AUTH_DB_PASSWORD_VALUE="${DIFY_AUTH_DB_PASSWORD:-}"
+if [ -z "${DIFY_AUTH_DATABASE_URL:-}" ] && docker inspect "$DIFY_API_CONTAINER" >/dev/null 2>&1; then
+  dify_db_env="$(docker exec "$DIFY_API_CONTAINER" sh -lc 'printf "%s\n%s\n%s\n%s\n%s\n" "${DB_HOST:-}" "${DB_PORT:-}" "${DB_DATABASE:-}" "${DB_USERNAME:-}" "${DB_PASSWORD:-}"' 2>/dev/null || true)"
+  if [ -n "$dify_db_env" ]; then
+    DIFY_AUTH_DB_HOST_VALUE="${DIFY_AUTH_DB_HOST_VALUE:-$(printf '%s\n' "$dify_db_env" | sed -n '1p')}"
+    DIFY_AUTH_DB_PORT_VALUE="${DIFY_AUTH_DB_PORT_VALUE:-$(printf '%s\n' "$dify_db_env" | sed -n '2p')}"
+    DIFY_AUTH_DB_NAME_VALUE="${DIFY_AUTH_DB_NAME_VALUE:-$(printf '%s\n' "$dify_db_env" | sed -n '3p')}"
+    DIFY_AUTH_DB_USER_VALUE="${DIFY_AUTH_DB_USER_VALUE:-$(printf '%s\n' "$dify_db_env" | sed -n '4p')}"
+    DIFY_AUTH_DB_PASSWORD_VALUE="${DIFY_AUTH_DB_PASSWORD_VALUE:-$(printf '%s\n' "$dify_db_env" | sed -n '5p')}"
+  fi
+fi
+
+OPENCLAW_BRIDGE_IMAGE="$FAST_IMAGE" \
+DIFY_AUTH_DB_HOST="$DIFY_AUTH_DB_HOST_VALUE" \
+DIFY_AUTH_DB_PORT="$DIFY_AUTH_DB_PORT_VALUE" \
+DIFY_AUTH_DB_NAME="$DIFY_AUTH_DB_NAME_VALUE" \
+DIFY_AUTH_DB_USER="$DIFY_AUTH_DB_USER_VALUE" \
+DIFY_AUTH_DB_PASSWORD="$DIFY_AUTH_DB_PASSWORD_VALUE" \
+docker compose \
   --env-file "$ENV_FILE" \
   -p "$PROJECT" \
   -f docker-compose.dify-admin-bridge.yaml \

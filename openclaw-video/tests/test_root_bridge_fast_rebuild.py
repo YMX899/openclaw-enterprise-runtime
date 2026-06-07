@@ -16,6 +16,10 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("pip install --no-cache-dir --no-deps /app", text)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET", text)
+        self.assertIn("DIFY_API_CONTAINER", text)
+        self.assertIn("DIFY_AUTH_DB_HOST", text)
+        self.assertIn("DIFY_AUTH_DB_PASSWORD", text)
+        self.assertIn("DB_PASSWORD", text)
         self.assertIn("OPENCLAW_SHARED_SECRETS_DIR:-/app/bin/openclaw-video/shared/secrets", text)
         self.assertIn("release secrets directory contains non-placeholder entries", text)
         self.assertIn("find secrets -mindepth 1 -depth -type d -empty -exec rmdir {} +", text)
@@ -32,6 +36,10 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("image: ${OPENCLAW_BRIDGE_IMAGE:-openclaw-video-openclaw-bridge}", text)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: ${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET: ${BRIDGE_TEST_IDENTITY_SECRET:-}", text)
+        self.assertIn("DIFY_AUTH_DB_HOST: ${DIFY_AUTH_DB_HOST:-}", text)
+        self.assertIn("DIFY_AUTH_DB_PASSWORD: ${DIFY_AUTH_DB_PASSWORD:-}", text)
+        self.assertIn("OPENCLAW_LOGIN_ACCOUNT_ALIASES: ${OPENCLAW_LOGIN_ACCOUNT_ALIASES:-}", text)
+        self.assertIn("OPENCLAW_SESSION_TTL_SECONDS: ${OPENCLAW_SESSION_TTL_SECONDS:-604800}", text)
         self.assertIn("openclaw-bridge:", text)
 
 

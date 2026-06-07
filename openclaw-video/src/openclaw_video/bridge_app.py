@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hmac
 import json
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from typing import Any
 
 try:
@@ -32,6 +34,10 @@ from .openclaw_gateway import (
     GatewayError,
     GatewayNotConfigured,
     OpenClawGatewayWsClient,
+)
+from .openclaw_auth import (
+    DifyDatabasePasswordAuthenticator,
+    OpenClawAuthenticationError,
 )
 from .phase4_controls import (
     Phase4Config,
@@ -141,6 +147,87 @@ def _principal_hashes(identity_secret: str, principal: DifyPrincipal) -> tuple[s
     )
 
 
+OPENCLAW_SESSION_COOKIE_NAME = "openclaw_session"
+
+
+def _b64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+
+
+def _b64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(value + padding)
+
+
+def _session_signature(secret: str, payload: str) -> str:
+    return hmac.new(secret.encode("utf-8"), payload.encode("ascii"), sha256).hexdigest()
+
+
+def _issue_openclaw_session_cookie(
+    identity_secret: str,
+    principal: DifyPrincipal,
+    tenant_hash: str,
+    account_hash: str,
+    *,
+    now: datetime | None = None,
+    ttl_seconds: int = 7 * 24 * 60 * 60,
+) -> tuple[str, datetime]:
+    if ttl_seconds <= 0:
+        ttl_seconds = 7 * 24 * 60 * 60
+    issued_at = now or datetime.now(UTC)
+    expires_at = issued_at + timedelta(seconds=ttl_seconds)
+    payload = {
+        "principal_id": principal.principal_id,
+        "tenant_hash": tenant_hash,
+        "account_hash": account_hash,
+        "exp": int(expires_at.timestamp()),
+    }
+    encoded_payload = _b64url_encode(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    signature = _session_signature(identity_secret, encoded_payload)
+    return encoded_payload + "." + signature, expires_at
+
+
+def _principal_from_openclaw_session_cookie(
+    identity_secret: str,
+    cookie_value: str,
+    *,
+    now: datetime | None = None,
+) -> tuple[DifyPrincipal, str, str] | None:
+    if not identity_secret or not cookie_value or "." not in cookie_value:
+        return None
+    encoded_payload, signature = cookie_value.rsplit(".", 1)
+    expected = _session_signature(identity_secret, encoded_payload)
+    if not hmac.compare_digest(signature, expected):
+        return None
+    try:
+        payload = json.loads(_b64url_decode(encoded_payload))
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        expires_at = int(payload.get("exp"))
+    except (TypeError, ValueError):
+        return None
+    reference = now or datetime.now(UTC)
+    if expires_at <= int(reference.timestamp()):
+        return None
+    principal_id = payload.get("principal_id")
+    tenant_hash = payload.get("tenant_hash")
+    account_hash = payload.get("account_hash")
+    if not all(isinstance(item, str) and len(item) == 64 for item in (principal_id, tenant_hash, account_hash)):
+        return None
+    principal = DifyPrincipal(account_id=account_hash, tenant_id=tenant_hash, principal_id=principal_id)
+    return principal, tenant_hash, account_hash
+
+
+def _request_is_secure(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    if forwarded_proto:
+        return forwarded_proto == "https"
+    return request.url.scheme == "https"
+
+
 LAB_PAGE_HTML = """<!doctype html>
 <html lang="en">
 <head>
@@ -220,13 +307,30 @@ LAB_PAGE_HTML = """<!doctype html>
       <div id="authStatus" class="status">Checking</div>
     </header>
     <section>
+      <h2>OpenClaw Login</h2>
+      <div class="grid">
+        <div>
+          <label for="loginAccount">Account</label>
+          <input id="loginAccount" autocomplete="username" inputmode="text">
+        </div>
+        <div>
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password">
+        </div>
+      </div>
+      <div class="actions">
+        <button id="loginButton">Login</button>
+        <button id="logoutButton" class="secondary">Logout</button>
+        <button id="refreshMe" class="secondary">Refresh Login</button>
+        <button id="identityDiagnostics" class="secondary">Identity Check</button>
+      </div>
+    </section>
+    <section>
       <h2>Session</h2>
       <label for="sessionTitle">Title</label>
       <input id="sessionTitle" value="Video analysis">
       <div class="actions">
         <button id="createSession">Create Session</button>
-        <button id="refreshMe" class="secondary">Refresh Login</button>
-        <button id="identityDiagnostics" class="secondary">Identity Check</button>
         <button id="runSelfTest" class="secondary">Self Test</button>
         <button id="runSecurityTest" class="secondary">Security Test</button>
         <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
@@ -283,38 +387,40 @@ LAB_PAGE_HTML = """<!doctype html>
       }
       return { poll: lastPoll, job: lastJob };
     }
-    function huahuoAccessToken() {
-      try { return window.localStorage && window.localStorage.getItem('Access-Token') || ''; }
-      catch { return ''; }
-    }
-    function huahuoAppUuid() {
-      try { return window.localStorage && window.localStorage.getItem('APP-UUID') || ''; }
-      catch { return ''; }
-    }
-    function huahuoRefreshToken() {
-      try { return window.localStorage && window.localStorage.getItem('Refresh-Token') || ''; }
-      catch { return ''; }
-    }
-    function authHeaders() {
-      const token = huahuoAccessToken();
-      const appUuid = huahuoAppUuid();
-      const refreshToken = huahuoRefreshToken();
-      if (!token) return {};
-      const headers = { 'X-Huahuo-Access-Token': token };
-      if (appUuid) headers['X-Huahuo-App-UUID'] = appUuid;
-      if (refreshToken) headers['X-Huahuo-Refresh-Token'] = refreshToken;
-      return headers;
-    }
     async function api(path, options = {}) {
       const response = await fetch(path, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
         ...options
       });
       const text = await response.text();
       let body;
       try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
       return { status: response.status, body };
+    }
+    async function login() {
+      const result = await api(apiPrefix + '/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          account: document.getElementById('loginAccount').value,
+          password: document.getElementById('loginPassword').value
+        })
+      });
+      if (result.status === 200) {
+        document.getElementById('loginPassword').value = '';
+        authStatus.textContent = 'Authenticated';
+        authStatus.className = 'status ok';
+      } else {
+        authStatus.textContent = result.status === 429 ? 'Rate Limited' : 'Login Failed';
+        authStatus.className = 'status fail';
+      }
+      show(result);
+    }
+    async function logout() {
+      const result = await api(apiPrefix + '/auth/logout', { method: 'POST', body: JSON.stringify({}) });
+      authStatus.textContent = 'Login Required';
+      authStatus.className = 'status fail';
+      show(result);
     }
     async function refreshMe() {
       const result = await api(apiPrefix + '/me');
@@ -570,7 +676,6 @@ LAB_PAGE_HTML = """<!doctype html>
       const uploadResponse = await fetch(apiPrefix + '/uploads', {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(),
         body: form
       });
       const uploadText = await uploadResponse.text();
@@ -635,7 +740,6 @@ LAB_PAGE_HTML = """<!doctype html>
       const response = await fetch(apiPrefix + '/uploads', {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(),
         body: form
       });
       const text = await response.text();
@@ -672,7 +776,6 @@ LAB_PAGE_HTML = """<!doctype html>
       const response = await fetch(apiPrefix + '/uploads', {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(),
         body: form
       });
       const text = await response.text();
@@ -707,6 +810,8 @@ LAB_PAGE_HTML = """<!doctype html>
       }
       show(jobResult);
     }
+    document.getElementById('loginButton').addEventListener('click', login);
+    document.getElementById('logoutButton').addEventListener('click', logout);
     document.getElementById('refreshMe').addEventListener('click', refreshMe);
     document.getElementById('identityDiagnostics').addEventListener('click', identityDiagnostics);
     document.getElementById('runSelfTest').addEventListener('click', runSelfTest);
@@ -747,6 +852,7 @@ def create_app(
     session_store: Any | None = None,
     job_store: Any | None = None,
     gateway: Any | None = None,
+    openclaw_authenticator: Any | None = None,
     identity_secret: str | None = None,
 ) -> FastAPI:
     app = FastAPI(title="OpenClaw Dify Bridge", version="0.1.0")
@@ -760,11 +866,15 @@ def create_app(
     session_store = session_store or _default_session_store()
     job_store = job_store or _default_job_store()
     gateway = gateway or OpenClawGatewayWsClient.from_environment()
+    openclaw_authenticator = openclaw_authenticator or DifyDatabasePasswordAuthenticator.from_environment()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
     enable_test_identity_headers = os.environ.get("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", "").lower() in {"1", "true", "yes"}
     test_identity_secret = os.environ.get("BRIDGE_TEST_IDENTITY_SECRET", "")
     phase4_config = load_phase4_config()
     rate_limiter = SlidingWindowRateLimiter()
+    login_limiter = SlidingWindowRateLimiter()
+    login_rate_limit = positive_int_from_env("OPENCLAW_LOGIN_RATE_LIMIT_PER_MINUTE", 8)
+    openclaw_session_ttl_seconds = positive_int_from_env("OPENCLAW_SESSION_TTL_SECONDS", 7 * 24 * 60 * 60)
 
     @app.middleware("http")
     async def _forward_dify_refresh_cookies(request: Request, call_next: Any) -> Any:
@@ -835,6 +945,33 @@ def create_app(
         existing = list(getattr(request.state, "dify_set_cookie_headers", []))
         request.state.dify_set_cookie_headers = existing + safe_headers
 
+    def set_openclaw_session_cookie(response: JSONResponse, request: Request, value: str, expires_at: datetime) -> None:
+        response.set_cookie(
+            OPENCLAW_SESSION_COOKIE_NAME,
+            value,
+            max_age=openclaw_session_ttl_seconds,
+            expires=expires_at,
+            path="/",
+            httponly=True,
+            secure=_request_is_secure(request),
+            samesite="lax",
+        )
+
+    def clear_openclaw_session_cookie(response: JSONResponse, request: Request) -> None:
+        response.delete_cookie(
+            OPENCLAW_SESSION_COOKIE_NAME,
+            path="/",
+            secure=_request_is_secure(request),
+            samesite="lax",
+            httponly=True,
+        )
+
+    def principal_from_openclaw_cookie(request: Request) -> tuple[DifyPrincipal, str, str] | None:
+        return _principal_from_openclaw_session_cookie(
+            identity_secret,
+            request.cookies.get(OPENCLAW_SESSION_COOKIE_NAME, ""),
+        )
+
     @app.get("/health")
     async def health() -> dict[str, Any]:
         return health_payload()
@@ -857,8 +994,69 @@ def create_app(
             },
         )
 
+    @app.post("/openclaw-api/auth/login")
+    @app.post("/ai/openclaw-api/auth/login")
+    @app.post("/api/openclaw-api/auth/login")
+    @app.post("/console/api/openclaw-api/auth/login")
+    async def openclaw_login(request: Request) -> JSONResponse:
+        if openclaw_authenticator is None:
+            raise HTTPException(status_code=503, detail="password login is not configured")
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be an object")
+        account = str(payload.get("account") or payload.get("username") or payload.get("email") or "").strip()
+        password = str(payload.get("password") or "")
+        remote_addr = request.client.host if request.client else "unknown"
+        rate_key = f"{remote_addr}:{account.lower()[:80]}"
+        if not login_limiter.allow(rate_key, limit=login_rate_limit):
+            raise HTTPException(status_code=429, detail="login rate limit exceeded")
+        try:
+            identity = openclaw_authenticator.authenticate(account, password)
+            principal = derive_principal(identity_secret, identity.profile, identity.workspaces)
+            tenant_hash, account_hash = _principal_hashes(identity_secret, principal)
+            enforce_principal_allowed(tenant_hash, account_hash)
+            if hasattr(session_store, "ensure_user"):
+                session_store.ensure_user(principal.principal_id, tenant_hash, account_hash)
+            cookie_value, expires_at = _issue_openclaw_session_cookie(
+                identity_secret,
+                principal,
+                tenant_hash,
+                account_hash,
+                ttl_seconds=openclaw_session_ttl_seconds,
+            )
+        except (OpenClawAuthenticationError, PermissionError) as exc:
+            raise HTTPException(status_code=401, detail="login failed") from exc
+        except IdentityError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        response = JSONResponse(
+            content={
+                "authenticated": True,
+                "principal_id": principal.principal_id,
+                "expires_at": expires_at.isoformat(),
+                **runtime_metadata(),
+            }
+        )
+        set_openclaw_session_cookie(response, request, cookie_value, expires_at)
+        return response
+
+    @app.post("/openclaw-api/auth/logout")
+    @app.post("/ai/openclaw-api/auth/logout")
+    @app.post("/api/openclaw-api/auth/logout")
+    @app.post("/console/api/openclaw-api/auth/logout")
+    async def openclaw_logout(request: Request) -> JSONResponse:
+        response = JSONResponse(content={"authenticated": False})
+        clear_openclaw_session_cookie(response, request)
+        return response
+
     async def current_principal(request: Request) -> DifyPrincipal:
         try:
+            session_identity = principal_from_openclaw_cookie(request)
+            if session_identity is not None:
+                principal, tenant_hash, account_hash = session_identity
+                enforce_principal_allowed(tenant_hash, account_hash)
+                if hasattr(session_store, "ensure_user"):
+                    session_store.ensure_user(principal.principal_id, tenant_hash, account_hash)
+                return principal
             if _test_identity_headers_allowed(request, enable_test_identity_headers, test_identity_secret):
                 profile = {"id": request.headers["x-test-account"]}
                 tenant_id = request.headers.get("x-test-tenant", "test-tenant")
@@ -900,6 +1098,8 @@ def create_app(
         result: dict[str, Any] = {
             "authenticated": False,
             "login_material_present": _has_dify_login_material(request.headers),
+            "openclaw_session_present": bool(request.cookies.get(OPENCLAW_SESSION_COOKIE_NAME)),
+            "auth_mode": None,
             "huahuo_access_token_present": _has_header(request.headers, "x-huahuo-access-token"),
             "huahuo_app_uuid_present": _has_header(request.headers, "x-huahuo-app-uuid"),
             "profile_ok": False,
@@ -911,6 +1111,20 @@ def create_app(
             "provider_probe": None,
         }
         try:
+            session_identity = principal_from_openclaw_cookie(request)
+            if session_identity is not None:
+                principal, tenant_hash, account_hash = session_identity
+                result["profile_ok"] = True
+                result["workspace_ok"] = True
+                result["current_workspace_count"] = 1
+                if not principal_allowed(tenant_hash, account_hash):
+                    result["failure_stage"] = "access"
+                    return result
+                result["access_ok"] = True
+                result["authenticated"] = True
+                result["principal_id"] = principal.principal_id
+                result["auth_mode"] = "openclaw_session"
+                return result
             if _test_identity_headers_allowed(request, enable_test_identity_headers, test_identity_secret):
                 profile = {"id": request.headers["x-test-account"]}
                 result["profile_ok"] = True
@@ -926,6 +1140,7 @@ def create_app(
                 result["access_ok"] = True
                 result["authenticated"] = True
                 result["principal_id"] = principal.principal_id
+                result["auth_mode"] = "test_identity_headers"
                 return result
             if hasattr(dify, "safe_identity_probe"):
                 try:
@@ -960,6 +1175,7 @@ def create_app(
             result["access_ok"] = True
             result["authenticated"] = True
             result["principal_id"] = principal.principal_id
+            result["auth_mode"] = identity_provider
             return result
         except Exception:
             result["failure_stage"] = "workspace"

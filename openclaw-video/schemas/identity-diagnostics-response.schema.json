@@ -5,6 +5,8 @@
   "required": [
     "authenticated",
     "login_material_present",
+    "openclaw_session_present",
+    "auth_mode",
     "huahuo_access_token_present",
     "huahuo_app_uuid_present",
     "profile_ok",
@@ -19,6 +21,13 @@
   "properties": {
     "authenticated": {"type": "boolean"},
     "login_material_present": {"type": "boolean"},
+    "openclaw_session_present": {"type": "boolean"},
+    "auth_mode": {
+      "oneOf": [
+        {"enum": ["openclaw_session", "test_identity_headers", "dify", "huahuo_front"]},
+        {"type": "null"}
+      ]
+    },
     "huahuo_access_token_present": {"type": "boolean"},
     "huahuo_app_uuid_present": {"type": "boolean"},
     "profile_ok": {"type": "boolean"},

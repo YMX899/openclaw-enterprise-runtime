@@ -1,0 +1,198 @@
+from __future__ import annotations
+
+import base64
+import binascii
+import hashlib
+import hmac
+import os
+import re
+from dataclasses import dataclass
+from typing import Any
+
+try:  # pragma: no cover - exercised in the production image/venv
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:  # pragma: no cover - keeps system-python unit tests importable
+    psycopg = None  # type: ignore[assignment]
+    dict_row = None  # type: ignore[assignment]
+
+
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+class OpenClawAuthenticationError(PermissionError):
+    """Raised when an OpenClaw username/password login fails."""
+
+
+class OpenClawAuthDependencyError(RuntimeError):
+    """Raised when password login is configured but dependencies are missing."""
+
+
+@dataclass(frozen=True)
+class OpenClawPasswordIdentity:
+    profile: dict[str, Any]
+    workspaces: dict[str, Any]
+
+
+def compare_dify_password(password: str, password_hashed_base64: str | None, salt_base64: str | None) -> bool:
+    """Return True when a plaintext password matches Dify's stored hash."""
+
+    if not password or not password_hashed_base64 or not salt_base64:
+        return False
+    try:
+        salt = base64.b64decode(salt_base64)
+        expected = base64.b64decode(password_hashed_base64)
+    except (binascii.Error, ValueError):
+        return False
+    actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 10000)
+    actual_hex = binascii.hexlify(actual)
+    return hmac.compare_digest(actual_hex, expected)
+
+
+def parse_account_aliases(raw: str | None) -> dict[str, str]:
+    aliases: dict[str, str] = {}
+    if not raw:
+        return aliases
+    for item in raw.split(","):
+        source, sep, target = item.partition("=")
+        if sep and source.strip() and target.strip():
+            aliases[source.strip()] = target.strip()
+    return aliases
+
+
+class DifyDatabasePasswordAuthenticator:
+    """Validate OpenClaw login credentials against Dify's accounts table."""
+
+    def __init__(
+        self,
+        conninfo: str | None = None,
+        *,
+        account_aliases: dict[str, str] | None = None,
+        connect_kwargs: dict[str, str] | None = None,
+        connection_factory: Any | None = None,
+    ) -> None:
+        self.conninfo = conninfo
+        self.account_aliases = account_aliases or {}
+        self.connect_kwargs = connect_kwargs or {}
+        self.connection_factory = connection_factory
+        if not conninfo and not connection_factory:
+            if not self.connect_kwargs:
+                raise ValueError("conninfo, connect_kwargs, or connection_factory is required")
+
+    @classmethod
+    def from_environment(cls) -> DifyDatabasePasswordAuthenticator | None:
+        conninfo = os.environ.get("DIFY_AUTH_DATABASE_URL", "").strip()
+        kwargs = {
+            "host": os.environ.get("DIFY_AUTH_DB_HOST", "").strip(),
+            "port": os.environ.get("DIFY_AUTH_DB_PORT", "").strip(),
+            "dbname": os.environ.get("DIFY_AUTH_DB_NAME", "").strip(),
+            "user": os.environ.get("DIFY_AUTH_DB_USER", "").strip(),
+            "password": os.environ.get("DIFY_AUTH_DB_PASSWORD", ""),
+        }
+        if not conninfo and not all(kwargs.values()):
+            return None
+        return cls(
+            conninfo or None,
+            account_aliases=parse_account_aliases(os.environ.get("OPENCLAW_LOGIN_ACCOUNT_ALIASES")),
+            connect_kwargs=kwargs if not conninfo else None,
+        )
+
+    def _connect(self) -> Any:
+        if self.connection_factory:
+            return self.connection_factory()
+        if psycopg is None or dict_row is None:
+            raise OpenClawAuthDependencyError("psycopg[binary] is required for OpenClaw password login")
+        return psycopg.connect(self.conninfo or "", row_factory=dict_row, **self.connect_kwargs)
+
+    def authenticate(self, account: str, password: str) -> OpenClawPasswordIdentity:
+        normalized_account = account.strip()
+        lookup_account = self.account_aliases.get(normalized_account, normalized_account)
+        if not lookup_account or not password:
+            raise OpenClawAuthenticationError("login failed")
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                account_row = self._find_account(cur, lookup_account)
+                if not account_row:
+                    raise OpenClawAuthenticationError("login failed")
+                status = str(account_row.get("status") or "")
+                if status not in {"active", "pending"}:
+                    raise OpenClawAuthenticationError("login failed")
+                if not compare_dify_password(
+                    password,
+                    account_row.get("password"),
+                    account_row.get("password_salt"),
+                ):
+                    raise OpenClawAuthenticationError("login failed")
+                tenants = self._tenant_rows(cur, str(account_row["id"]))
+        if not tenants:
+            raise OpenClawAuthenticationError("login failed")
+        selected_tenant_id = self._selected_tenant_id(tenants)
+        return OpenClawPasswordIdentity(
+            profile={"id": str(account_row["id"])},
+            workspaces={
+                "data": [
+                    {"id": str(row["id"]), "current": str(row["id"]) == selected_tenant_id}
+                    for row in tenants
+                ]
+            },
+        )
+
+    def _find_account(self, cur: Any, account: str) -> dict[str, Any] | None:
+        if _UUID_RE.fullmatch(account):
+            cur.execute(
+                """
+                SELECT id, email, name, password, password_salt, status
+                FROM accounts
+                WHERE lower(email) = lower(%s)
+                   OR name = %s
+                   OR id = %s
+                ORDER BY
+                  CASE
+                    WHEN lower(email) = lower(%s) THEN 0
+                    WHEN name = %s THEN 1
+                    WHEN id = %s THEN 2
+                    ELSE 3
+                  END
+                LIMIT 1
+                """,
+                (account, account, account, account, account, account),
+            )
+            return cur.fetchone()
+        cur.execute(
+            """
+            SELECT id, email, name, password, password_salt, status
+            FROM accounts
+            WHERE lower(email) = lower(%s)
+               OR name = %s
+            ORDER BY
+              CASE
+                WHEN lower(email) = lower(%s) THEN 0
+                WHEN name = %s THEN 1
+                ELSE 3
+              END
+            LIMIT 1
+            """,
+            (account, account, account, account),
+        )
+        return cur.fetchone()
+
+    def _tenant_rows(self, cur: Any, account_id: str) -> list[dict[str, Any]]:
+        cur.execute(
+            """
+            SELECT t.id, taj.current, taj.created_at
+            FROM tenant_account_joins taj
+            JOIN tenants t ON t.id = taj.tenant_id
+            WHERE taj.account_id = %s
+              AND t.status = 'normal'
+            ORDER BY taj.current DESC, taj.created_at ASC
+            """,
+            (account_id,),
+        )
+        return list(cur.fetchall())
+
+    @staticmethod
+    def _selected_tenant_id(rows: list[dict[str, Any]]) -> str:
+        for row in rows:
+            if row.get("current") is True:
+                return str(row["id"])
+        return str(rows[0]["id"])

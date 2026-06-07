@@ -128,6 +128,22 @@ class RefreshingDifyClient:
         }
 
 
+class FakeOpenClawAuthenticator:
+    def __init__(self):
+        self.calls = []
+
+    def authenticate(self, account, password):
+        from openclaw_video.openclaw_auth import OpenClawAuthenticationError, OpenClawPasswordIdentity
+
+        self.calls.append((account, password))
+        if account != "login-account" or password != "login-password":
+            raise OpenClawAuthenticationError("login failed")
+        return OpenClawPasswordIdentity(
+            profile={"id": "account-a"},
+            workspaces={"data": [{"id": "tenant-a", "current": True}]},
+        )
+
+
 class FakeGateway:
     def __init__(self):
         self.requests = []
@@ -179,12 +195,11 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("text/html", response.headers["content-type"])
         self.assertIn("OpenClaw Lab", response.text)
-        self.assertIn("Access-Token", response.text)
-        self.assertIn("APP-UUID", response.text)
-        self.assertIn("Refresh-Token", response.text)
-        self.assertIn("X-Huahuo-Access-Token", response.text)
-        self.assertIn("X-Huahuo-App-UUID", response.text)
-        self.assertIn("X-Huahuo-Refresh-Token", response.text)
+        self.assertIn("OpenClaw Login", response.text)
+        self.assertIn("loginAccount", response.text)
+        self.assertIn("loginPassword", response.text)
+        self.assertIn("apiPrefix + '/auth/login'", response.text)
+        self.assertIn("apiPrefix + '/auth/logout'", response.text)
         self.assertIn("const apiPrefix", response.text)
         self.assertIn("'/openclaw-api'", response.text)
         self.assertIn("'/api/openclaw-api'", response.text)
@@ -216,6 +231,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("tiny_upload_terminal", response.text)
         self.assertIn("tiny_upload_result", response.text)
         self.assertIn("messages_visible_to_owner", response.text)
+        self.assertNotIn("localStorage", response.text)
         self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
         self.assertNotIn("openclaw-gateway:18789", response.text)
         self.assertNotIn("Authorization", response.text)
@@ -234,6 +250,8 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("/api/openclaw-api", response.text)
         self.assertIn("/console/api/openclaw-api", response.text)
         self.assertIn("/openclaw-api", response.text)
+        self.assertIn("OpenClaw Login", response.text)
+        self.assertNotIn("localStorage", response.text)
         self.assertNotIn("OPENCLAW_GATEWAY_TOKEN", response.text)
         self.assertNotIn("Authorization", response.text)
         self.assertNotIn("Cookie", response.text)
@@ -264,6 +282,8 @@ class BridgeAppTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["authenticated"], False)
         self.assertEqual(body["login_material_present"], False)
+        self.assertEqual(body["openclaw_session_present"], False)
+        self.assertIsNone(body["auth_mode"])
         self.assertEqual(body["huahuo_access_token_present"], False)
         self.assertEqual(body["huahuo_app_uuid_present"], False)
         self.assertEqual(body["profile_ok"], False)
@@ -283,6 +303,8 @@ class BridgeAppTests(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["authenticated"], True)
         self.assertEqual(body["login_material_present"], True)
+        self.assertEqual(body["openclaw_session_present"], False)
+        self.assertEqual(body["auth_mode"], "dify")
         self.assertEqual(body["huahuo_access_token_present"], False)
         self.assertEqual(body["huahuo_app_uuid_present"], False)
         self.assertEqual(body["profile_ok"], True)
@@ -379,10 +401,117 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(body["profile_ok"], True)
         self.assertEqual(body["workspace_ok"], True)
         self.assertEqual(body["access_ok"], True)
+        self.assertEqual(body["auth_mode"], "test_identity_headers")
         self.assertEqual(len(body["principal_id"]), 64)
         self.assertNotIn("account-a", response.text)
         self.assertNotIn("tenant-a", response.text)
         self.assertNotIn("test-mode-secret", response.text)
+
+    def test_openclaw_password_login_sets_http_only_session_cookie(self):
+        from openclaw_video.bridge_app import create_app
+
+        authenticator = FakeOpenClawAuthenticator()
+        client = TestClient(
+            create_app(
+                dify=DenyingDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                openclaw_authenticator=authenticator,
+                identity_secret="test-secret",
+            )
+        )
+        login = client.post(
+            "/openclaw-api/auth/login",
+            json={"account": "login-account", "password": "login-password"},
+            headers={"x-forwarded-proto": "https"},
+        )
+
+        self.assertEqual(login.status_code, 200, login.text)
+        self.assertEqual(login.json()["authenticated"], True)
+        self.assertEqual(len(login.json()["principal_id"]), 64)
+        set_cookie = login.headers.get("set-cookie", "")
+        self.assertIn("openclaw_session=", set_cookie)
+        self.assertIn("HttpOnly", set_cookie)
+        self.assertIn("Secure", set_cookie)
+        self.assertIn("SameSite=lax", set_cookie)
+        self.assertNotIn("login-password", login.text)
+        self.assertNotIn("login-account", login.text)
+
+        client = TestClient(
+            create_app(
+                dify=DenyingDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                openclaw_authenticator=authenticator,
+                identity_secret="test-secret",
+            )
+        )
+        login = client.post(
+            "/openclaw-api/auth/login",
+            json={"account": "login-account", "password": "login-password"},
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+
+        me = client.get("/openclaw-api/me")
+        self.assertEqual(me.status_code, 200, me.text)
+        self.assertEqual(me.json()["authenticated"], True)
+        diagnostics = client.get("/openclaw-api/identity/diagnostics")
+        self.assertEqual(diagnostics.status_code, 200, diagnostics.text)
+        body = diagnostics.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(body["openclaw_session_present"], True)
+        self.assertEqual(body["auth_mode"], "openclaw_session")
+        self.assertIsNone(body["provider_probe"])
+        self.assertNotIn("account-a", diagnostics.text)
+        self.assertNotIn("tenant-a", diagnostics.text)
+
+    def test_openclaw_password_login_failure_does_not_create_session_or_echo_values(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=DenyingDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                openclaw_authenticator=FakeOpenClawAuthenticator(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.post(
+            "/openclaw-api/auth/login",
+            json={"account": "login-account", "password": "wrong-password"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn("openclaw_session=", response.headers.get("set-cookie", ""))
+        self.assertNotIn("login-account", response.text)
+        self.assertNotIn("wrong-password", response.text)
+        me = client.get("/openclaw-api/me")
+        self.assertEqual(me.status_code, 401)
+
+    def test_openclaw_logout_clears_session_cookie(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=DenyingDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                openclaw_authenticator=FakeOpenClawAuthenticator(),
+                identity_secret="test-secret",
+            )
+        )
+        login = client.post(
+            "/openclaw-api/auth/login",
+            json={"account": "login-account", "password": "login-password"},
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+        self.assertEqual(client.get("/openclaw-api/me").status_code, 200)
+
+        logout = client.post("/openclaw-api/auth/logout", json={})
+        self.assertEqual(logout.status_code, 200, logout.text)
+        self.assertIn("openclaw_session=", logout.headers.get("set-cookie", ""))
+        self.assertEqual(client.get("/openclaw-api/me").status_code, 401)
 
     def test_huahuo_front_identity_provider_accepts_frontend_token_without_raw_ids(self):
         from openclaw_video.bridge_app import create_app
