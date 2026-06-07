@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 import hashlib
+from http.cookies import SimpleCookie
 import time
 from typing import Mapping
 from urllib.parse import urlencode
@@ -43,6 +44,10 @@ def identity_headers(headers: Mapping[str, str]) -> dict[str, str]:
     for key, value in headers.items():
         if key.lower() in FORWARDED_IDENTITY_HEADERS:
             forwarded[key] = value
+    if not _header_value(forwarded, "authorization"):
+        access_token = _dify_access_token_from_cookie(headers)
+        if access_token:
+            forwarded["Authorization"] = "Bearer " + access_token
     host = _header_value(headers, "host")
     if host:
         forwarded.setdefault("Origin", f"https://{host}")
@@ -58,6 +63,33 @@ def _safe_cookie_names(headers: Mapping[str, str]) -> list[str]:
         if name:
             names.append(name)
     return sorted(set(names))
+
+
+def _cookie_value(headers: Mapping[str, str], name: str) -> str:
+    cookie_header = _header_value(headers, "cookie")
+    if not cookie_header:
+        return ""
+    parsed = SimpleCookie()
+    try:
+        parsed.load(cookie_header)
+    except Exception:
+        parsed = SimpleCookie()
+    morsel = parsed.get(name)
+    if morsel and morsel.value:
+        return morsel.value
+    for item in cookie_header.split(";"):
+        key, sep, value = item.partition("=")
+        if sep and key.strip() == name:
+            return value.strip()
+    return ""
+
+
+def _dify_access_token_from_cookie(headers: Mapping[str, str]) -> str:
+    for name in ("access_token", "__Host-access_token", "__Secure-access_token"):
+        value = _cookie_value(headers, name)
+        if value:
+            return value
+    return ""
 
 
 def dify_identity_material_present(headers: Mapping[str, str]) -> bool:
@@ -168,6 +200,9 @@ class DifyClient:
             "identity_headers_present": dify_identity_material_present(headers),
             "cookie_names": _safe_cookie_names(headers),
             "authorization_present": bool(_header_value(headers, "authorization")),
+            "authorization_generated_from_cookie": bool(
+                not _header_value(headers, "authorization") and _dify_access_token_from_cookie(headers)
+            ),
             "csrf_header_present": bool(_header_value(headers, "x-csrf-token") or _header_value(headers, "x-xsrf-token")),
             "profile_http_status": None,
             "profile_body_keys": [],

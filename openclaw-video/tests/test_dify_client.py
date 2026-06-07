@@ -47,12 +47,42 @@ class DifyClientTests(unittest.TestCase):
         self.assertTrue(dify_identity_material_present({"Cookie": "access_token=secret"}))
         self.assertFalse(dify_identity_material_present({"User-Agent": "browser"}))
 
+    def test_identity_headers_derives_dify_authorization_from_access_token_cookie(self):
+        selected = identity_headers(
+            {
+                "Cookie": "locale=en; access_token=dify-cookie-access; refresh_token=dify-refresh",
+                "Host": "ai001.huahuoai.com",
+            }
+        )
+
+        self.assertEqual(selected["Authorization"], "Bearer dify-cookie-access")
+        self.assertEqual(selected["Cookie"], "locale=en; access_token=dify-cookie-access; refresh_token=dify-refresh")
+        self.assertEqual(selected["Origin"], "https://ai001.huahuoai.com")
+        self.assertEqual(selected["Referer"], "https://ai001.huahuoai.com/")
+
+    def test_identity_headers_prefers_explicit_authorization_over_cookie_token(self):
+        selected = identity_headers(
+            {
+                "Authorization": "Bearer explicit",
+                "Cookie": "access_token=dify-cookie-access",
+            }
+        )
+
+        self.assertEqual(selected["Authorization"], "Bearer explicit")
+
     @unittest.skipIf(httpx is None, "httpx is not installed")
     def test_dify_safe_identity_probe_reports_only_safe_metadata(self):
         requests = []
 
         def handler(request):
-            requests.append((request.method, str(request.url), request.headers.get("Cookie", "")))
+            requests.append(
+                (
+                    request.method,
+                    str(request.url),
+                    request.headers.get("Cookie", ""),
+                    request.headers.get("Authorization", ""),
+                )
+            )
             if request.url.path == "/console/api/account/profile":
                 return httpx.Response(401, json={"code": "unauthorized"})
             if request.url.path == "/console/api/workspaces":
@@ -80,12 +110,36 @@ class DifyClientTests(unittest.TestCase):
         self.assertEqual(probe["identity_headers_present"], True)
         self.assertEqual(probe["cookie_names"], ["__Host-access_token", "csrf_token"])
         self.assertEqual(probe["authorization_present"], True)
+        self.assertEqual(probe["authorization_generated_from_cookie"], False)
         self.assertEqual(probe["csrf_header_present"], True)
         self.assertEqual(probe["profile_http_status"], 401)
         self.assertEqual(probe["workspaces_http_status"], 401)
         rendered = repr(probe)
         self.assertNotIn("secret", rendered)
-        self.assertTrue(all(cookie == "__Host-access_token=secret; csrf_token=csrf" for _, _, cookie in requests))
+        self.assertTrue(all(cookie == "__Host-access_token=secret; csrf_token=csrf" for _, _, cookie, _ in requests))
+
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_dify_safe_identity_probe_reports_generated_authorization_without_value(self):
+        requests = []
+
+        def handler(request):
+            requests.append((request.url.path, request.headers.get("Authorization", "")))
+            return httpx.Response(401, json={"code": "unauthorized"})
+
+        client = DifyClient(
+            "https://ai001.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+
+        import asyncio
+
+        probe = asyncio.run(client.safe_identity_probe({"Cookie": "access_token=cookie-secret"}))
+
+        self.assertEqual(probe["authorization_present"], False)
+        self.assertEqual(probe["authorization_generated_from_cookie"], True)
+        self.assertEqual(probe["cookie_names"], ["access_token"])
+        self.assertNotIn("cookie-secret", repr(probe))
+        self.assertTrue(all(auth == "Bearer cookie-secret" for _, auth in requests))
 
     def test_huahuo_authorization_header_matches_frontend_signing_shape(self):
         header = huahuo_authorization_header("HUAHUO-access", app_uuid="abc123", app_time_ms=123456)
