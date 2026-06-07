@@ -245,6 +245,7 @@ LAB_PAGE_HTML = """<!doctype html>
       --page: #f4f6f8;
       --surface: #ffffff;
       --surface-soft: #f8fafc;
+      --surface-raised: #fbfcfe;
       --border: #d6dde8;
       --border-strong: #b9c4d3;
       --text: #111827;
@@ -252,6 +253,7 @@ LAB_PAGE_HTML = """<!doctype html>
       --faint: #eef2f7;
       --primary: #1f5eff;
       --primary-strong: #174bd4;
+      --analysis: #0f766e;
       --ink: #172033;
       --success: #147a4b;
       --success-bg: #e5f8ef;
@@ -271,7 +273,7 @@ LAB_PAGE_HTML = """<!doctype html>
         linear-gradient(180deg, #fbfcfe 0, var(--page) 240px, #edf2f7 100%);
       color: var(--text);
     }
-    main.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 36px; }
+    main.shell { width: min(1260px, calc(100% - 32px)); margin: 0 auto; padding: 22px 0 34px; }
     header.topbar {
       display: flex;
       align-items: center;
@@ -280,6 +282,7 @@ LAB_PAGE_HTML = """<!doctype html>
       margin-bottom: 18px;
     }
     .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-copy { min-width: 0; }
     .brand-mark {
       display: grid;
       place-items: center;
@@ -293,10 +296,66 @@ LAB_PAGE_HTML = """<!doctype html>
       box-shadow: 0 12px 30px rgba(23, 32, 51, .16);
     }
     .eyebrow { margin: 0 0 3px; color: var(--muted); font-size: 13px; font-weight: 650; }
+    .brand-subtitle {
+      margin: 5px 0 0;
+      max-width: 620px;
+      color: #526176;
+      font-size: 14px;
+      line-height: 1.38;
+    }
     h1 { font-size: 30px; line-height: 1.08; margin: 0; font-weight: 760; }
     h2 { font-size: 16px; line-height: 1.25; margin: 0; font-weight: 760; }
     h3 { font-size: 15px; line-height: 1.25; margin: 0; font-weight: 730; }
     .top-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0 0 16px;
+    }
+    .flow-step {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .82);
+      color: #526176;
+      font-size: 12px;
+      font-weight: 760;
+      box-shadow: 0 8px 18px rgba(18, 31, 52, .04);
+    }
+    .flow-step::before {
+      content: attr(data-step);
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      background: #e8eef7;
+      color: #42526a;
+      font-size: 11px;
+    }
+    .flow-step.active {
+      border-color: #b8cdfd;
+      background: #eef4ff;
+      color: #1d4ed8;
+    }
+    .flow-step.active::before {
+      background: var(--primary);
+      color: #fff;
+    }
+    .flow-step.done {
+      border-color: #c4e7d4;
+      background: #f1fbf6;
+      color: var(--success);
+    }
+    .flow-step.done::before {
+      background: var(--success);
+      color: #fff;
+    }
     .status,
     .run-state,
     .panel-badge {
@@ -334,7 +393,7 @@ LAB_PAGE_HTML = """<!doctype html>
       border-radius: 8px;
       background: rgba(255, 255, 255, .96);
       padding: 16px;
-      box-shadow: 0 14px 34px rgba(18, 31, 52, .055);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 18px 40px rgba(15, 23, 42, .06);
     }
     .panel + .panel { margin-top: 12px; }
     .section-heading {
@@ -343,6 +402,23 @@ LAB_PAGE_HTML = """<!doctype html>
       justify-content: space-between;
       gap: 14px;
       margin-bottom: 12px;
+    }
+    .step-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .step-index {
+      display: inline-grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 820;
+      flex: 0 0 auto;
     }
     .section-note { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; max-width: 640px; }
     label { display: block; font-size: 13px; color: #475569; margin: 10px 0 6px; font-weight: 650; }
@@ -419,6 +495,43 @@ LAB_PAGE_HTML = """<!doctype html>
       padding-top: 8px;
       margin-top: 8px;
     }
+    .diagnostics-panel {
+      background: #fbfcfe;
+    }
+    .diagnostics-panel summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: 780;
+      color: var(--ink);
+    }
+    .diagnostics-panel summary::-webkit-details-marker { display: none; }
+    .diagnostics-panel summary::after {
+      content: "Open";
+      min-width: 56px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 9px;
+      color: #526176;
+      background: #f6f8fb;
+      font-size: 12px;
+      font-weight: 760;
+    }
+    .diagnostics-panel[open] summary::after { content: "Close"; }
+    .summary-note {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .operator-actions {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--faint);
+    }
     .workbench {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(390px, .92fr);
@@ -435,6 +548,41 @@ LAB_PAGE_HTML = """<!doctype html>
     }
     .field-help { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
     .divider { height: 1px; background: var(--faint); margin: 16px 0; }
+    .source-tabs {
+      display: inline-grid;
+      grid-template-columns: repeat(2, minmax(92px, 1fr));
+      gap: 4px;
+      min-height: 40px;
+      margin: 10px 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+      background: #eef2f7;
+    }
+    .source-tab {
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 6px;
+      background: transparent;
+      color: #42526a;
+      border-color: transparent;
+      box-shadow: none;
+    }
+    .source-tab:hover { background: #fff; color: var(--ink); box-shadow: none; transform: none; }
+    .source-tab.active {
+      background: #fff;
+      color: var(--primary);
+      border-color: #d8e3ff;
+      box-shadow: 0 6px 14px rgba(18, 31, 52, .08);
+    }
+    .source-panel[hidden] { display: none; }
+    .source-panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--surface-raised);
+    }
+    .source-panel .actions { margin-top: 12px; }
     .conversation {
       display: grid;
       gap: 8px;
@@ -472,6 +620,41 @@ LAB_PAGE_HTML = """<!doctype html>
       position: sticky;
       top: 14px;
       overflow: hidden;
+    }
+    .result-overview {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 2px 0 12px;
+    }
+    .result-card {
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px;
+      background: linear-gradient(180deg, #ffffff, #f8fafc);
+      box-shadow: 0 8px 18px rgba(18, 31, 52, .045);
+    }
+    .result-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      margin-bottom: 5px;
+    }
+    .result-card strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--ink);
+      font-size: 14px;
+    }
+    .result-card p {
+      margin: 5px 0 0;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.35;
     }
     .status-strip {
       display: grid;
@@ -511,8 +694,8 @@ LAB_PAGE_HTML = """<!doctype html>
     .output-summary.fail { border-left-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
     .output-summary.warn { border-left-color: #d68a00; background: var(--warning-bg); color: var(--warning); }
     pre {
-      min-height: 330px;
-      max-height: 520px;
+      min-height: 220px;
+      max-height: 360px;
       overflow: auto;
       margin: 0;
       padding: 14px;
@@ -525,6 +708,35 @@ LAB_PAGE_HTML = """<!doctype html>
       white-space: pre-wrap;
       word-break: break-word;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+    }
+    .raw-response {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+    .raw-response summary {
+      cursor: pointer;
+      padding: 10px 12px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 760;
+      list-style: none;
+    }
+    .raw-response summary::-webkit-details-marker { display: none; }
+    .raw-response summary::after {
+      content: "View";
+      float: right;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .raw-response[open] summary::after { content: "Hide"; }
+    .raw-response pre {
+      border-radius: 0;
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
     }
     @media (max-width: 960px) {
       .workbench { grid-template-columns: 1fr; }
@@ -542,6 +754,9 @@ LAB_PAGE_HTML = """<!doctype html>
       .session-actions { min-width: 0; }
       .session-actions .actions { margin-top: 11px; }
       .status-strip { grid-template-columns: 1fr; }
+      .flow-steps { grid-template-columns: 1fr; }
+      .result-overview { grid-template-columns: 1fr; }
+      .source-tabs { width: 100%; }
     }
     @media (max-width: 560px) {
       .brand-mark { width: 40px; height: 40px; }
@@ -558,9 +773,10 @@ LAB_PAGE_HTML = """<!doctype html>
     <header class="topbar">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">OC</div>
-        <div>
+        <div class="brand-copy">
           <p class="eyebrow">Short video analysis workbench</p>
           <h1>OpenClaw Lab</h1>
+          <p class="brand-subtitle">Standalone login, link reading, model-backed analysis, and sanitized handoff in one operator surface.</p>
         </div>
       </div>
       <div class="top-status" aria-label="OpenClaw runtime status">
@@ -569,13 +785,24 @@ LAB_PAGE_HTML = """<!doctype html>
       </div>
     </header>
 
+    <nav class="flow-steps" aria-label="Analysis workflow">
+      <div id="flowLogin" class="flow-step active" data-step="1">Login</div>
+      <div id="flowSession" class="flow-step" data-step="2">Session</div>
+      <div id="flowSource" class="flow-step" data-step="3">Source</div>
+      <div id="flowAnalyze" class="flow-step" data-step="4">Analyze</div>
+      <div id="flowResult" class="flow-step" data-step="5">Result</div>
+    </nav>
+
     <div class="workbench">
       <div class="control-stack">
         <section class="panel" aria-labelledby="loginHeading">
           <div class="section-heading">
             <div>
-              <h2 id="loginHeading">OpenClaw Login</h2>
-              <p class="section-note">Use the standalone OpenClaw session for analysis jobs and acceptance checks.</p>
+              <div class="step-title">
+                <span class="step-index">01</span>
+                <h2 id="loginHeading">OpenClaw Login</h2>
+              </div>
+              <p class="section-note">Sign in here; Dify Web does not need a separate login for this flow.</p>
             </div>
             <span class="panel-badge">Private session</span>
           </div>
@@ -593,15 +820,17 @@ LAB_PAGE_HTML = """<!doctype html>
             <button id="loginButton">Login</button>
             <button id="logoutButton" class="secondary">Logout</button>
             <button id="refreshMe" class="secondary">Refresh Login</button>
-            <button id="identityDiagnostics" class="secondary">Identity Check</button>
           </div>
         </section>
 
         <section class="panel" aria-labelledby="sessionHeading">
           <div class="section-heading">
             <div>
-              <h2 id="sessionHeading">Session</h2>
-              <p class="section-note">Create a workspace before submitting a link or upload.</p>
+              <div class="step-title">
+                <span class="step-index">02</span>
+                <h2 id="sessionHeading">Session</h2>
+              </div>
+              <p class="section-note">Create one analysis workspace, then keep every link, upload, and result attached to it.</p>
             </div>
           </div>
           <div class="session-layout">
@@ -612,11 +841,6 @@ LAB_PAGE_HTML = """<!doctype html>
             <div class="session-actions">
               <div class="actions">
                 <button id="createSession">Create Session</button>
-                <button id="runSelfTest" class="secondary">Self Test</button>
-              </div>
-              <div class="actions validation-actions" aria-label="Acceptance and safety checks">
-                <button id="runSecurityTest" class="secondary">Security Test</button>
-                <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
               </div>
             </div>
           </div>
@@ -625,49 +849,103 @@ LAB_PAGE_HTML = """<!doctype html>
         <section class="panel" aria-labelledby="videoHeading">
           <div class="section-heading">
             <div>
-              <h2 id="videoHeading">Video Job</h2>
-              <p class="section-note">Analyze an allowlisted video link or upload a compact video file for the same session.</p>
+              <div class="step-title">
+                <span class="step-index">03</span>
+                <h2 id="videoHeading">Video Source</h2>
+              </div>
+              <p class="section-note">Read a video link first when available; upload remains a compact fallback path.</p>
             </div>
           </div>
-          <div class="field-row">
+          <div>
             <div>
               <label for="sessionId">Session ID</label>
               <input id="sessionId" autocomplete="off" placeholder="Created session id">
             </div>
-            <div>
-              <label for="videoUrl">Video URL</label>
-              <input id="videoUrl" placeholder="https://v.douyin.com/...">
+          </div>
+          <div class="source-tabs" role="tablist" aria-label="Video source">
+            <button id="linkSourceTab" class="source-tab active" type="button" role="tab" aria-selected="true" aria-controls="linkSourcePanel">Link</button>
+            <button id="uploadSourceTab" class="source-tab" type="button" role="tab" aria-selected="false" aria-controls="uploadSourcePanel">Upload</button>
+          </div>
+          <div id="linkSourcePanel" class="source-panel" role="tabpanel" aria-labelledby="linkSourceTab">
+            <label for="videoUrl">Video URL</label>
+            <input id="videoUrl" placeholder="https://v.douyin.com/...">
+            <p class="field-help">Server-side URL validation runs before the worker reads the media.</p>
+            <div class="actions">
+              <button id="readVideoLink" class="secondary">Check Link</button>
+              <button id="submitJob">Analyze Video</button>
+              <button id="pollJob" class="secondary">Refresh Status</button>
             </div>
           </div>
-          <p class="field-help">Links are validated by the server before a worker reads the media.</p>
+          <div id="uploadSourcePanel" class="source-panel" role="tabpanel" aria-labelledby="uploadSourceTab" hidden>
+            <label for="videoFile">Video File</label>
+            <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
+            <p class="field-help">Supported local checks use MP4, MOV, and WebM within the configured upload limit.</p>
+            <div class="actions">
+              <button id="uploadJob">Analyze Upload</button>
+              <button id="uploadSmoke" class="secondary">Tiny Upload Check</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="conversationHeading">
+          <div class="section-heading">
+            <div>
+              <div class="step-title">
+                <span class="step-index">04</span>
+                <h2 id="conversationHeading">Conversation</h2>
+              </div>
+              <p class="section-note">Keep prompts and worker updates visible beside the result state.</p>
+            </div>
+          </div>
           <label>Conversation</label>
           <div id="conversation" class="conversation" aria-live="polite">
             <div class="message assistant">Log in, create a session, then send a video link for OpenClaw to analyze.</div>
           </div>
           <label for="prompt">Prompt</label>
           <textarea id="prompt">Analyze this video.</textarea>
-          <div class="actions">
-            <button id="readVideoLink" class="secondary">Read Link</button>
-            <button id="submitJob">Submit Job</button>
-            <button id="pollJob" class="secondary">Poll Job</button>
-          </div>
-          <div class="divider"></div>
-          <h3>Upload Video</h3>
-          <label for="videoFile">Video File</label>
-          <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
-          <p class="field-help">Supported local checks use MP4, MOV, and WebM within the configured upload limit.</p>
-          <div class="actions">
-            <button id="uploadJob">Upload Job</button>
-            <button id="uploadSmoke" class="secondary">Tiny Upload</button>
-          </div>
         </section>
+
+        <details class="panel diagnostics-panel">
+          <summary>
+            <span>Diagnostics & Acceptance</span>
+            <span class="summary-note">Operator checks</span>
+          </summary>
+          <div class="operator-actions">
+            <div class="actions">
+              <button id="identityDiagnostics" class="secondary">Identity Check</button>
+              <button id="runSelfTest" class="secondary">Self Test</button>
+              <button id="runSecurityTest" class="secondary">Security Test</button>
+              <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
+            </div>
+          </div>
+        </details>
       </div>
 
       <section class="panel output-panel" aria-labelledby="outputHeading">
         <div class="section-heading">
           <div>
-            <h2 id="outputHeading">Job Result & Status</h2>
-            <p class="section-note">Responses are shown as sanitized JSON for review, acceptance, and support handoff.</p>
+            <div class="step-title">
+              <span class="step-index">05</span>
+              <h2 id="outputHeading">Result & Status</h2>
+            </div>
+            <p class="section-note">Summary first, raw sanitized response on demand.</p>
+          </div>
+        </div>
+        <div class="result-overview" aria-label="Result overview">
+          <div class="result-card">
+            <span>Analysis</span>
+            <strong id="analysisMetric">Idle</strong>
+            <p>Worker progress and final status.</p>
+          </div>
+          <div class="result-card">
+            <span>Source</span>
+            <strong id="sourceMetric">No source</strong>
+            <p>Link read check or upload path.</p>
+          </div>
+          <div class="result-card">
+            <span>Result</span>
+            <strong id="resultMetric">Waiting</strong>
+            <p>Schema and summary availability.</p>
           </div>
         </div>
         <div class="status-strip" aria-label="Current job summary">
@@ -684,8 +962,11 @@ LAB_PAGE_HTML = """<!doctype html>
             <strong id="outputMetric">Idle</strong>
           </div>
         </div>
-        <div id="outputSummary" class="output-summary">Waiting for a login refresh, session action, job, or safety test.</div>
-        <pre id="output">{}</pre>
+        <div id="outputSummary" class="output-summary">Sign in to start an analysis. Results and technical payloads will appear here.</div>
+        <details class="raw-response">
+          <summary>Sanitized JSON response</summary>
+          <pre id="output">{}</pre>
+        </details>
       </section>
     </div>
   </main>
@@ -698,21 +979,76 @@ LAB_PAGE_HTML = """<!doctype html>
     const outputMetric = document.getElementById('outputMetric');
     const outputSummary = document.getElementById('outputSummary');
     const conversation = document.getElementById('conversation');
+    const analysisMetric = document.getElementById('analysisMetric');
+    const sourceMetric = document.getElementById('sourceMetric');
+    const resultMetric = document.getElementById('resultMetric');
+    const flowSteps = [
+      document.getElementById('flowLogin'),
+      document.getElementById('flowSession'),
+      document.getElementById('flowSource'),
+      document.getElementById('flowAnalyze'),
+      document.getElementById('flowResult')
+    ];
+    const linkSourceTab = document.getElementById('linkSourceTab');
+    const uploadSourceTab = document.getElementById('uploadSourceTab');
+    const linkSourcePanel = document.getElementById('linkSourcePanel');
+    const uploadSourcePanel = document.getElementById('uploadSourcePanel');
     let currentJobId = '';
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
       : (window.location.pathname.startsWith('/ai/openclaw-lab') ? '/api/openclaw-api' : '/openclaw-api');
     const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
 
+    function setFlowStep(index, state) {
+      const item = flowSteps[index];
+      if (!item) return;
+      item.classList.remove('active', 'done');
+      if (state) item.classList.add(state);
+    }
+    function activateFlow(index) {
+      flowSteps.forEach((item, itemIndex) => {
+        item.classList.remove('active', 'done');
+        if (itemIndex < index) item.classList.add('done');
+        if (itemIndex === index) item.classList.add('active');
+      });
+    }
+    function hasSession() {
+      return Boolean(document.getElementById('sessionId').value.trim());
+    }
+    function isAuthenticated() {
+      return authStatus.classList.contains('ok');
+    }
+    function moveToSourceIfReady() {
+      if (hasSession()) {
+        activateFlow(2);
+      } else if (isAuthenticated()) {
+        activateFlow(1);
+      } else {
+        activateFlow(0);
+      }
+    }
+    function setSourceMode(mode) {
+      const upload = mode === 'upload';
+      linkSourceTab.classList.toggle('active', !upload);
+      uploadSourceTab.classList.toggle('active', upload);
+      linkSourceTab.setAttribute('aria-selected', upload ? 'false' : 'true');
+      uploadSourceTab.setAttribute('aria-selected', upload ? 'true' : 'false');
+      linkSourcePanel.hidden = upload;
+      uploadSourcePanel.hidden = !upload;
+      sourceMetric.textContent = upload ? 'Upload selected' : 'Link selected';
+      moveToSourceIfReady();
+    }
     function setRunState(text, tone = 'busy') {
       runState.textContent = text;
       runState.className = 'run-state ' + tone;
       outputMetric.textContent = text;
+      analysisMetric.textContent = text;
     }
     function setAuthState(text, tone) {
       authStatus.textContent = text;
       authStatus.className = 'status ' + tone;
       authMetric.textContent = text;
+      setFlowStep(0, tone === 'ok' ? 'done' : 'active');
     }
     function setCurrentJob(jobId) {
       currentJobId = jobId || '';
@@ -751,6 +1087,8 @@ LAB_PAGE_HTML = """<!doctype html>
         const payload = value.video_link_read_check;
         const tone = payload.status === 'PASS' ? 'ok' : 'warn';
         const count = payload.direct_video_candidate_count || 0;
+        sourceMetric.textContent = payload.status === 'PASS' ? count + ' candidates' : 'Link checked';
+        resultMetric.textContent = 'Preflight';
         return { tone, text: 'Video link read check ' + payload.status + ': ' + count + ' direct candidates, model not invoked.' };
       }
       const status = typeof value.status === 'number' ? value.status : null;
@@ -758,6 +1096,8 @@ LAB_PAGE_HTML = """<!doctype html>
       if (job && job.job_id) {
         setCurrentJob(job.job_id);
         const tone = job.status === 'succeeded' ? 'ok' : (terminalStatuses.has(job.status) ? 'fail' : 'warn');
+        analysisMetric.textContent = job.status || 'Job';
+        resultMetric.textContent = job.result_schema_version || (job.status === 'succeeded' ? 'Ready' : 'Pending');
         return { tone, text: 'Job ' + job.status + ': ' + job.job_id.slice(0, 8) + '...' };
       }
       if (status) {
@@ -826,9 +1166,11 @@ LAB_PAGE_HTML = """<!doctype html>
         document.getElementById('loginPassword').value = '';
         setAuthState('Authenticated', 'ok');
         setRunState('Ready', 'ok');
+        activateFlow(1);
       } else {
         setAuthState(result.status === 429 ? 'Rate Limited' : 'Login Failed', 'fail');
         setRunState('Needs attention', 'fail');
+        activateFlow(0);
       }
       show(result);
       });
@@ -838,6 +1180,8 @@ LAB_PAGE_HTML = """<!doctype html>
       const result = await api(apiPrefix + '/auth/logout', { method: 'POST', body: JSON.stringify({}) });
       setAuthState('Login Required', 'fail');
       setRunState('Ready', 'busy');
+      resultMetric.textContent = 'Waiting';
+      activateFlow(0);
       show(result);
       });
     }
@@ -847,9 +1191,11 @@ LAB_PAGE_HTML = """<!doctype html>
       if (result.status === 200) {
         setAuthState('Authenticated', 'ok');
         setRunState('Ready', 'ok');
+        activateFlow(1);
       } else {
         setAuthState('Login Required', 'fail');
         setRunState('Login required', 'fail');
+        activateFlow(0);
       }
       if (!options.quiet) show(result);
       });
@@ -863,6 +1209,8 @@ LAB_PAGE_HTML = """<!doctype html>
       if (result.body.session && result.body.session.id) {
         document.getElementById('sessionId').value = result.body.session.id;
         setRunState('Session ready', 'ok');
+        resultMetric.textContent = 'Session ready';
+        activateFlow(2);
       } else {
         setRunState('Needs attention', 'fail');
       }
@@ -1189,6 +1537,9 @@ LAB_PAGE_HTML = """<!doctype html>
       if (result.body.job && result.body.job.job_id) {
         setCurrentJob(result.body.job.job_id);
         setRunState('Job submitted', 'ok');
+        sourceMetric.textContent = 'Link submitted';
+        resultMetric.textContent = 'Pending';
+        activateFlow(3);
         pushMessage('user', 'Submitted a video link for analysis.');
         pushMessage('assistant', 'Job submitted. Poll the job when the worker has progressed.');
       } else {
@@ -1207,9 +1558,13 @@ LAB_PAGE_HTML = """<!doctype html>
       show({ status: result.status, video_link_read_check: result.body });
       if (result.status === 200 && result.body.status === 'PASS') {
         setRunState('Link readable', 'ok');
+        sourceMetric.textContent = (result.body.direct_video_candidate_count || 0) + ' candidates';
+        resultMetric.textContent = 'Ready to submit';
+        activateFlow(3);
         pushMessage('assistant', 'Video link is readable. Direct candidates were found without invoking the model.');
       } else {
         setRunState('Link check ended', result.status >= 400 ? 'fail' : 'warn');
+        resultMetric.textContent = 'Preflight ended';
       }
       });
     }
@@ -1238,6 +1593,9 @@ LAB_PAGE_HTML = """<!doctype html>
       if (body.job && body.job.job_id) {
         setCurrentJob(body.job.job_id);
         setRunState('Upload submitted', 'ok');
+        sourceMetric.textContent = 'Upload accepted';
+        resultMetric.textContent = 'Pending';
+        activateFlow(3);
         pushMessage('user', 'Uploaded a video file for analysis.');
         pushMessage('assistant', 'Upload accepted. Poll the job for worker status and result.');
       } else {
@@ -1285,6 +1643,9 @@ LAB_PAGE_HTML = """<!doctype html>
       try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
       add('upload_job', { status: response.status, body });
       setCurrentJob(body.job && body.job.job_id || '');
+      sourceMetric.textContent = 'Tiny upload';
+      resultMetric.textContent = currentJobId ? 'Pending' : 'Waiting';
+      if (currentJobId) activateFlow(3);
       if (!currentJobId) {
         setRunState('Needs attention', 'fail');
         return;
@@ -1299,6 +1660,12 @@ LAB_PAGE_HTML = """<!doctype html>
       }
       if (lastJob && lastJob.status === 'succeeded') {
         add('job_result', await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result'));
+      }
+      if (lastJob && lastJob.status === 'succeeded') {
+        resultMetric.textContent = lastJob.result_schema_version || 'Ready';
+        activateFlow(4);
+      } else if (lastJob) {
+        resultMetric.textContent = terminalStatuses.has(lastJob.status) ? lastJob.status : 'Pending';
       }
       setRunState(lastJob && lastJob.status === 'succeeded' ? 'Tiny upload done' : 'Tiny upload ended', lastJob && lastJob.status === 'succeeded' ? 'ok' : 'fail');
       });
@@ -1317,12 +1684,19 @@ LAB_PAGE_HTML = """<!doctype html>
         pushMessage('assistant', 'Analysis result is ready. Review the structured output panel.');
         show({ job: jobResult, result });
         setRunState('Result ready', 'ok');
+        resultMetric.textContent = result.body.result && result.body.result.schema_version || 'Ready';
+        activateFlow(4);
         return;
       }
       show(jobResult);
+      if (job && job.status) {
+        resultMetric.textContent = terminalStatuses.has(job.status) ? (job.result_schema_version || job.status) : 'Pending';
+      }
       setRunState(job && terminalStatuses.has(job.status) ? 'Job ended' : 'Job running', job && terminalStatuses.has(job.status) ? 'fail' : 'busy');
       });
     }
+    linkSourceTab.addEventListener('click', () => setSourceMode('link'));
+    uploadSourceTab.addEventListener('click', () => setSourceMode('upload'));
     document.getElementById('loginButton').addEventListener('click', login);
     document.getElementById('logoutButton').addEventListener('click', logout);
     document.getElementById('refreshMe').addEventListener('click', refreshMe);

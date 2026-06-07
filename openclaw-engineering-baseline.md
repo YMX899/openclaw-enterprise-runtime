@@ -38,8 +38,11 @@ review, Dify web login, Douyin account login, or
   a polished professional tool surface with at least iOS-level visual care:
   restrained color, clear spacing, readable hierarchy, responsive layout,
   visible state feedback and no awkward overlapping text.
-- The page should be screenshot-tested after significant visual changes on both
-  desktop and mobile widths.
+- The page should be screenshot-tested after significant visual changes on root
+  after the UI implementation is complete.
+- For the current OpenClaw UI phase, do not use local browser/test loops as the
+  acceptance gate. Finish UI debugging by code/design review first, then deploy
+  to root and perform the authoritative page, browser and API checks there.
 - A UI/design agent may be asked to act as a top-tier software-company visual
   communication design director: inspect screenshots, critique the product
   purpose, raise 20 UI/visual-design questions, score the interface, iterate,
@@ -105,19 +108,25 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 - Secrets, cookies, authorization headers, CSRF values, full environment files,
   model keys, database URLs and private keys must not be printed or recorded.
 
-## Minimum Test Ladder
+## Root-First UI Test Ladder
 
-1. Run local tests that cover the changed surface.
-2. Build/upload/deploy the OpenClaw sidecar bundle to root when runtime behavior
+1. Finish OpenClaw UI implementation and code/design review first. Do not run
+   local UI browser loops as the acceptance gate unless the user explicitly
+   asks for local testing.
+2. Commit the ready UI/documentation changes so the deployed root artifact has
+   a clear version anchor.
+3. Build/upload/deploy the OpenClaw sidecar bundle to root when runtime behavior
    must be validated.
-3. Confirm Dify core container IDs and `StartedAt` did not change.
-4. Confirm the OpenClaw login page loads at `/ai/openclaw-lab/`.
-5. Confirm unauthenticated OpenClaw API fails closed with `401`.
-6. Log in through the OpenClaw login UI and run post-login acceptance.
-7. Run security negative tests for rejected URLs and inaccessible random
+4. Confirm Dify core container IDs and `StartedAt` did not change.
+5. Confirm the OpenClaw login page loads at `/ai/openclaw-lab/`.
+6. Confirm unauthenticated OpenClaw API fails closed with `401`.
+7. Log in through the OpenClaw login UI and run post-login acceptance on root.
+8. Capture root desktop/mobile UI evidence and check for console errors,
+   obvious layout overlap and horizontal overflow.
+9. Run security negative tests for rejected URLs and inaccessible random
    resources.
-8. Run video link-read testing with an explicit video URL, then run a real
-   model-backed analysis job when validating the full pipeline.
-9. Confirm Dify public pages still load and no new obvious 5xx appears in
-   checked routes.
-10. Commit, push and record sanitized deployment/test evidence.
+10. Run video link-read testing with an explicit video URL, then run a real
+    model-backed analysis job when validating the full pipeline.
+11. Confirm Dify public pages still load and no new obvious 5xx appears in
+    checked routes.
+12. Commit, push and record sanitized deployment/test evidence.

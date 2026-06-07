@@ -97,6 +97,18 @@ PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
 The exit gate must run from a clean git worktree and must not be run for the
 first time on the production Dify server.
 
+## Current OpenClaw UI Verification Override
+
+As of 2026-06-07, the active OpenClaw page work uses a root-first UI verification
+policy. Finish UI implementation/debugging by code and design review first, then
+deploy to the root sidecar and run browser/API acceptance there. Do not keep
+reminding future agents to run a local browser or local test loop for this UI
+phase unless the user explicitly asks for local testing.
+
+This override applies to the OpenClaw standalone login, conversation, video
+source selector, result panel and diagnostics UI. It does not authorize changes
+to Dify `api`, `web` or `nginx` containers.
+
 ## OpenClaw Gateway Contract
 
 Bridge V1 uses OpenClaw `2026.3.13` Gateway WebSocket v3, not the rejected
