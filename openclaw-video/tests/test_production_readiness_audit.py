@@ -269,6 +269,28 @@ new 5xx: NONE
         self.assertIn("latest attempt blocked", result.evidence)
         self.assertIn("http_401", result.evidence)
 
+    def test_dify_authenticated_baseline_attempt_is_reported_but_not_passed(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "dify-public-baseline.md", "authenticated_baseline: BLOCKED\n")
+            write(
+                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-attempt-20260607.json",
+                """
+{
+  "schema": "dify-authenticated-baseline-attempt.v1",
+  "status": "blocked",
+  "reason": "The current Chrome profile is not authenticated.",
+  "final_url": "https://ai001.huahuoai.com/signin"
+}
+""",
+            )
+
+            result = audit_module.check_authenticated_dify_baseline(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("authenticated public Dify baseline blocked", result.evidence)
+        self.assertIn("signin", result.evidence)
+
     def test_openclaw_security_requires_triage_when_decision_approved(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)

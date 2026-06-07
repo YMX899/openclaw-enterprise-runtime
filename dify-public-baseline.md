@@ -320,6 +320,60 @@ Route:
 https://ai001.huahuoai.com/apps
 ```
 
+## Real Chrome Authenticated Baseline Attempt 2026-06-07 10:49 Asia/Shanghai
+
+Mode: real Chrome browser through the Codex Chrome extension. No cookies, local
+storage, session storage, request headers, CSRF values, Authorization tokens or
+passwords were read or recorded. No credentials were submitted.
+
+Route:
+
+```text
+https://ai001.huahuoai.com/apps
+```
+
+Observed:
+
+```text
+finalUrl: https://ai001.huahuoai.com/signin
+title: Dify
+visible page: Dify login page
+visible controls: email input, password input, login button
+app_link_count: 0
+console_error_count: 0
+```
+
+Visible DOM markers:
+
+```text
+登录 Dify
+邮箱
+密码
+登录
+© 2026 LangGenius, Inc. All rights reserved.
+```
+
+Interpretation:
+
+- The current Chrome profile is still not authenticated for
+  `https://ai001.huahuoai.com`.
+- `/apps` redirects to `/signin`, which blocks the authenticated baseline flow.
+- Existing-app open/message-flow testing is still incomplete and remains a
+  required production readiness gate.
+
+Current authenticated baseline status:
+
+```text
+authenticated_baseline: BLOCKED
+existing app message: NOT_RUN
+streaming reply: NOT_RUN
+refresh: NOT_RUN
+history: NOT_RUN
+logout: NOT_RUN
+profile 401: NOT_RUN
+new 5xx: NOT_RUN
+```
+
 Observed:
 
 ```text

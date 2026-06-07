@@ -230,6 +230,19 @@ def check_authenticated_dify_baseline(repo: Path) -> GateResult:
     ]
     missing = [pattern for pattern in pass_markers if not re.search(pattern, text, re.IGNORECASE)]
     if missing:
+        attempt_path = repo / "artifacts" / "evidence" / "phase4" / "dify-authenticated-baseline-attempt-20260607.json"
+        if attempt_path.exists():
+            try:
+                attempt = json.loads(_read(attempt_path))
+            except json.JSONDecodeError:
+                attempt = {}
+            reason = str(attempt.get("reason") or "authenticated baseline attempt exists but has not passed")
+            final_url = str(attempt.get("final_url") or "unknown")
+            return GateResult(
+                "authenticated_dify_baseline",
+                "NO_GO",
+                f"authenticated public Dify baseline blocked: {reason}; final_url={final_url}",
+            )
         return GateResult(
             "authenticated_dify_baseline",
             "NO_GO",
