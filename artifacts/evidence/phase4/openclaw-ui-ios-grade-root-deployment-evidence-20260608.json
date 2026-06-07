@@ -1,0 +1,81 @@
+{
+  "schema": "openclaw-ui-ios-grade-root-deployment-evidence.v1",
+  "captured_at": "2026-06-08T01:25:00.000Z",
+  "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "deployed_release": "video-agent-fix-20260608T0001",
+  "bridge_image": "openclaw-video-openclaw-bridge:fast",
+  "commit": "f553e65",
+  "tag": "phase4-openclaw-ui-ios-grade-polish-20260608",
+  "summary": "OpenClaw lab UI upgraded to iOS-grade visual standard (design-token foundation: radius scale, layered shadows, motion tokens, refined palette; 44px+ tap targets; branded focus rings; custom scrollbars; chat-bubble tails; richer landing hero with status badge, stats strip and staggered entrance). CSS and landing markup only; all element IDs and JS-toggled state classes preserved.",
+  "screenshots": {
+    "desktop": "artifacts/evidence/phase4/openclaw-ui-ios-grade-root-desktop-20260608.png",
+    "mobile": "artifacts/evidence/phase4/openclaw-ui-ios-grade-root-mobile-20260608.png"
+  },
+  "public_routes": {
+    "huahuo_root_status": 200,
+    "openclaw_lab_status": 200,
+    "openclaw_api_me_unauthenticated_status": 401
+  },
+  "dify_invariants": {
+    "api_web_nginx_container_ids_unchanged": true,
+    "api_web_nginx_started_at_unchanged": true,
+    "started_at_reference": "2026-01-05T11:17:xxZ",
+    "note": "Dify api/web/nginx containers were not restarted, rebuilt or recreated; only openclaw-bridge was recreated."
+  },
+  "sidecar_peers_untouched": {
+    "openclaw_gateway": true,
+    "video_analysis_worker": true,
+    "bridge_postgres": true,
+    "dify_openclaw_bridge": true
+  },
+  "desktop": {
+    "viewport": { "width": 1440, "height": 900 },
+    "http_status": 200,
+    "horizontal_overflow_px": 0,
+    "hero_badge_present": true,
+    "hero_stats_count": 3,
+    "landing_visible": true,
+    "radius_token_r_md": "16px",
+    "brand_mark_radius": "14px",
+    "body_rendered_bytes": 56171
+  },
+  "mobile": {
+    "viewport": { "width": 390, "height": 844 },
+    "http_status": 200,
+    "horizontal_overflow_px": 0,
+    "hero_badge_present": true,
+    "hero_stats_count": 3,
+    "landing_visible": true,
+    "radius_token_r_md": "16px",
+    "brand_mark_radius": "14px",
+    "body_rendered_bytes": 56171
+  },
+  "title_encoding_verified": "OpenClaw 短视频智能分析",
+  "console_observed": {
+    "expected_unauthenticated_me_401_seen": true,
+    "optional_favicon_404_seen": true,
+    "page_js_error_seen": false,
+    "note": "401 on /me before login is the correct login-boundary behavior; 404 is an optional resource unrelated to this UI change."
+  },
+  "accessibility": {
+    "wcag_aa_contrast_verified_on_measured_text": true,
+    "smallest_measured_contrast": 4.66,
+    "min_tap_target_px": 44
+  },
+  "cache_control": "no-store",
+  "cookies_recorded": false,
+  "secrets_recorded": false,
+  "headers_recorded": false,
+  "account_recorded": false,
+  "password_recorded": false,
+  "assertions": {
+    "page_loaded": true,
+    "new_design_tokens_live": true,
+    "desktop_no_horizontal_overflow": true,
+    "mobile_no_horizontal_overflow": true,
+    "title_chinese_intact": true,
+    "dify_invariants_held": true,
+    "only_bridge_recreated": true,
+    "production_readiness_audit_go": true
+  }
+}

@@ -1,6 +1,6 @@
 # OpenClaw Engineering Baseline
 
-Date: 2026-06-07 Asia/Shanghai
+Date: 2026-06-08 Asia/Shanghai
 
 This document is the current execution baseline for the OpenClaw x Dify
 short-video integration. It supersedes older notes that required web GPT
