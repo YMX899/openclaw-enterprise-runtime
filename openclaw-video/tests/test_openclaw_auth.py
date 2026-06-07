@@ -179,6 +179,7 @@ class OpenClawAuthTests(unittest.TestCase):
         self.assertEqual(identity.profile, {"id": "huahuo:19"})
         self.assertEqual(identity.workspaces, {"data": [{"id": "huahuo-front", "current": True}]})
         self.assertEqual(requests[0][0:2], ("POST", "/api/login"))
+        self.assertTrue(requests[0][2].startswith("Bearer "))
         rendered = repr(identity)
         self.assertNotIn("huahuo-access", rendered)
         self.assertNotIn("huahuo-refresh", rendered)

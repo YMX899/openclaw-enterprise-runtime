@@ -6,7 +6,10 @@ import hashlib
 import hmac
 import os
 import re
+import time
+import uuid
 from dataclasses import dataclass
+from urllib.parse import urlencode
 from typing import Any
 
 try:
@@ -266,7 +269,7 @@ class HuahuoPasswordAuthenticator:
             ) as client:
                 login_response = client.post(
                     "/api/login",
-                    headers=self._headers(),
+                    headers=self._headers(access_token=""),
                     json={"loginName": account, "password": password},
                 )
                 if login_response.status_code in {401, 403}:
@@ -320,8 +323,25 @@ class HuahuoPasswordAuthenticator:
                 "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
             ),
         }
-        if access_token:
-            from .dify_client import huahuo_authorization_header
-
-            headers["Authorization"] = huahuo_authorization_header(access_token)
+        if access_token is not None:
+            headers["Authorization"] = HuahuoPasswordAuthenticator._authorization_header(access_token or "null")
         return headers
+
+    @staticmethod
+    def _authorization_header(access_token: str) -> str:
+        app_uuid = uuid.uuid4().hex
+        app_time_ms = int(time.time() * 1000)
+        first = hashlib.md5(("WEB" + app_uuid).encode("utf-8")).hexdigest().upper()
+        app_sign = hashlib.md5((first + str(app_time_ms)).encode("utf-8")).hexdigest().upper()
+        payload = urlencode(
+            {
+                "appVersion": "1.0.1",
+                "appType": "WEB",
+                "appUuid": app_uuid,
+                "appTime": str(app_time_ms),
+                "appSign": app_sign,
+                "token": access_token,
+            }
+        )
+        encoded = base64.b64encode(payload.encode("utf-8")).decode("ascii")
+        return "Bearer " + encoded
