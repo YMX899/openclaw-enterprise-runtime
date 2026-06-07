@@ -120,6 +120,18 @@ to writable paths below that volume before dropping privileges. Do not let the
 Gateway inherit `HOME=/root`; that causes `.openclaw/workspace` writes to fail
 and can surface as Gateway readiness or pairing errors during chat.
 
+Ordinary text chat uses the OpenClaw Gateway agent. In this deployment the agent
+model is `volcengine-plan/ark-code-latest`; the Gateway reads `ARK_API_KEY`
+from the root runtime `douyin_chong.env` secret and exports it as
+`VOLCANO_ENGINE_API_KEY`. Keep this as a mounted runtime secret; never inline
+the key in compose, docs or evidence. This is separate from the asynchronous
+video-analysis worker, even though both use the same root secret file.
+
+The Bridge backend device must be approved in Gateway device pairing with
+`operator.read` and `operator.write`. If `/openclaw-api/chat` returns
+`pairing required`, inspect `openclaw devices list` and approve the matching
+Bridge/backend request before debugging login or session code.
+
 Run the fixed-version Gateway WS contract in an isolated environment:
 
 ```bash

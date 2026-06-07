@@ -96,8 +96,11 @@ services:
         APT_DEBIAN_MIRROR: ${APT_DEBIAN_MIRROR:-http://deb.debian.org/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://deb.debian.org/debian-security}
         NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}
+    environment:
+      DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
     volumes:
       - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
+      - ./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro
       - openclaw-gateway-state:/var/lib/openclaw
       - ./openclaw/config:/etc/openclaw:ro
       - ../artifacts/knowledge-base-short-video/2026.06.06:/knowledge/short-video:ro

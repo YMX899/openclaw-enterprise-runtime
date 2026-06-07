@@ -125,6 +125,14 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
   `/var/lib/openclaw`. Its container `HOME`, XDG directories and `.openclaw`
   workspace must not inherit `/root`; otherwise chat can fail with Gateway
   readiness or pairing errors.
+- Ordinary text chat goes through the OpenClaw Gateway agent, not the video
+  analysis worker. The Gateway agent uses the Volcano/Doubao provider and reads
+  `ARK_API_KEY` from the root runtime `douyin_chong.env` secret as
+  `VOLCANO_ENGINE_API_KEY`; do not inline the key in compose or documentation.
+- The Bridge backend device must be approved in OpenClaw Gateway device pairing
+  with `operator.read` and `operator.write` before `/openclaw-api/chat` can
+  call `chat.send`. A `pairing required` response means the backend device is
+  pending or unapproved, not that OpenClaw page login failed.
 - Public browser access must go through OpenResty routes to the Bridge only.
 - Secrets, cookies, authorization headers, CSRF values, full environment files,
   model keys, database URLs and private keys must not be printed or recorded.
