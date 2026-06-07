@@ -56,9 +56,12 @@ class CompositeOpenClawAuthenticator:
 
 
 def default_openclaw_authenticator() -> Any | None:
-    """Use Dify's database as the only password-login authority."""
+    """Use Huahuo's frontend user system as the OpenClaw password authority."""
 
-    return DifyDatabasePasswordAuthenticator.from_environment()
+    return HuahuoPasswordAuthenticator(
+        os.environ.get("HUAHUO_FRONT_BASE", "https://www.huahuoai.com"),
+        tenant_id=os.environ.get("HUAHUO_FRONT_TENANT_ID", "huahuo-front"),
+    )
 
 
 def compare_dify_password(password: str, password_hashed_base64: str | None, salt_base64: str | None) -> bool:

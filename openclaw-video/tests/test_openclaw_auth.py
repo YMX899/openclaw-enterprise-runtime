@@ -81,32 +81,18 @@ class OpenClawAuthTests(unittest.TestCase):
         self.assertEqual(aliases["phone-login"], "user@example.com")
         self.assertEqual(aliases["phone-b"], "account-b")
 
-    def test_default_authenticator_is_dify_database_only(self):
+    def test_default_authenticator_is_huahuo_front_user_system(self):
         with mock.patch.dict(
             os.environ,
             {
-                "OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN": "1",
                 "HUAHUO_FRONT_BASE": "https://www.huahuoai.com",
-            },
-            clear=True,
-        ):
-            self.assertIsNone(default_openclaw_authenticator())
-
-        with mock.patch.dict(
-            os.environ,
-            {
-                "DIFY_AUTH_DB_HOST": "db",
-                "DIFY_AUTH_DB_PORT": "5432",
-                "DIFY_AUTH_DB_NAME": "dify",
-                "DIFY_AUTH_DB_USER": "dify",
-                "DIFY_AUTH_DB_PASSWORD": "test-db-password",
-                "OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN": "1",
+                "HUAHUO_FRONT_TENANT_ID": "huahuo-front",
             },
             clear=True,
         ):
             authenticator = default_openclaw_authenticator()
 
-        self.assertIsInstance(authenticator, DifyDatabasePasswordAuthenticator)
+        self.assertIsInstance(authenticator, HuahuoPasswordAuthenticator)
         self.assertNotIsInstance(authenticator, CompositeOpenClawAuthenticator)
 
     def test_database_authenticator_returns_profile_and_current_workspace(self):
