@@ -114,6 +114,12 @@ payload with an Ed25519 private key, and requests only `operator.read` plus
 `operator.write`. Without the token file or device key file, non-video chat
 stays disabled and returns `501`.
 
+Gateway runtime state must stay under `/var/lib/openclaw`. The container
+entrypoint sets `HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` and `XDG_DATA_HOME`
+to writable paths below that volume before dropping privileges. Do not let the
+Gateway inherit `HOME=/root`; that causes `.openclaw/workspace` writes to fail
+and can surface as Gateway readiness or pairing errors during chat.
+
 Run the fixed-version Gateway WS contract in an isolated environment:
 
 ```bash

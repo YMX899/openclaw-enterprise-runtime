@@ -30,6 +30,10 @@ RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then \
     && ./node_modules/.bin/openclaw --version
 
 ENV OPENCLAW_STATE_DIR=/var/lib/openclaw \
+    HOME=/var/lib/openclaw \
+    XDG_CONFIG_HOME=/var/lib/openclaw/.config \
+    XDG_CACHE_HOME=/var/lib/openclaw/.cache \
+    XDG_DATA_HOME=/var/lib/openclaw/.local/share \
     OPENCLAW_CONFIG_PATH=/etc/openclaw/config.yaml \
     PATH=/opt/openclaw-runtime/node_modules/.bin:$PATH
 

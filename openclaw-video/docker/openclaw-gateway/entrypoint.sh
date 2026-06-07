@@ -12,7 +12,22 @@ fi
 
 umask 077
 OPENCLAW_GATEWAY_TOKEN="$(cat "$TOKEN_FILE")"
-HOME="${HOME:-/home/node}"
-export OPENCLAW_GATEWAY_TOKEN HOME
+OPENCLAW_HOME="${OPENCLAW_HOME:-${OPENCLAW_STATE_DIR:-/var/lib/openclaw}}"
+HOME="$OPENCLAW_HOME"
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$OPENCLAW_HOME/.config}"
+XDG_CACHE_HOME="${XDG_CACHE_HOME:-$OPENCLAW_HOME/.cache}"
+XDG_DATA_HOME="${XDG_DATA_HOME:-$OPENCLAW_HOME/.local/share}"
+
+case "$HOME" in
+  /var/lib/openclaw|/var/lib/openclaw/*) ;;
+  *)
+    echo "refusing to use unsafe OpenClaw home directory: $HOME" >&2
+    exit 1
+    ;;
+esac
+
+mkdir -p "$HOME/.openclaw" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME"
+chown -R "$APP_UID:$APP_GID" "$HOME"
+export OPENCLAW_GATEWAY_TOKEN OPENCLAW_HOME HOME XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME
 
 exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"

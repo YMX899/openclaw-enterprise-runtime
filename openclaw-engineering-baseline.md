@@ -121,6 +121,10 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 - OpenClaw Bridge may be rebuilt/recreated as part of OpenClaw deployment.
 - OpenClaw Gateway, Worker and Bridge Postgres must not expose public host
   ports.
+- OpenClaw Gateway must run with writable state rooted at
+  `/var/lib/openclaw`. Its container `HOME`, XDG directories and `.openclaw`
+  workspace must not inherit `/root`; otherwise chat can fail with Gateway
+  readiness or pairing errors.
 - Public browser access must go through OpenResty routes to the Bridge only.
 - Secrets, cookies, authorization headers, CSRF values, full environment files,
   model keys, database URLs and private keys must not be printed or recorded.
