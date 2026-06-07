@@ -38,7 +38,7 @@ TARGETS = {
         },
     },
     "huahuo-user-web": {
-        "url": "https://www.huahuoai.com/ai/?id=4",
+        "url": "https://www.huahuoai.com/?id=4",
         "wait_ms": "1000",
         "expected_statuses": {
             "GET https://www.huahuoai.com/ai/": 200,

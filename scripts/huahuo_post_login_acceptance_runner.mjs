@@ -9,7 +9,7 @@
  */
 
 export const LAB_URL = "https://www.huahuoai.com/openclaw-lab/";
-export const USER_URL = "https://www.huahuoai.com/ai/?id=4";
+export const USER_URL = "https://www.huahuoai.com/?id=4";
 export const STANDALONE_LAB_URL = "https://www.huahuoai.com/ai/openclaw-lab/";
 export const DIFY_APPS_URL = "https://ai001.huahuoai.com/apps";
 export const DIFY_PROFILE_URL = "https://ai001.huahuoai.com/console/api/account/profile";
@@ -264,7 +264,7 @@ export async function runDifyAuthenticatedBaseline(browser, options = {}) {
   }
 }
 
-export async function runOpenClawStandaloneLoginAcceptance(browser, options = {}) {
+export async function runOpenClawProductizedLoginAcceptance(browser, options = {}) {
   const timeoutSeconds = Math.max(Number(options.timeoutSeconds || 180), 30);
   const account = String(options.account || "");
   const password = String(options.password || "");
@@ -281,17 +281,31 @@ export async function runOpenClawStandaloneLoginAcceptance(browser, options = {}
     const hasLoginForm = labText.includes("OpenClaw Login") && labText.includes("Post-Login Acceptance");
     if (!account || !password || !hasLoginForm) {
       finalReport = {
-        schema: "openclaw-standalone-login-browser-acceptance.v1",
+        schema: "openclaw-ui-productized-root-acceptance.v1",
         created_at: new Date().toISOString(),
         status: "PENDING_CREDENTIALS",
-        lab_url: await labTab.url(),
-        lab_has_login_form: hasLoginForm,
-        account_recorded: false,
-        password_recorded: false,
-        cookies_recorded: false,
-        secrets_recorded: false,
-        headers_recorded: false,
-        local_storage_values_recorded: false,
+        target_url: await labTab.url(),
+        assertions: {
+          page_loaded: !!labText,
+          workflow_present: hasLoginForm,
+          login_authenticated: false,
+          session_created: false,
+          post_login_acceptance_all_pass: false,
+        },
+        login: {
+          authenticated: false,
+          passwordCleared: false,
+          accountRecorded: false,
+        },
+        session: {
+          created: false,
+          idLength: 0,
+        },
+        post_login_acceptance: {
+          overall: "PENDING_CREDENTIALS",
+          checkCount: 0,
+          allPass: false,
+        },
       };
       return finalReport;
     }
@@ -327,18 +341,45 @@ export async function runOpenClawStandaloneLoginAcceptance(browser, options = {}
     }
 
     const logs = await labTab.dev.logs({ levels: ["error"], limit: 20 });
+    const sessionId = await labTab.playwright.locator("#sessionId").inputValue({ timeoutMs: 2000 }).catch(() => "");
+    const loginAuthenticated = !!(loginOutput && loginOutput.body && loginOutput.body.authenticated === true);
+    const passwordCleared = await labTab.playwright.locator("#loginPassword").inputValue({ timeoutMs: 2000 })
+      .then((value) => value.length === 0)
+      .catch(() => false);
+    const allPass = acceptanceSummary.overall === "PASS" && acceptanceSummary.failed_steps.length === 0;
     finalReport = {
-      schema: "openclaw-standalone-login-browser-acceptance.v1",
+      schema: "openclaw-ui-productized-root-acceptance.v1",
       created_at: new Date().toISOString(),
-      status: acceptanceSummary.overall === "PASS" ? "PASS" : "FAIL",
+      status: allPass ? "PASS" : "FAIL",
       started_at: startedAt.toISOString(),
       finished_at: new Date().toISOString(),
-      lab_url: await labTab.url(),
-      lab_has_login_form: hasLoginForm,
+      target_url: await labTab.url(),
+      deployed_release: options.deployedRelease || null,
+      assertions: {
+        page_loaded: !!labText,
+        workflow_present: hasLoginForm,
+        login_authenticated: loginAuthenticated,
+        session_created: sessionId.length === 36,
+        post_login_acceptance_all_pass: allPass,
+      },
+      login: {
+        authenticated: loginAuthenticated,
+        runState: authStatusText,
+        passwordCleared,
+        accountRecorded: false,
+      },
+      session: {
+        created: sessionId.length === 36,
+        idLength: sessionId.length,
+      },
+      post_login_acceptance: {
+        overall: acceptanceSummary.overall,
+        checkCount: acceptanceSummary.step_count,
+        checks: acceptanceSummary.step_names.map((name) => ({ name })),
+        allPass,
+      },
       login_status: loginOutput ? loginOutput.status : null,
       auth_status_text: authStatusText,
-      login_authenticated: !!(loginOutput && loginOutput.body && loginOutput.body.authenticated === true),
-      login_principal_len: loginOutput && loginOutput.body && typeof loginOutput.body.principal_id === "string" ? loginOutput.body.principal_id.length : 0,
       diagnostics: {
         status: diagnosticsOutput ? diagnosticsOutput.status : null,
         authenticated: diagnosticsBody.authenticated === true,
@@ -355,10 +396,7 @@ export async function runOpenClawStandaloneLoginAcceptance(browser, options = {}
         provider_probe_present: !!diagnosticsBody.provider_probe,
         failure_stage: diagnosticsBody.failure_stage || null,
       },
-      post_login_acceptance: acceptanceSummary,
       console_error_count: logs.length,
-      account_recorded: false,
-      password_recorded: false,
       cookies_recorded: false,
       secrets_recorded: false,
       headers_recorded: false,

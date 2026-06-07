@@ -56,7 +56,7 @@ review, Dify web login, Douyin account login, or
 
 ## OpenClaw Login Boundary
 
-- The OpenClaw login UI is part of Phase 4 standalone-login acceptance.
+- The OpenClaw login UI is part of Phase 4 productized-login acceptance.
 - The primary user page is:
 
 ```text
@@ -69,6 +69,9 @@ https://www.huahuoai.com/ai/openclaw-lab/
   business/Dify database identity source.
 - Successful login issues only an OpenClaw-owned HttpOnly session.
 - Users do not need to log in to Dify Web or Dify admin for this integration.
+- The Dify Web user page, when discussed separately, is
+  `https://www.huahuoai.com/?id=4`. Its browser login state is independent from
+  OpenClaw and must not be reintroduced as an OpenClaw gate.
 
 ## Video Link Boundary
 
@@ -87,7 +90,7 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 - Runtime model credentials and permissions are configured through root runtime
   secret files, not committed environment files. Keep Ark/Mediakit keys,
   database URLs and model outputs out of docs, logs and evidence.
-- As of 2026-06-07, root-side OpenClaw standalone login plus a real Douyin
+- As of 2026-06-07, root-side OpenClaw-owned login plus a real Douyin
   video-link analysis job has succeeded with `doubao-seed-2-0-pro`; this
   replaces the earlier Ark 401 blocker.
 - OpenClaw may expose a logged-in `video-link/read-check` preflight that proves
@@ -97,6 +100,9 @@ douyin_chong UniversalVideoResolver -> direct video candidates -> model analysis
 ## Root Deployment Baseline
 
 - Use the root server for direct deployment/testing when needed.
+- For this project phase, do not start by asking to test locally or to verify
+  whether Dify Web is logged in. The operating default is: finish UI/code
+  review, deploy the OpenClaw sidecar to root, and verify OpenClaw on root.
 - Do not modify the Dify compose file for OpenClaw work.
 - Do not restart, rebuild, or recreate Dify `api`, `web`, or `nginx`
   containers unless the user explicitly approves a Dify maintenance action.

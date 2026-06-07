@@ -224,7 +224,7 @@ def huahuo_front_request_headers(headers: Mapping[str, str], *, access_token: st
         "Content-Type": "application/json; charset=UTF-8",
         "Cache-Control": "max-age=1000",
         "Origin": "https://www.huahuoai.com",
-        "Referer": "https://www.huahuoai.com/ai/?id=4",
+        "Referer": "https://www.huahuoai.com/?id=4",
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"

@@ -14,7 +14,7 @@ class ProductionMissingGatesDocTests(unittest.TestCase):
         self.assertIn("root deployment is still NO_GO", text)
         self.assertIn("remaining production readiness gate: none expected from login/sample scope", text)
         self.assertIn("video link-read mode: ADOPTED", text)
-        self.assertIn("OpenClaw standalone login evidence: PASS", text)
+        self.assertIn("OpenClaw-owned login evidence: PASS", text)
         self.assertIn("legacy ai001 console login is no longer a blocking", text)
         self.assertNotRegex(text, r"REAL_SAMPLE_EVIDENCE\.json:\s*PASS\b")
 

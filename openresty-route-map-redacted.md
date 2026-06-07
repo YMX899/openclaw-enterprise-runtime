@@ -142,7 +142,7 @@ Before future route changes:
 8. Confirm /signin, /apps, and an existing Dify app flow from a real browser.
 ```
 
-Current status:
+Historical status before OpenClaw root deployment:
 
 ```text
 OpenResty route-map discovery: PASS
@@ -171,6 +171,37 @@ Mount summary:
 /app/test/data/cache   -> /app/test/data/cache                type=bind rw=True
 ```
 
-No OpenClaw route was added. Safe-to-add-route remains `NO` because the
-Bridge/OpenClaw sidecar has not passed isolated Linux Docker and real-browser
-Dify baseline gates.
+At this historical checkpoint no OpenClaw route had been added.
+
+## Refresh 2026-06-07 Asia/Shanghai
+
+Mode: current root-side productized UI deployment evidence. Full OpenResty
+configuration bodies, certificate private keys and secret material were not
+recorded in this file.
+
+Current public route behavior:
+
+```text
+https://www.huahuoai.com/                  -> 200
+https://www.huahuoai.com/ai/openclaw-lab/ -> 200
+https://www.huahuoai.com/api/openclaw-api/me unauthenticated -> 401
+http://127.0.0.1:18181/healthz on root -> 200
+```
+
+Current conclusion:
+
+```text
+OpenClaw route present: YES
+OpenClaw browser entry: /ai/openclaw-lab/
+OpenClaw API prefix: /api/openclaw-api/
+Browser target: Bridge only
+Gateway public route: NO
+Worker public route: NO
+Bridge Postgres public route: NO
+Dify api/web/nginx restart during latest UI deployment: NO
+```
+
+The earlier "no OpenClaw route present" line is historical and must not be used
+as a current blocker for this OpenClaw phase. Current route safety is proven by
+the productized root deployment evidence, unauthenticated API 401 behavior, and
+Dify core container invariants.

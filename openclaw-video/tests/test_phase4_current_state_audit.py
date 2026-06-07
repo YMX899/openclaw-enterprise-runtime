@@ -51,116 +51,21 @@ SMOKE_PASS = {
 }
 
 
-CURRENT_ROOT_CHROME_PASS = {
-    "schema": "openclaw-current-root-chrome-evidence.v1",
-    "status": "PASS",
-    "root_runtime": {
-        "current_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
-        "previous_release": "/app/bin/openclaw-video/releases/bea6534980dc",
-        "release_has_video_link_probe": True,
-        "release_has_douyin_chong_vendor": True,
-        "gateway_version": "OpenClaw 2026.3.13 (61d171a)",
-        "dify_core": {
-            "api": {
-                "id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
-                "started_at": "2026-01-05T11:17:20.555976179Z",
-                "status": "running",
-            },
-            "web": {
-                "id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
-                "started_at": "2026-01-05T11:17:19.85303869Z",
-                "status": "running",
-            },
-            "nginx": {
-                "id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
-                "started_at": "2026-01-05T11:17:20.937420886Z",
-                "status": "running",
-            },
-        },
-        "openclaw_ports": {
-            "bridge": "3000/tcp -> 127.0.0.1:18181",
-            "gateway": "",
-            "postgres": "",
-            "worker": "",
-        },
-        "public_routes": {
-            "ai_openclaw_lab": 200,
-            "openclaw_api_me_unauth": 401,
-            "huahuo_ai": 200,
-        },
+DIFY_CORE_PASS = {
+    "api": {
+        "id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+        "started_at": "2026-01-05T11:17:20.555976179Z",
+        "status": "running",
     },
-    "chrome_visible_acceptance": {
-        "status": "PASS",
-        "lab_has_login_form": True,
-        "lab_has_workbench": True,
-        "lab_has_acceptance_button": True,
-        "me_status": 200,
-        "me_authenticated": True,
-        "post_login_acceptance": {
-            "overall": "PASS",
-            "step_count": 16,
-            "failed_steps": [],
-        },
-        "console_error_count": 0,
-        "account_recorded": False,
-        "password_recorded": False,
-        "cookies_recorded": False,
-        "headers_recorded": False,
-        "secrets_recorded": False,
-        "local_storage_values_recorded": False,
+    "web": {
+        "id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+        "started_at": "2026-01-05T11:17:19.85303869Z",
+        "status": "running",
     },
-    "public_smoke": {
-        "status": "PASS",
-        "secrets_recorded": False,
-        "headers_recorded": False,
-        "bodies_recorded": False,
-    },
-    "video_link_read_check": {
-        "schema": "openclaw-video-link-read-check-root-chrome-evidence.v1",
-        "api_status": 200,
-        "auth_status": "Authenticated",
-        "auth_metric": "Authenticated",
-        "read_link_button_present": True,
-        "schema_version": "openclaw-video-link-read-check.v1",
-        "status": "PASS",
-        "canonical_host": "www.douyin.com",
-        "redirect_hop_count": 0,
-        "redirect_chain_hosts": ["www.douyin.com"],
-        "resolved_ip_count": 18,
-        "resolver": "douyin_chong.UniversalVideoResolver",
-        "video_id_present": True,
-        "direct_video_candidate_count": 2,
-        "direct_video_host_present": True,
-        "playwm_host_present": True,
-        "content_type_present": True,
-        "duration_seconds_present": True,
-        "size_bytes_present": True,
-        "video_url_source": "direct",
-        "eligible_for_model_analysis": True,
-        "raw_url_recorded": False,
-        "direct_video_url_recorded": False,
-        "cookies_recorded": False,
-        "headers_recorded": False,
-        "tokens_recorded": False,
-        "model_invoked": False,
-        "raw_input_url_leaked": False,
-        "test_account_leaked": False,
-        "password_leaked": False,
-        "direct_mp4_or_m3u8_leaked": False,
-        "cookie_value_recorded": False,
-        "authorization_word_in_output": False,
-    },
-    "video_link_read_scope": {
-        "mode": "ADOPTED",
-        "douyin_login_required": False,
-        "real_sample_evidence_required": False,
-        "runtime_path_verified_by_tests": True,
-        "latest_read_check": "PASS",
-        "raw_url_recorded": False,
-        "secret_file_contents_recorded": False,
-        "headers_recorded": False,
-        "cookies_recorded": False,
-        "tokens_recorded": False,
+    "nginx": {
+        "id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+        "started_at": "2026-01-05T11:17:20.937420886Z",
+        "status": "running",
     },
 }
 
@@ -172,7 +77,7 @@ PRODUCTIZED_UI_ROOT_PASS = {
     "root_runtime": {
         "current_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
         "previous_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
-        "dify_core": CURRENT_ROOT_CHROME_PASS["root_runtime"]["dify_core"],
+        "dify_core": DIFY_CORE_PASS,
         "public_routes": {
             "dify_root": 200,
             "openclaw_lab": 200,
@@ -246,49 +151,17 @@ RUNNER = """
 export async function runHuahuoPostLoginAcceptance(browser, options = {}) {
   await browser.tabs.new();
 }
-export async function runOpenClawStandaloneLoginAcceptance(browser, options = {}) {
+export async function runOpenClawProductizedLoginAcceptance(browser, options = {}) {
   await browser.tabs.new();
 }
 openclaw-chrome-post-login-acceptance.v1
-openclaw-standalone-login-browser-acceptance.v1
+openclaw-ui-productized-root-acceptance.v1
 Post-Login Acceptance
 PENDING_LOGIN
 secrets_recorded: false
 headers_recorded: false
 local_storage_values_recorded: false
 """
-
-
-STANDALONE_LOGIN_PASS = {
-    "schema": "openclaw-standalone-login-browser-acceptance.v1",
-    "status": "PASS",
-    "login_status": 200,
-    "login_authenticated": True,
-    "login_principal_len": 64,
-    "diagnostics": {
-        "authenticated": True,
-        "openclaw_session_present": True,
-        "auth_mode": "openclaw_session",
-        "huahuo_access_token_present": False,
-        "huahuo_app_uuid_present": False,
-        "profile_ok": True,
-        "workspace_ok": True,
-        "access_ok": True,
-        "provider_probe_present": False,
-    },
-    "post_login_acceptance": {
-        "overall": "PASS",
-        "step_count": 16,
-        "failed_steps": [],
-    },
-    "console_error_count": 0,
-    "account_recorded": False,
-    "secrets_recorded": False,
-    "headers_recorded": False,
-    "cookies_recorded": False,
-    "local_storage_values_recorded": False,
-    "password_recorded": False,
-}
 
 
 class Phase4CurrentStateAuditTests(unittest.TestCase):
@@ -326,10 +199,6 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
                 json.dumps(PRODUCTIZED_UI_ROOT_PASS["ui_acceptance"]),
             )
             write(
-                repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
-                json.dumps(STANDALONE_LOGIN_PASS),
-            )
-            write(
                 repo / "artifacts/douyin_chong/LINK_READ_DECISION.md",
                 """
 link_read_mode: ADOPTED
@@ -354,18 +223,18 @@ no_browser_login_state: PASS
         self.assertEqual(report["overall"], "PASS")
         self.assertTrue(all(gate["status"] == "PASS" for gate in report["gates"]))
 
-    def test_standalone_login_evidence_passes_authenticated_gate(self):
+    def test_productized_login_evidence_passes_authenticated_gate(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
-                json.dumps(STANDALONE_LOGIN_PASS),
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
+                json.dumps(PRODUCTIZED_UI_ROOT_PASS["ui_acceptance"]),
             )
 
             result = phase4_audit.check_authenticated_browser_gate(repo)
 
         self.assertEqual(result.status, "PASS")
-        self.assertIn("standalone", result.evidence)
+        self.assertIn("productized", result.evidence)
 
     def test_current_root_chrome_evidence_passes(self):
         with TemporaryDirectory() as tmp:
@@ -395,20 +264,20 @@ no_browser_login_state: PASS
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("productized", result.evidence)
 
-    def test_standalone_login_evidence_rejects_sensitive_recording(self):
+    def test_productized_login_evidence_rejects_sensitive_recording(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            payload = dict(STANDALONE_LOGIN_PASS)
-            payload["password_recorded"] = True
+            payload = json.loads(json.dumps(PRODUCTIZED_UI_ROOT_PASS["ui_acceptance"]))
+            payload["login"]["accountRecorded"] = True
             write(
-                repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
                 json.dumps(payload),
             )
 
             result = phase4_audit.check_authenticated_browser_gate(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("standalone", result.evidence)
+        self.assertIn("productized", result.evidence)
 
     def test_runner_gate_rejects_storage_or_header_access(self):
         with TemporaryDirectory() as tmp:

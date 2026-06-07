@@ -19,13 +19,9 @@ REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.j
 PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
 CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES = (
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-productized-ui-root-deployment-evidence-20260607.json",
-    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-current-root-chrome-evidence-20260607.json",
 )
-STANDALONE_LOGIN_EVIDENCE_CANDIDATES = (
+PRODUCTIZED_LOGIN_EVIDENCE_CANDIDATES = (
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-productized-root-acceptance-20260607.json",
-    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-workbench-login-acceptance-root-20260607.json",
-    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-root-20260607.json",
-    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json",
 )
 
 EXPECTED_DIFY_CORE = {
@@ -45,7 +41,7 @@ class GateResult:
 
 
 def _read(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8-sig")
 
 
 def _load_production_audit():
@@ -211,109 +207,13 @@ def check_current_root_chrome_evidence(repo: Path) -> GateResult:
         return GateResult(
             "current_root_chrome_evidence",
             "PASS",
-            "root runtime proves productized OpenClaw UI, standalone login, Dify invariants and sanitized acceptance",
+            "root runtime proves productized OpenClaw UI login, Dify invariants and sanitized acceptance",
         )
 
-    root = payload.get("root_runtime") or {}
-    chrome = payload.get("chrome_visible_acceptance") or {}
-    acceptance = chrome.get("post_login_acceptance") or {}
-    public_routes = root.get("public_routes") or {}
-    ports = root.get("openclaw_ports") or {}
-    dify_core = root.get("dify_core") or {}
-    smoke = payload.get("public_smoke") or {}
-    video_scope = payload.get("video_link_read_scope") or {}
-    read_check = payload.get("video_link_read_check") or {}
-
-    dify_ok = True
-    for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
-        current = dify_core.get(name) or {}
-        dify_ok = dify_ok and current.get("id") == expected_id
-        dify_ok = dify_ok and current.get("started_at") == expected_started_at
-        dify_ok = dify_ok and current.get("status") == "running"
-
-    safe_flags = (
-        chrome.get("account_recorded") is False
-        and chrome.get("password_recorded") is False
-        and chrome.get("cookies_recorded") is False
-        and chrome.get("headers_recorded") is False
-        and chrome.get("secrets_recorded") is False
-        and chrome.get("local_storage_values_recorded") is False
-        and smoke.get("secrets_recorded") is False
-        and smoke.get("headers_recorded") is False
-        and smoke.get("bodies_recorded") is False
-        and video_scope.get("raw_url_recorded") is False
-        and video_scope.get("secret_file_contents_recorded") is False
-        and video_scope.get("headers_recorded") is False
-        and video_scope.get("cookies_recorded") is False
-        and video_scope.get("tokens_recorded") is False
-        and read_check.get("raw_url_recorded") is False
-        and read_check.get("direct_video_url_recorded") is False
-        and read_check.get("cookies_recorded") is False
-        and read_check.get("headers_recorded") is False
-        and read_check.get("tokens_recorded") is False
-        and read_check.get("model_invoked") is False
-        and read_check.get("raw_input_url_leaked") is False
-        and read_check.get("test_account_leaked") is False
-        and read_check.get("password_leaked") is False
-        and read_check.get("direct_mp4_or_m3u8_leaked") is False
-        and read_check.get("cookie_value_recorded") is False
-        and read_check.get("authorization_word_in_output") is False
-    )
-
-    checks = [
-        payload.get("schema") == "openclaw-current-root-chrome-evidence.v1",
-        payload.get("status") == "PASS",
-        root.get("current_release") == EXPECTED_CURRENT_RELEASE,
-        root.get("previous_release") == "/app/bin/openclaw-video/releases/bea6534980dc",
-        root.get("release_has_video_link_probe") is True,
-        root.get("release_has_douyin_chong_vendor") is True,
-        root.get("gateway_version") == "OpenClaw 2026.3.13 (61d171a)",
-        dify_ok,
-        "127.0.0.1:18181" in str(ports.get("bridge", "")),
-        ports.get("gateway") == "",
-        ports.get("postgres") == "",
-        ports.get("worker") == "",
-        public_routes.get("ai_openclaw_lab") == 200,
-        public_routes.get("openclaw_api_me_unauth") == 401,
-        public_routes.get("huahuo_ai") == 200,
-        chrome.get("status") == "PASS",
-        chrome.get("lab_has_login_form") is True,
-        chrome.get("lab_has_workbench") is True,
-        chrome.get("lab_has_acceptance_button") is True,
-        chrome.get("me_status") == 200,
-        chrome.get("me_authenticated") is True,
-        acceptance.get("overall") == "PASS",
-        acceptance.get("step_count") == 16,
-        acceptance.get("failed_steps") == [],
-        chrome.get("console_error_count") == 0,
-        smoke.get("status") == "PASS",
-        video_scope.get("mode") == "ADOPTED",
-        video_scope.get("douyin_login_required") is False,
-        video_scope.get("real_sample_evidence_required") is False,
-        video_scope.get("runtime_path_verified_by_tests") is True,
-        video_scope.get("latest_read_check") == "PASS",
-        read_check.get("schema") == "openclaw-video-link-read-check-root-chrome-evidence.v1",
-        read_check.get("api_status") == 200,
-        read_check.get("auth_status") == "Authenticated",
-        read_check.get("read_link_button_present") is True,
-        read_check.get("schema_version") == "openclaw-video-link-read-check.v1",
-        read_check.get("status") == "PASS",
-        read_check.get("canonical_host") == "www.douyin.com",
-        read_check.get("direct_video_candidate_count", 0) >= 1,
-        read_check.get("direct_video_host_present") is True,
-        read_check.get("playwm_host_present") is True,
-        read_check.get("content_type_present") is True,
-        read_check.get("duration_seconds_present") is True,
-        read_check.get("size_bytes_present") is True,
-        read_check.get("eligible_for_model_analysis") is True,
-        safe_flags,
-    ]
-    if not all(checks):
-        return GateResult("current_root_chrome_evidence", "NO_GO", "current root/Chrome evidence failed required checks")
     return GateResult(
         "current_root_chrome_evidence",
-        "PASS",
-        "root runtime proves OpenClaw 2026.3.13, private sidecar ports, Dify invariants, and Chrome acceptance",
+        "NO_GO",
+        "current root evidence must use productized OpenClaw UI schema",
     )
 
 
@@ -324,9 +224,9 @@ def check_chrome_runner_ready(repo: Path) -> GateResult:
     text = _read(path)
     required = [
         "openclaw-chrome-post-login-acceptance.v1",
-        "openclaw-standalone-login-browser-acceptance.v1",
+        "openclaw-ui-productized-root-acceptance.v1",
         "runHuahuoPostLoginAcceptance",
-        "runOpenClawStandaloneLoginAcceptance",
+        "runOpenClawProductizedLoginAcceptance",
         "Post-Login Acceptance",
         "PENDING_LOGIN",
         "secrets_recorded: false",
@@ -349,17 +249,6 @@ def check_chrome_runner_ready(repo: Path) -> GateResult:
     if found_forbidden:
         return GateResult("chrome_post_login_runner", "NO_GO", "runner contains forbidden browser/session access")
     return GateResult("chrome_post_login_runner", "PASS", "Chrome helper is present and sanitized")
-
-
-def _json_has_safe_flags(payload: dict[str, Any]) -> bool:
-    return (
-        payload.get("secrets_recorded") is False
-        and payload.get("headers_recorded") is False
-        and payload.get("cookies_recorded") is False
-        and payload.get("local_storage_values_recorded") is False
-        and payload.get("account_recorded") is False
-        and payload.get("password_recorded") is False
-    )
 
 
 def check_public_smoke_summary(path: Path | None) -> GateResult:
@@ -401,19 +290,19 @@ def check_public_smoke_summary(path: Path | None) -> GateResult:
 
 
 def check_authenticated_browser_gate(repo: Path) -> GateResult:
-    standalone_path = next(
+    productized_path = next(
         (
             repo / path.relative_to(REPO_ROOT)
-            for path in STANDALONE_LOGIN_EVIDENCE_CANDIDATES
+            for path in PRODUCTIZED_LOGIN_EVIDENCE_CANDIDATES
             if (repo / path.relative_to(REPO_ROOT)).exists()
         ),
         None,
     )
-    if standalone_path is not None and standalone_path.exists():
+    if productized_path is not None and productized_path.exists():
         try:
-            payload = json.loads(_read(standalone_path))
+            payload = json.loads(_read(productized_path))
         except json.JSONDecodeError:
-            return GateResult("authenticated_browser_gate", "NO_GO", "standalone login evidence is not valid JSON")
+            return GateResult("authenticated_browser_gate", "NO_GO", "productized login evidence is not valid JSON")
         if payload.get("schema") == "openclaw-ui-productized-root-acceptance.v1":
             assertions = payload.get("assertions") or {}
             acceptance = payload.get("post_login_acceptance") or {}
@@ -432,51 +321,16 @@ def check_authenticated_browser_gate(repo: Path) -> GateResult:
                 return GateResult(
                     "authenticated_browser_gate",
                     "PASS",
-                    "OpenClaw productized UI standalone login and post-login acceptance passed on root",
+                    "OpenClaw productized UI login and post-login acceptance passed on root",
                 )
             return GateResult("authenticated_browser_gate", "NO_GO", "productized UI login evidence did not pass required checks")
-        diagnostics = payload.get("diagnostics") or {}
-        acceptance = payload.get("post_login_acceptance") or {}
-        if (
-            payload.get("schema") == "openclaw-standalone-login-browser-acceptance.v1"
-            and payload.get("status") == "PASS"
-            and payload.get("login_status") == 200
-            and payload.get("login_authenticated") is True
-            and payload.get("login_principal_len") == 64
-            and diagnostics.get("authenticated") is True
-            and diagnostics.get("openclaw_session_present") is True
-            and diagnostics.get("auth_mode") == "openclaw_session"
-            and diagnostics.get("huahuo_access_token_present") is False
-            and diagnostics.get("huahuo_app_uuid_present") is False
-            and diagnostics.get("profile_ok") is True
-            and diagnostics.get("workspace_ok") is True
-            and diagnostics.get("access_ok") is True
-            and diagnostics.get("provider_probe_present") is False
-            and acceptance.get("overall") == "PASS"
-            and acceptance.get("step_count") == 16
-            and acceptance.get("failed_steps") == []
-            and payload.get("console_error_count") == 0
-            and _json_has_safe_flags(payload)
-        ):
-            return GateResult(
-                "authenticated_browser_gate",
-                "PASS",
-                "OpenClaw standalone password login and post-login Chrome acceptance passed",
-            )
-        return GateResult("authenticated_browser_gate", "NO_GO", "standalone login evidence did not pass required checks")
+        return GateResult("authenticated_browser_gate", "NO_GO", "authenticated evidence must use productized OpenClaw UI schema")
 
-    path = repo / PHASE4_EVIDENCE.relative_to(REPO_ROOT)
-    if not path.exists():
-        return GateResult("authenticated_browser_gate", "NO_GO", f"missing {path.name}")
-    text = _read(path)
-    if (
-        "openclaw-chrome-post-login-acceptance.v1" in text
-        and re.search(r'"status":\s*"PASS"', text)
-    ):
-        return GateResult("authenticated_browser_gate", "PASS", "post-login Chrome acceptance has passed")
-    if "PENDING_LOGIN" in text and "user_looks_logged_out" in text:
-        return GateResult("authenticated_browser_gate", "PENDING_LOGIN", "Huahuo user web login is still absent in Chrome")
-    return GateResult("authenticated_browser_gate", "NO_GO", "post-login Chrome acceptance evidence is missing")
+    return GateResult(
+        "authenticated_browser_gate",
+        "NO_GO",
+        "missing productized OpenClaw UI acceptance evidence",
+    )
 
 
 def check_real_douyin_sample(repo: Path) -> GateResult:

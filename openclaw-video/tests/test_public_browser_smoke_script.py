@@ -26,7 +26,7 @@ class PublicBrowserSmokeScriptTests(unittest.TestCase):
         self.assertIn("https://www.huahuoai.com/ai/openclaw-lab/", text)
         self.assertIn("https://www.huahuoai.com/openclaw-lab/", text)
         self.assertIn("https://www.huahuoai.com/openclaw-api/me", text)
-        self.assertIn("https://www.huahuoai.com/ai/?id=4", text)
+        self.assertIn("https://www.huahuoai.com/?id=4", text)
         self.assertIn(
             "https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration",
             text,

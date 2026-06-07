@@ -1,8 +1,9 @@
 # OpenClaw Video Sidecar
 
-Status: Phase 1 offline artifact draft. Do not deploy to production until all
-gates in `../phase1-artifact-gates.md` and
-`../phase1.5-isolated-docker-gates.md` pass.
+Status: root-side OpenClaw sidecar is active for the current development and
+acceptance phase. The current execution baseline is
+`../openclaw-engineering-baseline.md`; older Phase 1/1.5 wording is historical
+unless the user explicitly asks to re-enable those gates.
 
 This directory defines the sidecar architecture for an independent
 `/openclaw-lab/` page and `/openclaw-api/` API in front of OpenClaw `2026.3.13`.
@@ -22,19 +23,20 @@ private sidecar network and expose no public host ports.
 
 ## Current Gate
 
-The source here is not production-ready until these external artifacts are
-supplied and verified:
+For the current OpenClaw page phase, the live gate is root-first OpenClaw
+acceptance:
 
-- actual `douyin_chong` binary/source/image.
-- OpenClaw Gateway API contract in a Docker/Linux isolated host with real model
-  credentials.
-- explicit security decision for npm audit findings affecting
-  `openclaw@2026.3.13`.
-- real Postgres container integration test for the durable queue migration and
-  adapter.
-- real Dify authenticated browser baseline.
-- final ChatGPT web review captured in git.
-- Phase 1.5 isolated Linux Docker validation.
+- OpenClaw-owned login on `/ai/openclaw-lab/` passes.
+- Dify Web login is not required.
+- Douyin account login, cookies and browser storage state are retired.
+- video link-read mode is adopted.
+- root public routes pass: Huahuo web 200, OpenClaw page 200, unauthenticated
+  OpenClaw API 401.
+- Dify `api`, `web` and `nginx` containers are not restarted or rebuilt.
+- evidence is sanitized and committed.
+
+Web GPT/ChatGPT review and local browser loops are not required for this phase
+unless the user explicitly requests them.
 
 ## douyin_chong Candidate Intake
 
@@ -57,8 +59,8 @@ video URL candidates without a Douyin account login or browser storage state.
 Production readiness no longer depends on committing
 `artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json`.
 
-Run a real model-backed sample only as an optional diagnostic in an isolated
-environment with an explicit runtime secret file:
+Run a real model-backed sample only when an explicit video URL is provided and
+the runtime secret file is already configured:
 
 ```bash
 python scripts/run_douyin_real_sample.py \
@@ -72,30 +74,32 @@ default. It records URL hash/host, timing, schema status and result hash/size;
 it does not record the secret file, raw stdout/stderr, cookies, tokens or full
 request headers.
 
-## Local Unit Tests
+## Unit Tests
 
-The unit tests cover the pure safety logic and do not require server access:
+The unit tests cover the pure safety logic and do not require server access.
+For the current UI/root phase, do not use these local tests as the acceptance
+gate unless the user explicitly asks for local testing:
 
 ```powershell
 $env:PYTHONPATH='openclaw-video\src'
 .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -m unittest discover openclaw-video\tests
 ```
 
-Phase 1.5 development gate on Windows without Docker:
+Historical Phase 1.5 development gate on Windows without Docker:
 
 ```powershell
 .\scripts\verify_phase1_5_gates.ps1 -PythonCmd .\.phase1-sandbox\bridge-api-venv\Scripts\python.exe -SkipDocker -AllowDirty
 ```
 
-Phase 1.5 exit gate on an isolated Linux Docker host:
+Historical Phase 1.5 exit gate on an isolated Linux Docker host:
 
 ```bash
 REQUIRE_OPENCLAW_SECURITY_APPROVAL=1 \
 PYTHON=/path/to/venv/bin/python scripts/verify_phase1_5_gates.sh
 ```
 
-The exit gate must run from a clean git worktree and must not be run for the
-first time on the production Dify server.
+The historical isolated-host gate is retained for reference, but it no longer
+blocks the current root-first OpenClaw UI/video-link phase.
 
 ## Current OpenClaw UI Verification Override
 
@@ -105,7 +109,7 @@ deploy to the root sidecar and run browser/API acceptance there. Do not keep
 reminding future agents to run a local browser or local test loop for this UI
 phase unless the user explicitly asks for local testing.
 
-This override applies to the OpenClaw standalone login, conversation, video
+This override applies to the OpenClaw-owned login, conversation, video
 source selector, result panel and diagnostics UI. It does not authorize changes
 to Dify `api`, `web` or `nginx` containers.
 
@@ -135,61 +139,28 @@ OPENCLAW_GATEWAY_TOKEN='<redacted-token>' \
 node scripts/verify_openclaw_gateway_ws_contract.mjs
 ```
 
-## Production Principle
+## Root Deployment Principle
 
-No OpenClaw service may be deployed until this repository is clean, artifacts are
-committed, generated image digests are recorded, and rollback has been tested in
-a non-production or no-op mode.
+Use the root server as the authoritative environment for this OpenClaw phase.
+Deploy only reversible OpenClaw sidecar changes and preserve rollback markers.
 
-The production Dify server must not be the first environment used to test
-Docker build, compose render, sidecar startup, Gateway WS v3 runtime behavior,
-or worker resource limits.
+Allowed:
 
-Before any future root-server deployment attempt, the local evidence gate must
-return `GO`:
+- rebuild/recreate OpenClaw Bridge for the new release.
+- keep Gateway, Worker and Bridge Postgres private.
+- validate OpenClaw login, page UI, API gates and video-link analysis on root.
 
-```bash
-python scripts/preflight_root_deploy.py --target-host root --fail-on-no-go
-```
+Not allowed without explicit approval:
 
-This preflight intentionally fails closed until the ubuntu22.04 or another
-non-production Linux Docker host has produced a valid `phase1.5-exit-proof.md`
-and the production readiness audit is fully `GO`.
+- restarting, rebuilding or recreating Dify `api`, `web` or `nginx`.
+- changing Dify compose for OpenClaw.
+- exposing Gateway, Worker or Bridge Postgres as public browser targets.
 
-After the preflight returns `GO`, build the sanitized root deployment bundle
-instead of uploading a working directory by hand:
+After each root deployment, record sanitized evidence for:
 
-```bash
-python scripts/build_root_deploy_bundle.py --target-host root --fail-on-no-go
-```
-
-The bundle builder records the git commit, tags, SHA256 digest and preflight
-report, and refuses to create a bundle while the preflight is `NO_GO`.
-
-## Root Private Sidecar Deployment
-
-When the production public browser baseline is still blocked, the only allowed
-root deployment scope is a private Phase 2 sidecar:
-
-- no OpenResty route.
-- no Dify compose change.
-- no Dify container restart.
-- `openclaw-bridge` bound only to `127.0.0.1:18181`.
-- OpenClaw Gateway, worker and Postgres without host-published ports.
-- `bridge-postgres` uses `postgres:15-alpine` for the private root sidecar,
-  matching the image already present on the production host. The schema only
-  uses PostgreSQL 15-compatible features.
-- OpenClaw Gateway uses the committed `openclaw/config/config.yaml` with
-  `gateway.controlUi.enabled=false`; browsers must only talk to Bridge, never
-  directly to Gateway.
-
-Use the narrower private preflight and bundle builder for that scope:
-
-```bash
-python scripts/preflight_root_private_sidecar.py --target-host root --fail-on-no-go
-python scripts/build_root_private_sidecar_bundle.py --target-host root --fail-on-no-go
-```
-
-This private gate does not authorize `/openclaw-lab/` or `/openclaw-api/`
-public routes. Public routing still requires the full
-`scripts/preflight_root_deploy.py` gate to return `GO`.
+- current release and previous release.
+- Dify container ID/StartedAt invariants.
+- public route checks.
+- OpenClaw-owned login/post-login acceptance.
+- desktop/mobile UI screenshots when UI changed.
+- video link-read or full analysis evidence when a test URL is available.

@@ -319,6 +319,7 @@ LAB_PAGE_HTML = """<!doctype html>
       justify-content: center;
       gap: 7px;
       min-height: 36px;
+      padding: 0 8px;
       border: 1px solid var(--border);
       border-radius: 8px;
       background: rgba(255, 255, 255, .82);
@@ -356,6 +357,11 @@ LAB_PAGE_HTML = """<!doctype html>
       background: var(--success);
       color: #fff;
     }
+    .flow-step.locked {
+      color: #8290a3;
+      background: #f8fafc;
+      box-shadow: none;
+    }
     .status,
     .run-state,
     .panel-badge {
@@ -385,6 +391,8 @@ LAB_PAGE_HTML = """<!doctype html>
     .run-state.ok { background: var(--success-bg); color: var(--success); border-color: #bdebd2; }
     .status.fail,
     .run-state.fail { background: var(--danger-bg); color: var(--danger); border-color: #ffc9c3; }
+    .status.todo,
+    .run-state.todo { background: #eef2f7; color: #42526a; border-color: #d6dde8; }
     .run-state.busy { background: var(--info-bg); color: var(--info); border-color: #b9e8ef; }
     .run-state.warn { background: var(--warning-bg); color: var(--warning); border-color: #f4d18f; }
     .panel-badge { background: #f2f6fb; border-color: var(--border); color: #445166; }
@@ -478,6 +486,7 @@ LAB_PAGE_HTML = """<!doctype html>
     button.secondary:hover { background: #edf2f8; border-color: #c6d1df; box-shadow: none; }
     button:disabled { opacity: .55; cursor: not-allowed; }
     button:disabled:hover { transform: none; }
+    button.primary-flow { min-width: 148px; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .field-row { display: grid; grid-template-columns: minmax(190px, .72fr) minmax(0, 1fr); gap: 14px; }
     .session-layout {
@@ -497,6 +506,8 @@ LAB_PAGE_HTML = """<!doctype html>
     }
     .diagnostics-panel {
       background: #fbfcfe;
+      margin-top: 12px;
+      box-shadow: none;
     }
     .diagnostics-panel summary {
       display: flex;
@@ -738,6 +749,17 @@ LAB_PAGE_HTML = """<!doctype html>
       border-right: 0;
       border-bottom: 0;
     }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     @media (max-width: 960px) {
       .workbench { grid-template-columns: 1fr; }
       .output-panel { position: static; }
@@ -754,7 +776,21 @@ LAB_PAGE_HTML = """<!doctype html>
       .session-actions { min-width: 0; }
       .session-actions .actions { margin-top: 11px; }
       .status-strip { grid-template-columns: 1fr; }
-      .flow-steps { grid-template-columns: 1fr; }
+      .flow-steps {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px;
+      }
+      .flow-step {
+        min-height: 32px;
+        gap: 4px;
+        padding: 0 4px;
+        font-size: 10px;
+      }
+      .flow-step::before {
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+      }
       .result-overview { grid-template-columns: 1fr; }
       .source-tabs { width: 100%; }
     }
@@ -763,8 +799,10 @@ LAB_PAGE_HTML = """<!doctype html>
       h1 { font-size: 26px; }
       .panel { padding: 15px; }
       .section-heading { flex-direction: column; }
-      .actions { display: grid; grid-template-columns: 1fr; }
-      button { width: 100%; }
+      .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .actions button { width: 100%; min-width: 0; }
+      .actions button.primary-flow { grid-column: 1 / -1; }
+      .top-status { display: grid; grid-template-columns: 1fr; gap: 6px; }
     }
   </style>
 </head>
@@ -776,12 +814,12 @@ LAB_PAGE_HTML = """<!doctype html>
         <div class="brand-copy">
           <p class="eyebrow">Short video analysis workbench</p>
           <h1>OpenClaw Lab</h1>
-          <p class="brand-subtitle">Standalone login, link reading, model-backed analysis, and sanitized handoff in one operator surface.</p>
+          <p class="brand-subtitle">OpenClaw-owned login, link reading, model-backed analysis, and sanitized handoff in one operator surface.</p>
         </div>
       </div>
       <div class="top-status" aria-label="OpenClaw runtime status">
-        <div id="runState" class="run-state busy">Ready</div>
-        <div id="authStatus" class="status">Checking</div>
+        <div id="runState" class="run-state todo">Ready for login</div>
+        <div id="authStatus" class="status todo">Sign in needed</div>
       </div>
     </header>
 
@@ -817,7 +855,7 @@ LAB_PAGE_HTML = """<!doctype html>
             </div>
           </div>
           <div class="actions">
-            <button id="loginButton">Login</button>
+            <button id="loginButton" class="primary-flow">Login</button>
             <button id="logoutButton" class="secondary">Logout</button>
             <button id="refreshMe" class="secondary">Refresh Login</button>
           </div>
@@ -840,7 +878,7 @@ LAB_PAGE_HTML = """<!doctype html>
             </div>
             <div class="session-actions">
               <div class="actions">
-                <button id="createSession">Create Session</button>
+                <button id="createSession" class="primary-flow">Create Session</button>
               </div>
             </div>
           </div>
@@ -871,8 +909,8 @@ LAB_PAGE_HTML = """<!doctype html>
             <input id="videoUrl" placeholder="https://v.douyin.com/...">
             <p class="field-help">Server-side URL validation runs before the worker reads the media.</p>
             <div class="actions">
-              <button id="readVideoLink" class="secondary">Check Link</button>
-              <button id="submitJob">Analyze Video</button>
+              <button id="readVideoLink" class="secondary">Read Link</button>
+              <button id="submitJob" class="primary-flow">Analyze Video</button>
               <button id="pollJob" class="secondary">Refresh Status</button>
             </div>
           </div>
@@ -881,7 +919,7 @@ LAB_PAGE_HTML = """<!doctype html>
             <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
             <p class="field-help">Supported local checks use MP4, MOV, and WebM within the configured upload limit.</p>
             <div class="actions">
-              <button id="uploadJob">Analyze Upload</button>
+              <button id="uploadJob" class="primary-flow">Analyze Upload</button>
               <button id="uploadSmoke" class="secondary">Tiny Upload Check</button>
             </div>
           </div>
@@ -905,20 +943,6 @@ LAB_PAGE_HTML = """<!doctype html>
           <textarea id="prompt">Analyze this video.</textarea>
         </section>
 
-        <details class="panel diagnostics-panel">
-          <summary>
-            <span>Diagnostics & Acceptance</span>
-            <span class="summary-note">Operator checks</span>
-          </summary>
-          <div class="operator-actions">
-            <div class="actions">
-              <button id="identityDiagnostics" class="secondary">Identity Check</button>
-              <button id="runSelfTest" class="secondary">Self Test</button>
-              <button id="runSecurityTest" class="secondary">Security Test</button>
-              <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
-            </div>
-          </div>
-        </details>
       </div>
 
       <section class="panel output-panel" aria-labelledby="outputHeading">
@@ -934,38 +958,52 @@ LAB_PAGE_HTML = """<!doctype html>
         <div class="result-overview" aria-label="Result overview">
           <div class="result-card">
             <span>Analysis</span>
-            <strong id="analysisMetric">Idle</strong>
+            <strong id="analysisMetric">Ready</strong>
             <p>Worker progress and final status.</p>
           </div>
           <div class="result-card">
             <span>Source</span>
-            <strong id="sourceMetric">No source</strong>
+            <strong id="sourceMetric">Awaiting source</strong>
             <p>Link read check or upload path.</p>
           </div>
           <div class="result-card">
             <span>Result</span>
-            <strong id="resultMetric">Waiting</strong>
+            <strong id="resultMetric">No result yet</strong>
             <p>Schema and summary availability.</p>
           </div>
         </div>
         <div class="status-strip" aria-label="Current job summary">
           <div>
             <span class="metric-label">Auth</span>
-            <strong id="authMetric">Checking</strong>
+            <strong id="authMetric">Sign in needed</strong>
           </div>
           <div>
             <span class="metric-label">Job</span>
-            <strong id="jobMetric">No job yet</strong>
+            <strong id="jobMetric">No job</strong>
           </div>
           <div>
             <span class="metric-label">Output</span>
-            <strong id="outputMetric">Idle</strong>
+            <strong id="outputMetric">Ready</strong>
           </div>
         </div>
-        <div id="outputSummary" class="output-summary">Sign in to start an analysis. Results and technical payloads will appear here.</div>
+        <div id="outputSummary" class="output-summary">Sign in, create a session, then add a video link or upload.</div>
         <details class="raw-response">
           <summary>Sanitized JSON response</summary>
           <pre id="output">{}</pre>
+        </details>
+        <details class="diagnostics-panel">
+          <summary>
+            <span>Diagnostics & Acceptance</span>
+            <span class="summary-note">Operator checks</span>
+          </summary>
+          <div class="operator-actions">
+            <div class="actions">
+              <button id="identityDiagnostics" class="secondary">Identity Check</button>
+              <button id="runSelfTest" class="secondary">Self Test</button>
+              <button id="runSecurityTest" class="secondary">Security Test</button>
+              <button id="runPostLoginAcceptance" class="secondary">Post-Login Acceptance</button>
+            </div>
+          </div>
         </details>
       </section>
     </div>
@@ -1002,14 +1040,15 @@ LAB_PAGE_HTML = """<!doctype html>
     function setFlowStep(index, state) {
       const item = flowSteps[index];
       if (!item) return;
-      item.classList.remove('active', 'done');
+      item.classList.remove('active', 'done', 'locked');
       if (state) item.classList.add(state);
     }
     function activateFlow(index) {
       flowSteps.forEach((item, itemIndex) => {
-        item.classList.remove('active', 'done');
+        item.classList.remove('active', 'done', 'locked');
         if (itemIndex < index) item.classList.add('done');
         if (itemIndex === index) item.classList.add('active');
+        if (itemIndex > index) item.classList.add('locked');
       });
     }
     function hasSession() {
@@ -1037,22 +1076,73 @@ LAB_PAGE_HTML = """<!doctype html>
       uploadSourcePanel.hidden = !upload;
       sourceMetric.textContent = upload ? 'Upload selected' : 'Link selected';
       moveToSourceIfReady();
+      syncActionAvailability();
+    }
+    function syncActionAvailability() {
+      const authenticated = isAuthenticated();
+      const sessionReady = hasSession();
+      document.getElementById('logoutButton').disabled = !authenticated;
+      document.getElementById('refreshMe').disabled = false;
+      document.getElementById('loginButton').disabled = authenticated;
+      document.getElementById('createSession').disabled = !authenticated;
+      document.getElementById('readVideoLink').disabled = !authenticated || !sessionReady;
+      document.getElementById('submitJob').disabled = !authenticated || !sessionReady;
+      document.getElementById('pollJob').disabled = !authenticated || !currentJobId;
+      document.getElementById('uploadJob').disabled = !authenticated || !sessionReady;
+      document.getElementById('uploadSmoke').disabled = !authenticated;
+    }
+    function setPreLoginView() {
+      setAuthState('Sign in needed', 'todo');
+      runState.textContent = 'Ready for login';
+      runState.className = 'run-state todo';
+      document.getElementById('loginAccount').disabled = false;
+      document.getElementById('loginPassword').disabled = false;
+      authMetric.textContent = 'Sign in needed';
+      analysisMetric.textContent = 'Ready';
+      sourceMetric.textContent = 'Awaiting source';
+      resultMetric.textContent = 'No result yet';
+      outputMetric.textContent = 'Ready';
+      outputSummary.textContent = 'Sign in, create a session, then add a video link or upload.';
+      outputSummary.className = 'output-summary';
+      activateFlow(0);
+      syncActionAvailability();
+    }
+    function setAuthenticatedView() {
+      setAuthState('Authenticated', 'ok');
+      runState.textContent = hasSession() ? 'Session ready' : 'Create session';
+      runState.className = 'run-state ok';
+      document.getElementById('loginAccount').disabled = true;
+      document.getElementById('loginPassword').disabled = true;
+      authMetric.textContent = 'Authenticated';
+      analysisMetric.textContent = hasSession() ? 'Ready to analyze' : 'Ready';
+      sourceMetric.textContent = hasSession() ? 'Awaiting source' : 'Create session first';
+      resultMetric.textContent = hasSession() ? 'No result yet' : 'Session needed';
+      outputMetric.textContent = hasSession() ? 'Ready' : 'Session needed';
+      outputSummary.textContent = hasSession()
+        ? 'Session is ready. Add a video source to start analysis.'
+        : 'Authenticated. Create a session to attach links, uploads, and results.';
+      outputSummary.className = 'output-summary ok';
+      activateFlow(hasSession() ? 2 : 1);
+      syncActionAvailability();
     }
     function setRunState(text, tone = 'busy') {
       runState.textContent = text;
       runState.className = 'run-state ' + tone;
       outputMetric.textContent = text;
       analysisMetric.textContent = text;
+      syncActionAvailability();
     }
     function setAuthState(text, tone) {
       authStatus.textContent = text;
       authStatus.className = 'status ' + tone;
       authMetric.textContent = text;
-      setFlowStep(0, tone === 'ok' ? 'done' : 'active');
+      setFlowStep(0, tone === 'ok' ? 'done' : (tone === 'fail' ? 'active' : 'active'));
+      syncActionAvailability();
     }
     function setCurrentJob(jobId) {
       currentJobId = jobId || '';
-      jobMetric.textContent = currentJobId ? currentJobId.slice(0, 8) + '...' : 'No job yet';
+      jobMetric.textContent = currentJobId ? currentJobId.slice(0, 8) + '...' : 'No job';
+      syncActionAvailability();
     }
     function summarizeOutput(value) {
       if (typeof value === 'string') {
@@ -1164,9 +1254,8 @@ LAB_PAGE_HTML = """<!doctype html>
       });
       if (result.status === 200) {
         document.getElementById('loginPassword').value = '';
-        setAuthState('Authenticated', 'ok');
-        setRunState('Ready', 'ok');
-        activateFlow(1);
+        document.getElementById('loginAccount').value = '';
+        setAuthenticatedView();
       } else {
         setAuthState(result.status === 429 ? 'Rate Limited' : 'Login Failed', 'fail');
         setRunState('Needs attention', 'fail');
@@ -1178,10 +1267,9 @@ LAB_PAGE_HTML = """<!doctype html>
     async function logout() {
       return withBusy('Logging out', async () => {
       const result = await api(apiPrefix + '/auth/logout', { method: 'POST', body: JSON.stringify({}) });
-      setAuthState('Login Required', 'fail');
-      setRunState('Ready', 'busy');
-      resultMetric.textContent = 'Waiting';
-      activateFlow(0);
+      document.getElementById('sessionId').value = '';
+      setCurrentJob('');
+      setPreLoginView();
       show(result);
       });
     }
@@ -1189,13 +1277,9 @@ LAB_PAGE_HTML = """<!doctype html>
       return withBusy('Refreshing', async () => {
       const result = await api(apiPrefix + '/me');
       if (result.status === 200) {
-        setAuthState('Authenticated', 'ok');
-        setRunState('Ready', 'ok');
-        activateFlow(1);
+        setAuthenticatedView();
       } else {
-        setAuthState('Login Required', 'fail');
-        setRunState('Login required', 'fail');
-        activateFlow(0);
+        setPreLoginView();
       }
       if (!options.quiet) show(result);
       });
@@ -1208,7 +1292,10 @@ LAB_PAGE_HTML = """<!doctype html>
       });
       if (result.body.session && result.body.session.id) {
         document.getElementById('sessionId').value = result.body.session.id;
+        setCurrentJob('');
+        setAuthenticatedView();
         setRunState('Session ready', 'ok');
+        sourceMetric.textContent = 'Awaiting source';
         resultMetric.textContent = 'Session ready';
         activateFlow(2);
       } else {
@@ -1233,7 +1320,7 @@ LAB_PAGE_HTML = """<!doctype html>
       const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
       if (!diagnostics.body.authenticated) {
-        setRunState('Login required', 'fail');
+        setPreLoginView();
         return;
       }
 
@@ -1259,6 +1346,7 @@ LAB_PAGE_HTML = """<!doctype html>
         return;
       }
       document.getElementById('sessionId').value = sessionId;
+      setAuthenticatedView();
 
       const jobResult = await api(apiPrefix + '/jobs', {
         method: 'POST',
@@ -1303,7 +1391,7 @@ LAB_PAGE_HTML = """<!doctype html>
       const diagnostics = await api(apiPrefix + '/identity/diagnostics');
       add('identity_diagnostics', { status: diagnostics.status, body: diagnostics.body });
       if (!diagnostics.body.authenticated) {
-        setRunState('Login required', 'fail');
+        setPreLoginView();
         return;
       }
 
@@ -1333,6 +1421,7 @@ LAB_PAGE_HTML = """<!doctype html>
         return;
       }
       document.getElementById('sessionId').value = sessionId;
+      setAuthenticatedView();
 
       const negativeCases = [
         ['non_allowlisted_domain', 'https://example.com/not-douyin'],
@@ -1390,6 +1479,14 @@ LAB_PAGE_HTML = """<!doctype html>
         const overall = failed.length ? 'FAIL' : 'PASS';
         render(overall);
         setRunState(overall === 'PASS' ? 'Acceptance PASS' : 'Acceptance FAIL', overall === 'PASS' ? 'ok' : 'fail');
+        if (overall === 'PASS') {
+          setAuthState('Authenticated', 'ok');
+          if (hasSession()) {
+            sourceMetric.textContent = 'Awaiting source';
+            resultMetric.textContent = 'Session ready';
+            activateFlow(2);
+          }
+        }
       };
 
       const diagnostics = await api(apiPrefix + '/identity/diagnostics');
@@ -1443,6 +1540,7 @@ LAB_PAGE_HTML = """<!doctype html>
         return;
       }
       document.getElementById('sessionId').value = sessionId;
+      setAuthenticatedView();
 
       const negativeCases = [
         ['non_allowlisted_domain', 'https://example.com/not-douyin'],
@@ -1620,6 +1718,7 @@ LAB_PAGE_HTML = """<!doctype html>
         add('create_session', { status: sessionResult.status, body: sessionResult.body });
         sessionId = sessionResult.body.session && sessionResult.body.session.id || '';
         document.getElementById('sessionId').value = sessionId;
+        if (sessionId) setAuthenticatedView();
       }
       if (!sessionId) {
         setRunState('Needs attention', 'fail');
@@ -1644,7 +1743,7 @@ LAB_PAGE_HTML = """<!doctype html>
       add('upload_job', { status: response.status, body });
       setCurrentJob(body.job && body.job.job_id || '');
       sourceMetric.textContent = 'Tiny upload';
-      resultMetric.textContent = currentJobId ? 'Pending' : 'Waiting';
+      resultMetric.textContent = currentJobId ? 'Pending' : 'No job';
       if (currentJobId) activateFlow(3);
       if (!currentJobId) {
         setRunState('Needs attention', 'fail');
@@ -1710,6 +1809,11 @@ LAB_PAGE_HTML = """<!doctype html>
     document.getElementById('uploadJob').addEventListener('click', uploadJob);
     document.getElementById('uploadSmoke').addEventListener('click', uploadTinySmoke);
     document.getElementById('pollJob').addEventListener('click', pollJob);
+    document.getElementById('sessionId').addEventListener('input', () => {
+      if (isAuthenticated()) setAuthenticatedView();
+      syncActionAvailability();
+    });
+    setPreLoginView();
     refreshMe({ quiet: true });
   </script>
 </body>

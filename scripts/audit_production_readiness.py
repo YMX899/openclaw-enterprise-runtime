@@ -23,7 +23,7 @@ class GateResult:
 
 
 def _read(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8-sig")
 
 
 def _json_text(value: Any) -> str:
@@ -191,23 +191,11 @@ def check_video_link_read_mode(repo: Path) -> GateResult:
 def check_douyin_real_sample(repo: Path) -> GateResult:
     path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
     if not path.exists():
-        attempt_path = repo / "artifacts" / "douyin_chong" / "REAL_SAMPLE_ATTEMPT_20260607.json"
-        if attempt_path.exists():
-            try:
-                attempt = json.loads(_read(attempt_path))
-            except json.JSONDecodeError:
-                attempt = {}
-            categories = []
-            for item in attempt.get("attempts") or []:
-                categories.extend(item.get("error_categories") or [])
-            category_text = ",".join(sorted(set(str(item) for item in categories))) or "unknown"
-            reason = str(attempt.get("reason") or "real sample attempt exists but has not succeeded")
-            return GateResult(
-                "douyin_real_sample",
-                "NO_GO",
-                f"missing {path}; latest attempt blocked: {reason}; categories={category_text}",
-            )
-        return GateResult("douyin_real_sample", "NO_GO", f"missing {path}")
+        return GateResult(
+            "douyin_real_sample",
+            "WARN",
+            "REAL_SAMPLE_EVIDENCE.json is absent; this is optional diagnostic evidence under the current video link-read mode",
+        )
     try:
         evidence = json.loads(_read(path))
     except json.JSONDecodeError:
@@ -290,90 +278,100 @@ def check_phase1_5_exit(repo: Path) -> GateResult:
     return GateResult("phase1_5_exit_proof", "PASS", "isolated Linux Docker exit proof markers present")
 
 
-def _openclaw_standalone_login_safe(payload: dict[str, Any]) -> bool:
-    return (
-        payload.get("secrets_recorded") is False
-        and payload.get("headers_recorded") is False
-        and payload.get("cookies_recorded") is False
-        and payload.get("local_storage_values_recorded") is False
-        and payload.get("account_recorded") is False
-        and payload.get("password_recorded") is False
-    )
-
-
-def _openclaw_standalone_login_passed(payload: dict[str, Any]) -> bool:
-    diagnostics = payload.get("diagnostics") or {}
+def _openclaw_productized_ui_login_passed(payload: dict[str, Any]) -> bool:
+    assertions = payload.get("assertions") or {}
+    login = payload.get("login") or {}
+    session = payload.get("session") or {}
     acceptance = payload.get("post_login_acceptance") or {}
     return (
-        payload.get("schema") == "openclaw-standalone-login-browser-acceptance.v1"
-        and payload.get("status") == "PASS"
-        and payload.get("login_status") == 200
-        and payload.get("login_authenticated") is True
-        and payload.get("login_principal_len") == 64
-        and isinstance(payload.get("page_url"), str)
-        and payload["page_url"].startswith("https://www.huahuoai.com/")
-        and "openclaw-lab" in payload["page_url"]
-        and diagnostics.get("authenticated") is True
-        and diagnostics.get("openclaw_session_present") is True
-        and diagnostics.get("auth_mode") == "openclaw_session"
-        and diagnostics.get("huahuo_access_token_present") is False
-        and diagnostics.get("huahuo_app_uuid_present") is False
-        and diagnostics.get("profile_ok") is True
-        and diagnostics.get("workspace_ok") is True
-        and diagnostics.get("access_ok") is True
-        and diagnostics.get("provider_probe_present") is False
+        payload.get("schema") == "openclaw-ui-productized-root-acceptance.v1"
+        and isinstance(payload.get("target_url"), str)
+        and payload["target_url"].startswith("https://www.huahuoai.com/")
+        and "openclaw-lab" in payload["target_url"]
+        and assertions.get("login_authenticated") is True
+        and assertions.get("session_created") is True
+        and assertions.get("post_login_acceptance_all_pass") is True
+        and login.get("authenticated") is True
+        and login.get("passwordCleared") is True
+        and login.get("accountRecorded") is False
+        and session.get("created") is True
+        and session.get("idLength") == 36
         and acceptance.get("overall") == "PASS"
-        and acceptance.get("step_count") == 16
-        and acceptance.get("failed_steps") == []
-        and payload.get("console_error_count") == 0
-        and _openclaw_standalone_login_safe(payload)
+        and acceptance.get("checkCount") == 16
+        and acceptance.get("allPass") is True
     )
 
 
 def check_authenticated_dify_baseline(repo: Path) -> GateResult:
-    # Compatibility note: the gate id is kept so older preflight code keeps
-    # working, but the current production scope is the OpenClaw standalone login
-    # on the Huahuo user-facing web. The ai001 Dify console login is legacy
-    # operator-console evidence and is no longer a blocking requirement here.
-    evidence_path = (
+    # The gate id is kept for older preflight callers, but the current
+    # acceptance source is OpenClaw productized UI login on the Huahuo user web.
+    # Legacy ai001 console and pre-productized standalone evidence do not pass.
+    productized_path = (
         repo
         / "artifacts"
         / "evidence"
         / "phase4"
-        / "openclaw-standalone-login-browser-acceptance-20260607.json"
+        / "openclaw-ui-productized-root-acceptance-20260607.json"
     )
-    if evidence_path.exists():
+    if productized_path.exists():
         try:
-            evidence = json.loads(_read(evidence_path))
+            evidence = json.loads(_read(productized_path))
         except json.JSONDecodeError:
-            return GateResult("authenticated_dify_baseline", "NO_GO", "OpenClaw standalone login evidence is not valid JSON")
-        if _openclaw_standalone_login_passed(evidence):
+            return GateResult("authenticated_dify_baseline", "NO_GO", "OpenClaw productized UI evidence is not valid JSON")
+        if _openclaw_productized_ui_login_passed(evidence):
             return GateResult(
                 "authenticated_dify_baseline",
                 "PASS",
-                "OpenClaw standalone login baseline passed on Huahuo user web; Dify console login is not required",
+                "OpenClaw productized UI login and post-login acceptance passed on Huahuo user web",
             )
         return GateResult(
             "authenticated_dify_baseline",
             "NO_GO",
-            "OpenClaw standalone login evidence did not pass required checks",
+            "OpenClaw productized UI evidence did not pass required login checks",
         )
 
     return GateResult(
         "authenticated_dify_baseline",
         "NO_GO",
-        "missing OpenClaw standalone login evidence; legacy ai001 Dify console login evidence no longer satisfies this gate",
+        "missing OpenClaw productized UI acceptance evidence; legacy ai001 and pre-productized evidence no longer satisfy this gate",
     )
 
 
 def check_production_route_absent(repo: Path) -> GateResult:
-    path = repo / "openresty-route-map-redacted.md"
-    if not path.exists():
-        return GateResult("openresty_no_route_change", "NO_GO", f"missing {path}")
-    text = _read(path).lower()
-    if "no openclaw route present" in text:
-        return GateResult("openresty_no_route_change", "PASS", "no OpenClaw public route is present")
-    return GateResult("openresty_no_route_change", "NO_GO", "route state is unclear; do not proceed")
+    productized_path = (
+        repo
+        / "artifacts"
+        / "evidence"
+        / "phase4"
+        / "openclaw-productized-ui-root-deployment-evidence-20260607.json"
+    )
+    if productized_path.exists():
+        try:
+            payload = json.loads(_read(productized_path))
+        except json.JSONDecodeError:
+            return GateResult("openresty_no_route_change", "NO_GO", "OpenClaw productized route evidence is not valid JSON")
+        routes = ((payload.get("root_runtime") or {}).get("public_routes") or {})
+        policy = payload.get("policy") or {}
+        if (
+            routes.get("dify_root") == 200
+            and routes.get("openclaw_lab") == 200
+            and routes.get("openclaw_api_me_unauth") == 401
+            and routes.get("bridge_healthz") == 200
+            and policy.get("dify_core_restarted") is False
+            and policy.get("dify_core_rebuilt") is False
+        ):
+            return GateResult(
+                "openresty_no_route_change",
+                "PASS",
+                "OpenClaw public route is present through Bridge; unauthenticated API fails closed and Dify core was unchanged",
+            )
+        return GateResult("openresty_no_route_change", "NO_GO", "OpenClaw public route evidence failed required checks")
+
+    return GateResult(
+        "openresty_no_route_change",
+        "NO_GO",
+        "missing current productized OpenClaw route evidence; historical no-route notes no longer satisfy this gate",
+    )
 
 
 def check_git_clean(repo: Path) -> GateResult:

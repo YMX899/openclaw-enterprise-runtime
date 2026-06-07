@@ -12,7 +12,7 @@ https://www.huahuoai.com/openclaw-api/
 The original Huahuo/Dify user web remains:
 
 ```text
-https://www.huahuoai.com/ai/?id=4
+https://www.huahuoai.com/?id=4
 ```
 
 The Dify administration URL is not used as the primary user-web evidence.
@@ -85,7 +85,7 @@ Public route checks:
 ```text
 https://www.huahuoai.com/openclaw-lab/        -> 200
 https://www.huahuoai.com/openclaw-api/me      -> 401 without Huahuo login material
-https://www.huahuoai.com/ai/?id=4             -> 200
+https://www.huahuoai.com/?id=4             -> 200
 ```
 
 ## Chrome Evidence
@@ -95,7 +95,7 @@ Chrome profile: user logged in to Huahuo web.
 Huahuo user web regression already passed before OpenClaw deployment:
 
 ```text
-URL: https://www.huahuoai.com/ai/?id=4
+URL: https://www.huahuoai.com/?id=4
 Action: sent a new chat message asking for a simple acknowledgement
 Result: message appeared and the AI produced a visible reply
 ```
@@ -158,7 +158,7 @@ was executed with two live Chrome tabs:
 
 ```text
 Tab A: https://www.huahuoai.com/openclaw-lab/
-Tab B: https://www.huahuoai.com/ai/?id=4
+Tab B: https://www.huahuoai.com/?id=4
 ```
 
 Preconditions:
@@ -203,7 +203,7 @@ Post-parallel server baseline:
 ```text
 https://www.huahuoai.com/openclaw-lab/   -> 200
 https://www.huahuoai.com/openclaw-api/me -> 401 without login material
-https://www.huahuoai.com/ai/?id=4        -> 200
+https://www.huahuoai.com/?id=4        -> 200
 ```
 
 Dify core containers were still not rebuilt or restarted:
@@ -320,7 +320,7 @@ Post-update public checks:
 http://127.0.0.1:18181/healthz                         -> 200
 https://www.huahuoai.com/openclaw-lab/                  -> 200
 https://www.huahuoai.com/openclaw-api/me                -> 401 without login material
-https://www.huahuoai.com/ai/?id=4                       -> 200
+https://www.huahuoai.com/?id=4                       -> 200
 ```
 
 Dify core containers were still not rebuilt or restarted:
@@ -377,7 +377,7 @@ After Huahuo user login is restored in Chrome, rerun:
 1. Identity Check: expect authenticated=true, profile_ok=true, workspace_ok=true, access_ok=true.
 2. Security Test: expect random resource checks to return 404 and all negative URL jobs to finish failed/url_rejected.
 3. Tiny Upload: expect 202 job creation and succeeded result.
-4. Huahuo user web regression: send one short message at https://www.huahuoai.com/ai/?id=4 and confirm reply.
+4. Huahuo user web regression: send one short message at https://www.huahuoai.com/?id=4 and confirm reply.
 ```
 
 Rollback to the previous sidecar release:
@@ -397,7 +397,7 @@ The public smoke script was updated to use the current Huahuo/Dify entry points:
 ```text
 OpenClaw Lab:             https://www.huahuoai.com/openclaw-lab/
 OpenClaw unauth API:      https://www.huahuoai.com/openclaw-api/me
-Huahuo user web:          https://www.huahuoai.com/ai/?id=4
+Huahuo user web:          https://www.huahuoai.com/?id=4
 Dify admin configuration: https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration
 ```
 
@@ -426,7 +426,7 @@ Smoke targets:
 ```text
 https://www.huahuoai.com/openclaw-lab/                                      -> 200, passed
 https://www.huahuoai.com/openclaw-api/me                                    -> 401, passed
-https://www.huahuoai.com/ai/?id=4                                           -> 200, passed
+https://www.huahuoai.com/?id=4                                           -> 200, passed
 https://ai001.huahuoai.com/app/d44c1add-5043-4b33-b513-1d4f6ec3b4f0/configuration -> 200, passed
 ```
 
@@ -512,7 +512,7 @@ No Cookie, Authorization header, access token, refresh token, full request heade
 Pending authenticated browser gate:
 
 ```text
-After the Huahuo user web is logged in again at https://www.huahuoai.com/ai/?id=4:
+After the Huahuo user web is logged in again at https://www.huahuoai.com/?id=4:
 1. Identity Check must return authenticated=true.
 2. Security Test must pass random resource isolation and negative URL rejection.
 3. Tiny Upload must return a succeeded async job.
@@ -641,7 +641,7 @@ Pending:
 
 ```text
 The Post-Login Acceptance browser gate is deployed and ready.
-It cannot pass until the Huahuo user web at https://www.huahuoai.com/ai/?id=4 is logged in again in Chrome.
+It cannot pass until the Huahuo user web at https://www.huahuoai.com/?id=4 is logged in again in Chrome.
 The current unauthenticated behavior remains correct and fails closed.
 ```
 
@@ -721,7 +721,7 @@ Interpretation:
 ```text
 The automated Chrome runner is ready for the post-login gate.
 The current browser still lacks a Huahuo user-web login session, so it correctly stops before running jobs.
-After the user logs in at https://www.huahuoai.com/ai/?id=4, the same runner can execute the full OpenClaw browser gate and return PASS/FAIL.
+After the user logs in at https://www.huahuoai.com/?id=4, the same runner can execute the full OpenClaw browser gate and return PASS/FAIL.
 ```
 
 ## Standalone OpenClaw Login Acceptance
@@ -1299,15 +1299,16 @@ bodies_recorded: false
 secrets_recorded: false
 ```
 
-UI design agent evidence:
+UI design evidence, superseded by productized UI pass:
 
 ```text
-review: artifacts/evidence/phase4/openclaw-ui-design-director-review-20260607.md
-desktop screenshot: artifacts/evidence/phase4/openclaw-ui-screenshot-public-20260607.png
-mobile screenshot: artifacts/evidence/phase4/openclaw-ui-screenshot-public-mobile-20260607.png
-current UI score: 70/100
-conclusion: functionally acceptable for Phase 4, not yet full iOS-level visual polish
-next UI-only path: stepper workflow, Diagnostics drawer, Raw JSON detail tab, result summary cards
+current review: artifacts/evidence/phase4/openclaw-ui-productized-final-design-review-20260607.md
+desktop screenshot: artifacts/evidence/phase4/openclaw-ui-productized-root-desktop-20260607.png
+mobile screenshot: artifacts/evidence/phase4/openclaw-ui-productized-root-mobile-20260607.png
+acceptance JSON: artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json
+root deployment JSON: artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json
+old design review/screenshot files were removed from current evidence
+status: productized UI evidence is the active reference; latest source-level UI state refinements still require a fresh root deployment capture
 ```
 
 Current remaining boundary:

@@ -100,37 +100,47 @@ decision: approve_exception
 """
 
 
-OPENCLAW_STANDALONE_LOGIN_PASS = """
+OPENCLAW_PRODUCTIZED_UI_PASS = """
 {
-  "schema": "openclaw-standalone-login-browser-acceptance.v1",
-  "status": "PASS",
-  "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
-  "login_status": 200,
-  "login_authenticated": true,
-  "login_principal_len": 64,
-  "diagnostics": {
+  "schema": "openclaw-ui-productized-root-acceptance.v1",
+  "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "assertions": {
+    "login_authenticated": true,
+    "session_created": true,
+    "post_login_acceptance_all_pass": true
+  },
+  "login": {
     "authenticated": true,
-    "openclaw_session_present": true,
-    "auth_mode": "openclaw_session",
-    "huahuo_access_token_present": false,
-    "huahuo_app_uuid_present": false,
-    "profile_ok": true,
-    "workspace_ok": true,
-    "access_ok": true,
-    "provider_probe_present": false
+    "passwordCleared": true,
+    "accountRecorded": false
+  },
+  "session": {
+    "created": true,
+    "idLength": 36
   },
   "post_login_acceptance": {
     "overall": "PASS",
-    "step_count": 16,
-    "failed_steps": []
+    "checkCount": 16,
+    "allPass": true
+  }
+}
+"""
+
+OPENCLAW_PRODUCTIZED_ROUTE_PASS = """
+{
+  "schema": "openclaw-productized-ui-root-deployment-evidence.v1",
+  "root_runtime": {
+    "public_routes": {
+      "dify_root": 200,
+      "openclaw_lab": 200,
+      "openclaw_api_me_unauth": 401,
+      "bridge_healthz": 200
+    }
   },
-  "console_error_count": 0,
-  "account_recorded": false,
-  "password_recorded": false,
-  "secrets_recorded": false,
-  "headers_recorded": false,
-  "cookies_recorded": false,
-  "local_storage_values_recorded": false
+  "policy": {
+    "dify_core_restarted": false,
+    "dify_core_rebuilt": false
+  }
 }
 """
 
@@ -210,10 +220,13 @@ video link-read mode gate: ADOPTED
 """,
             )
             write(
-                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
-                OPENCLAW_STANDALONE_LOGIN_PASS,
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
+                OPENCLAW_PRODUCTIZED_UI_PASS,
             )
-            write(repo / "openresty-route-map-redacted.md", "no OpenClaw route present\n")
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
+                OPENCLAW_PRODUCTIZED_ROUTE_PASS,
+            )
 
             report = audit_module.audit(repo)
 
@@ -260,10 +273,13 @@ video link-read mode gate: ADOPTED
 """,
             )
             write(
-                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
-                OPENCLAW_STANDALONE_LOGIN_PASS,
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
+                OPENCLAW_PRODUCTIZED_UI_PASS,
             )
-            write(repo / "openresty-route-map-redacted.md", "no OpenClaw route present\n")
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
+                OPENCLAW_PRODUCTIZED_ROUTE_PASS,
+            )
 
             report = audit_module.audit(repo)
 
@@ -311,35 +327,66 @@ video link-read mode gate: ADOPTED
             result = audit_module.check_authenticated_dify_baseline(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("OpenClaw standalone login evidence", result.evidence)
+        self.assertIn("productized UI acceptance", result.evidence)
         self.assertIn("legacy ai001", result.evidence)
 
-    def test_openclaw_standalone_login_evidence_can_pass(self):
+    def test_openclaw_standalone_login_evidence_no_longer_passes(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
                 repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
-                OPENCLAW_STANDALONE_LOGIN_PASS,
+                """
+{
+  "schema": "openclaw-standalone-login-browser-acceptance.v1",
+  "status": "PASS",
+  "page_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "login_status": 200,
+  "login_authenticated": true,
+  "post_login_acceptance": {
+    "overall": "PASS",
+    "step_count": 16,
+    "failed_steps": []
+  },
+  "account_recorded": false,
+  "password_recorded": false,
+  "secrets_recorded": false,
+  "headers_recorded": false,
+  "cookies_recorded": false
+}
+""",
+            )
+
+            result = audit_module.check_authenticated_dify_baseline(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("pre-productized evidence no longer satisfy", result.evidence)
+
+    def test_openclaw_productized_ui_evidence_can_pass_login_gate(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
+                OPENCLAW_PRODUCTIZED_UI_PASS,
             )
 
             result = audit_module.check_authenticated_dify_baseline(repo)
 
         self.assertEqual(result.status, "PASS")
-        self.assertIn("OpenClaw standalone login", result.evidence)
+        self.assertIn("productized UI", result.evidence)
 
-    def test_openclaw_standalone_login_evidence_rejects_sensitive_recording(self):
+    def test_openclaw_productized_ui_evidence_rejects_sensitive_recording(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            payload = OPENCLAW_STANDALONE_LOGIN_PASS.replace('"password_recorded": false', '"password_recorded": true')
+            payload = OPENCLAW_PRODUCTIZED_UI_PASS.replace('"accountRecorded": false', '"accountRecorded": true')
             write(
-                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-ui-productized-root-acceptance-20260607.json",
                 payload,
             )
 
             result = audit_module.check_authenticated_dify_baseline(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("did not pass", result.evidence)
+        self.assertIn("productized UI evidence did not pass", result.evidence)
 
     def test_legacy_dify_browser_evidence_no_longer_passes_gate(self):
         with TemporaryDirectory() as tmp:
@@ -353,6 +400,19 @@ video link-read mode gate: ADOPTED
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("legacy ai001", result.evidence)
+
+    def test_productized_route_evidence_allows_current_openclaw_route(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/openclaw-productized-ui-root-deployment-evidence-20260607.json",
+                OPENCLAW_PRODUCTIZED_ROUTE_PASS,
+            )
+
+            result = audit_module.check_production_route_absent(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("public route is present through Bridge", result.evidence)
 
     def test_openclaw_security_requires_triage_when_decision_approved(self):
         with TemporaryDirectory() as tmp:

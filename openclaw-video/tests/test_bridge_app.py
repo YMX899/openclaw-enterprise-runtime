@@ -241,7 +241,7 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("OpenClaw Login", response.text)
         self.assertIn("Short video analysis workbench", response.text)
         self.assertIn("Analysis workflow", response.text)
-        self.assertIn("Standalone login, link reading, model-backed analysis", response.text)
+        self.assertIn("OpenClaw-owned login, link reading, model-backed analysis", response.text)
         self.assertIn("Private session", response.text)
         self.assertIn("Result & Status", response.text)
         self.assertIn("Video Source", response.text)

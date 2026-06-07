@@ -11,7 +11,7 @@ Scope clarification on 2026-06-07: the user-facing Dify web path for this
 integration is the Huahuo/OpenClaw page on `https://www.huahuoai.com`, not the
 legacy `https://ai001.huahuoai.com/apps` operator console. The production
 readiness gate named `authenticated_dify_baseline` is kept for compatibility
-with older preflight code, but it is now satisfied by the OpenClaw standalone
+with older preflight code, but it is now satisfied by the OpenClaw-owned
 login browser evidence. The legacy ai001 console login is no longer a blocking
 requirement for this project.
 
@@ -29,7 +29,7 @@ recorded for this inventory.
 - Ubuntu 22.04 phase audit: PASS.
 - Isolated Linux Docker Phase 1.5 proof: PASS.
 - Ubuntu 22.04 authenticated Dify baseline: PASS.
-- OpenClaw standalone login on Huahuo user web: PASS.
+- OpenClaw-owned login on Huahuo user web: PASS.
 - OpenClaw version under test: `2026.3.13`.
 - OpenClaw security triage: allowed by operator-approved exception.
 - `douyin_chong` artifact manifest: verified.
@@ -58,7 +58,7 @@ remaining production readiness gate: none expected from login/sample scope
 Current evidence:
 
 ```text
-OpenClaw standalone login evidence: PASS
+OpenClaw-owned login evidence: PASS
 Huahuo/OpenClaw post-login browser acceptance: PASS
 REAL_SAMPLE_EVIDENCE.json: missing
 latest real sample attempt: Ark model authentication returned HTTP 401
