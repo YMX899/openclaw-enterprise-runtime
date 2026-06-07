@@ -9,6 +9,11 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+try:
+    import httpx
+except ImportError:  # pragma: no cover
+    httpx = None  # type: ignore[assignment]
+
 try:  # pragma: no cover - exercised in the production image/venv
     import psycopg
     from psycopg.rows import dict_row
@@ -32,6 +37,39 @@ class OpenClawAuthDependencyError(RuntimeError):
 class OpenClawPasswordIdentity:
     profile: dict[str, Any]
     workspaces: dict[str, Any]
+
+
+class CompositeOpenClawAuthenticator:
+    def __init__(self, *authenticators: Any) -> None:
+        self.authenticators = [authenticator for authenticator in authenticators if authenticator is not None]
+
+    def authenticate(self, account: str, password: str) -> OpenClawPasswordIdentity:
+        for authenticator in self.authenticators:
+            try:
+                return authenticator.authenticate(account, password)
+            except OpenClawAuthenticationError:
+                continue
+        raise OpenClawAuthenticationError("login failed")
+
+
+def default_openclaw_authenticator() -> Any | None:
+    authenticators = []
+    dify_database = DifyDatabasePasswordAuthenticator.from_environment()
+    if dify_database is not None:
+        authenticators.append(dify_database)
+    enable_huahuo = os.environ.get("OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN", "1").lower() in {"1", "true", "yes"}
+    if enable_huahuo:
+        authenticators.append(
+            HuahuoPasswordAuthenticator(
+                os.environ.get("HUAHUO_FRONT_BASE", "https://www.huahuoai.com"),
+                tenant_id=os.environ.get("HUAHUO_FRONT_TENANT_ID", "huahuo-front"),
+            )
+        )
+    if not authenticators:
+        return None
+    if len(authenticators) == 1:
+        return authenticators[0]
+    return CompositeOpenClawAuthenticator(*authenticators)
 
 
 def compare_dify_password(password: str, password_hashed_base64: str | None, salt_base64: str | None) -> bool:
@@ -196,3 +234,94 @@ class DifyDatabasePasswordAuthenticator:
             if row.get("current") is True:
                 return str(row["id"])
         return str(rows[0]["id"])
+
+
+class HuahuoPasswordAuthenticator:
+    """Validate OpenClaw login credentials against Huahuo's frontend login API."""
+
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        tenant_id: str = "huahuo-front",
+        timeout_seconds: float = 10.0,
+        transport: Any | None = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.tenant_id = tenant_id
+        self.timeout_seconds = timeout_seconds
+        self.transport = transport
+
+    def authenticate(self, account: str, password: str) -> OpenClawPasswordIdentity:
+        account = account.strip()
+        if not account or not password:
+            raise OpenClawAuthenticationError("login failed")
+        if httpx is None:
+            raise OpenClawAuthDependencyError("httpx is required for Huahuo password login")
+        try:
+            with httpx.Client(
+                base_url=self.base_url,
+                timeout=self.timeout_seconds,
+                transport=self.transport,
+            ) as client:
+                login_response = client.post(
+                    "/api/login",
+                    headers=self._headers(),
+                    json={"loginName": account, "password": password},
+                )
+                if login_response.status_code in {401, 403}:
+                    raise OpenClawAuthenticationError("login failed")
+                login_response.raise_for_status()
+                login_payload = login_response.json()
+                access_token = self._access_token(login_payload)
+                if not access_token:
+                    raise OpenClawAuthenticationError("login failed")
+                profile_response = client.get(
+                    "/api/front/user/queryUserInfo",
+                    headers=self._headers(access_token=access_token),
+                )
+                if profile_response.status_code in {401, 403}:
+                    raise OpenClawAuthenticationError("login failed")
+                profile_response.raise_for_status()
+                profile_payload = profile_response.json()
+        except OpenClawAuthenticationError:
+            raise
+        except (httpx.HTTPError, ValueError) as exc:
+            raise OpenClawAuthenticationError("login failed") from exc
+        data = profile_payload.get("data") if isinstance(profile_payload, dict) else None
+        if not isinstance(profile_payload, dict) or profile_payload.get("status") != 1 or not isinstance(data, dict):
+            raise OpenClawAuthenticationError("login failed")
+        account_id = data.get("id") or data.get("userId") or data.get("loginName") or data.get("mobile") or data.get("email")
+        if account_id in (None, ""):
+            raise OpenClawAuthenticationError("login failed")
+        return OpenClawPasswordIdentity(
+            profile={"id": f"huahuo:{account_id}"},
+            workspaces={"data": [{"id": self.tenant_id, "current": True}]},
+        )
+
+    @staticmethod
+    def _access_token(payload: Any) -> str:
+        if not isinstance(payload, dict) or payload.get("status") != 1:
+            return ""
+        data = payload.get("data")
+        if isinstance(data, dict):
+            return str(data.get("accessToken") or "")
+        return str(payload.get("accessToken") or "")
+
+    @staticmethod
+    def _headers(*, access_token: str | None = None) -> dict[str, str]:
+        headers = {
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json; charset=UTF-8",
+            "Origin": "https://www.huahuoai.com",
+            "Referer": "https://www.huahuoai.com/",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+            ),
+        }
+        if access_token:
+            from .dify_client import huahuo_authorization_header
+
+            headers["Authorization"] = huahuo_authorization_header(access_token)
+        return headers

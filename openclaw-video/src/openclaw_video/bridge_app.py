@@ -36,8 +36,8 @@ from .openclaw_gateway import (
     OpenClawGatewayWsClient,
 )
 from .openclaw_auth import (
-    DifyDatabasePasswordAuthenticator,
     OpenClawAuthenticationError,
+    default_openclaw_authenticator,
 )
 from .phase4_controls import (
     Phase4Config,
@@ -866,7 +866,7 @@ def create_app(
     session_store = session_store or _default_session_store()
     job_store = job_store or _default_job_store()
     gateway = gateway or OpenClawGatewayWsClient.from_environment()
-    openclaw_authenticator = openclaw_authenticator or DifyDatabasePasswordAuthenticator.from_environment()
+    openclaw_authenticator = openclaw_authenticator or default_openclaw_authenticator()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
     enable_test_identity_headers = os.environ.get("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", "").lower() in {"1", "true", "yes"}
     test_identity_secret = os.environ.get("BRIDGE_TEST_IDENTITY_SECRET", "")

@@ -38,6 +38,7 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET: ${BRIDGE_TEST_IDENTITY_SECRET:-}", text)
         self.assertIn("DIFY_AUTH_DB_HOST: ${DIFY_AUTH_DB_HOST:-}", text)
         self.assertIn("DIFY_AUTH_DB_PASSWORD: ${DIFY_AUTH_DB_PASSWORD:-}", text)
+        self.assertIn("OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN: ${OPENCLAW_ENABLE_HUAHUO_PASSWORD_LOGIN:-1}", text)
         self.assertIn("OPENCLAW_LOGIN_ACCOUNT_ALIASES: ${OPENCLAW_LOGIN_ACCOUNT_ALIASES:-}", text)
         self.assertIn("OPENCLAW_SESSION_TTL_SECONDS: ${OPENCLAW_SESSION_TTL_SECONDS:-604800}", text)
         self.assertIn("openclaw-bridge:", text)
