@@ -71,12 +71,12 @@ DIFY_CORE_PASS = {
 
 PRODUCTIZED_UI_ROOT_PASS = {
     "schema": "openclaw-productized-ui-root-deployment-evidence.v1",
-    "deployed_commit": "94fdd79b29a0",
-    "deployed_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
-    "previous_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+    "deployed_commit": "c9aaaa8c6655",
+    "deployed_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+    "previous_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
     "root_runtime": {
-        "current_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
-        "previous_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+        "current_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+        "previous_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
         "dify_core": DIFY_CORE_PASS,
         "public_routes": {
             "dify_root": 200,
@@ -132,7 +132,7 @@ PRODUCTIZED_UI_ROOT_PASS = {
 
 
 PHASE4_BASE = """
-current=/app/bin/openclaw-video/releases/94fdd79b29a0
+current=/app/bin/openclaw-video/releases/c9aaaa8c6655
 tag: phase4-openclaw-ui-workbench-20260607
 tag: phase4-video-link-read-check-20260607
 ai_openclaw_lab=200
@@ -154,13 +154,14 @@ export async function runHuahuoPostLoginAcceptance(browser, options = {}) {
 export async function runOpenClawProductizedLoginAcceptance(browser, options = {}) {
   await browser.tabs.new();
 }
-openclaw-chrome-post-login-acceptance.v1
 openclaw-ui-productized-root-acceptance.v1
 Post-Login Acceptance
-PENDING_LOGIN
+PENDING_CREDENTIALS
 secrets_recorded: false
 headers_recorded: false
 local_storage_values_recorded: false
+account_recorded: false
+password_recorded: false
 """
 
 
@@ -186,7 +187,6 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
             write(
                 repo / "phase4-same-origin-openclaw-lab-deployment-evidence-20260607.md",
                 PHASE4_BASE
-                + '\n"schema": "openclaw-chrome-post-login-acceptance.v1"\n'
                 + '\n"status": "PASS"\n',
             )
             write(repo / "scripts/huahuo_post_login_acceptance_runner.mjs", RUNNER)

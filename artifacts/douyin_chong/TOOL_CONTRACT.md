@@ -112,19 +112,6 @@ It must not print or commit the runtime secret file, raw headers, cookies,
 Authorization values, CSRF values, or full model output. The generated output
 directory is under `tmp/` by default and is ignored by git.
 
-If the sanitized evidence is useful for troubleshooting, promote it only through
-the promotion script:
-
-```bash
-python scripts/promote_douyin_real_sample_evidence.py \
-  --source tmp/douyin-real-samples/<run-id>/sanitized-run.json
-```
-
-The promotion script fails closed if the sample did not succeed, if the runtime
-secret file was missing, if stdout/stderr contents were recorded, if a raw URL is
-present, or if the result hash/schema evidence is missing. It also strips local
-temporary output paths before writing the optional evidence file:
-
-```text
-artifacts/douyin_chong/REAL_SAMPLE_EVIDENCE.json
-```
+Keep troubleshooting output under `tmp/`. Do not promote it into a committed
+`REAL_SAMPLE_EVIDENCE.json` gate file; the current production path is the
+OpenClaw-owned login plus video link-read workflow.

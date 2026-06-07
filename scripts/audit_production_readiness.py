@@ -302,10 +302,10 @@ def _openclaw_productized_ui_login_passed(payload: dict[str, Any]) -> bool:
     )
 
 
-def check_authenticated_dify_baseline(repo: Path) -> GateResult:
+def check_openclaw_owned_login(repo: Path) -> GateResult:
     # The gate id is kept for older preflight callers, but the current
     # acceptance source is OpenClaw productized UI login on the Huahuo user web.
-    # Legacy ai001 console and pre-productized standalone evidence do not pass.
+    # Legacy console and pre-productized standalone evidence do not pass.
     productized_path = (
         repo
         / "artifacts"
@@ -317,23 +317,23 @@ def check_authenticated_dify_baseline(repo: Path) -> GateResult:
         try:
             evidence = json.loads(_read(productized_path))
         except json.JSONDecodeError:
-            return GateResult("authenticated_dify_baseline", "NO_GO", "OpenClaw productized UI evidence is not valid JSON")
+            return GateResult("openclaw_owned_login", "NO_GO", "OpenClaw productized UI evidence is not valid JSON")
         if _openclaw_productized_ui_login_passed(evidence):
             return GateResult(
-                "authenticated_dify_baseline",
+                "openclaw_owned_login",
                 "PASS",
                 "OpenClaw productized UI login and post-login acceptance passed on Huahuo user web",
             )
         return GateResult(
-            "authenticated_dify_baseline",
+            "openclaw_owned_login",
             "NO_GO",
             "OpenClaw productized UI evidence did not pass required login checks",
         )
 
     return GateResult(
-        "authenticated_dify_baseline",
+        "openclaw_owned_login",
         "NO_GO",
-        "missing OpenClaw productized UI acceptance evidence; legacy ai001 and pre-productized evidence no longer satisfy this gate",
+        "missing OpenClaw productized UI acceptance evidence; legacy console and pre-productized evidence no longer satisfy this gate",
     )
 
 
@@ -394,7 +394,7 @@ GATES: tuple[Callable[[Path], GateResult], ...] = (
     check_douyin_artifact,
     check_video_link_read_mode,
     check_phase1_5_exit,
-    check_authenticated_dify_baseline,
+    check_openclaw_owned_login,
     check_production_route_absent,
 )
 

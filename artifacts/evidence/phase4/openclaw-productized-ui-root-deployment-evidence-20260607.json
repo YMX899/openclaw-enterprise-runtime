@@ -1,169 +1,270 @@
-﻿{
-    "schema":  "openclaw-productized-ui-root-deployment-evidence.v1",
-    "captured_at":  "2026-06-07T08:11:03.7113752Z",
-    "deployed_commit":  "94fdd79b29a0",
-    "deployed_release":  "/app/bin/openclaw-video/releases/94fdd79b29a0",
-    "previous_release":  "/app/bin/openclaw-video/releases/f1ba8273e7b6",
-    "root_runtime":  {
-                         "current_release":  "/app/bin/openclaw-video/releases/94fdd79b29a0",
-                         "previous_release":  "/app/bin/openclaw-video/releases/f1ba8273e7b6",
-                         "build_info":  "git_commit: 94fdd79b29a0\ngit_refs: master\nbuilt_at: 2026-06-07T15:52:34+08:00\nbuild_source: codex git archive HEAD",
-                         "dify_core":  {
-                                           "api":  {
-                                                       "name":  "/docker-api-1",
-                                                       "id":  "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
-                                                       "started_at":  "2026-01-05T11:17:20.555976179Z",
-                                                       "status":  "running",
-                                                       "image":  "langgenius/dify-api:1.11.2"
-                                                   },
-                                           "web":  {
-                                                       "name":  "/docker-web-1",
-                                                       "id":  "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
-                                                       "started_at":  "2026-01-05T11:17:19.85303869Z",
-                                                       "status":  "running",
-                                                       "image":  "langgenius/dify-web:1.11.2"
-                                                   },
-                                           "nginx":  {
-                                                         "name":  "/docker-nginx-1",
-                                                         "id":  "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
-                                                         "started_at":  "2026-01-05T11:17:20.937420886Z",
-                                                         "status":  "running",
-                                                         "image":  "nginx:latest"
-                                                     }
-                                       },
-                         "openclaw_bridge":  {
-                                                 "name":  "/openclaw-video-openclaw-bridge-1",
-                                                 "id":  "3a46874d1fe667aa0c6be0ad9e9fd024ec2b3ad22e575f99ed8dd60630b784ba",
-                                                 "started_at":  "2026-06-07T07:54:23.448157846Z",
-                                                 "status":  "running",
-                                                 "image":  "openclaw-video-openclaw-bridge:fast"
-                                             },
-                         "public_routes":  {
-                                               "dify_root":  200,
-                                               "openclaw_lab":  200,
-                                               "openclaw_api_me_unauth":  401,
-                                               "bridge_healthz":  200
-                                           },
-                         "openclaw_ps":  "openclaw-video-openclaw-bridge-1 openclaw-video-openclaw-bridge:fast Up 16 minutes 127.0.0.1:18181-\u003e3000/tcp\nopenclaw-video-video-analysis-worker-1 openclaw-video-video-analysis-worker Up 58 minutes \nopenclaw-video-dify-openclaw-bridge-1 3d23d8c1f2b9 Up 6 hours 127.0.0.1:18182-\u003e3000/tcp\nopenclaw-video-openclaw-gateway-1 openclaw-video-openclaw-gateway Up 18 hours 18789/tcp\nopenclaw-video-bridge-postgres-1 postgres:15-alpine Up 18 hours (healthy) 5432/tcp\ndocker-nginx-1 nginx:latest Up 5 months 0.0.0.0:8081-\u003e8081/tcp, [::]:8081-\u003e8081/tcp, 80/tcp, 0.0.0.0:8443-\u003e8443/tcp, [::]:8443-\u003e8443/tcp\ndocker-api-1 langgenius/dify-api:1.11.2 Up 5 months 5001/tcp\ndocker-web-1 langgenius/dify-web:1.11.2 Up 5 months (unhealthy) 3000/tcp"
-                     },
-    "ui_acceptance":  {
-                          "schema":  "openclaw-ui-productized-root-acceptance.v1",
-                          "target_url":  "https://www.huahuoai.com/ai/openclaw-lab/",
-                          "screenshots":  {
-                                              "desktop":  "artifacts/evidence/phase4/openclaw-ui-productized-root-desktop-20260607.png",
-                                              "mobile":  "artifacts/evidence/phase4/openclaw-ui-productized-root-mobile-20260607.png"
-                                          },
-                          "assertions":  {
-                                             "page_loaded":  true,
-                                             "workflow_present":  true,
-                                             "source_tabs_present":  true,
-                                             "result_cards_present":  true,
-                                             "diagnostics_available":  true,
-                                             "raw_json_secondary":  true,
-                                             "desktop_no_horizontal_overflow":  true,
-                                             "mobile_no_horizontal_overflow":  true,
-                                             "required_ids_present":  true,
-                                             "login_authenticated":  true,
-                                             "session_created":  true,
-                                             "post_login_acceptance_all_pass":  true
-                                         },
-                          "login":  {
-                                        "authenticated":  true,
-                                        "runState":  "Acceptance PASS",
-                                        "passwordCleared":  true,
-                                        "accountRecorded":  false
-                                    },
-                          "session":  {
-                                          "created":  true,
-                                          "idLength":  36
-                                      },
-                          "post_login_acceptance":  {
-                                                        "overall":  "PASS",
-                                                        "checkCount":  16,
-                                                        "checks":  [
-                                                                       {
-                                                                           "name":  "identity_diagnostics",
-                                                                           "status":  200
-                                                                       },
-                                                                       {
-                                                                           "name":  "me",
-                                                                           "status":  200
-                                                                       },
-                                                                       {
-                                                                           "name":  "random_session_404",
-                                                                           "status":  404
-                                                                       },
-                                                                       {
-                                                                           "name":  "random_job_404",
-                                                                           "status":  404
-                                                                       },
-                                                                       {
-                                                                           "name":  "random_result_404",
-                                                                           "status":  404
-                                                                       },
-                                                                       {
-                                                                           "name":  "create_session",
-                                                                           "status":  201
-                                                                       },
-                                                                       {
-                                                                           "name":  "non_allowlisted_domain_submitted",
-                                                                           "status":  202
-                                                                       },
-                                                                       {
-                                                                           "name":  "non_allowlisted_domain_terminal",
-                                                                           "status":  "failed"
-                                                                       },
-                                                                       {
-                                                                           "name":  "localhost_blocked_submitted",
-                                                                           "status":  202
-                                                                       },
-                                                                       {
-                                                                           "name":  "localhost_blocked_terminal",
-                                                                           "status":  "failed"
-                                                                       },
-                                                                       {
-                                                                           "name":  "cloud_metadata_blocked_submitted",
-                                                                           "status":  202
-                                                                       },
-                                                                       {
-                                                                           "name":  "cloud_metadata_blocked_terminal",
-                                                                           "status":  "failed"
-                                                                       },
-                                                                       {
-                                                                           "name":  "tiny_upload_submitted",
-                                                                           "status":  202
-                                                                       },
-                                                                       {
-                                                                           "name":  "tiny_upload_terminal",
-                                                                           "status":  "succeeded"
-                                                                       },
-                                                                       {
-                                                                           "name":  "tiny_upload_result",
-                                                                           "status":  200
-                                                                       },
-                                                                       {
-                                                                           "name":  "messages_visible_to_owner",
-                                                                           "status":  200
-                                                                       }
-                                                                   ],
-                                                        "allPass":  true
-                                                    },
-                          "console_observed":  {
-                                                   "expected_unauth_refresh_401":  true,
-                                                   "favicon_404_seen":  true,
-                                                   "page_js_error_seen":  false
-                                               }
-                      },
-    "policy":  {
-                   "local_test_loop_used":  false,
-                   "authoritative_environment":  "root",
-                   "ui_debug_completed_before_root_testing":  true,
-                   "dify_core_restarted":  false,
-                   "dify_core_rebuilt":  false,
-                   "secrets_recorded":  false,
-                   "account_recorded":  false,
-                   "password_recorded":  false,
-                   "cookies_recorded":  false,
-                   "headers_recorded":  false
-               }
+{
+  "schema": "openclaw-productized-ui-root-deployment-evidence.v1",
+  "captured_at": "2026-06-07T09:44:27.4562896Z",
+  "deployed_commit": "c9aaaa8c6655",
+  "deployed_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+  "previous_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
+  "root_runtime": {
+    "current_release": "/app/bin/openclaw-video/releases/c9aaaa8c6655",
+    "previous_release": "/app/bin/openclaw-video/releases/94fdd79b29a0",
+    "build_info": "schema_version: openclaw-build-info.v1\ngit_commit: c9aaaa8c6655ebdb0bfec4632142a833f21be6f1\ngit_refs: HEAD -> master",
+    "dify_core": {
+      "api": {
+        "name": "/docker-api-1",
+        "id": "1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631",
+        "started_at": "2026-01-05T11:17:20.555976179Z",
+        "status": "running",
+        "image": "langgenius/dify-api:1.11.2"
+      },
+      "web": {
+        "name": "/docker-web-1",
+        "id": "62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36",
+        "started_at": "2026-01-05T11:17:19.85303869Z",
+        "status": "running",
+        "image": "langgenius/dify-web:1.11.2"
+      },
+      "nginx": {
+        "name": "/docker-nginx-1",
+        "id": "8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe",
+        "started_at": "2026-01-05T11:17:20.937420886Z",
+        "status": "running",
+        "image": "nginx:latest"
+      }
+    },
+    "openclaw_bridge": {
+      "name": "/openclaw-video-openclaw-bridge-1",
+      "id": "e01e2c64fecc53ef16652af7c3e37acd12d21bdf3f0a3f00c322faf28dcc6554",
+      "started_at": "2026-06-07T09:23:38.064346066Z",
+      "status": "running",
+      "image": "openclaw-video-openclaw-bridge:fast"
+    },
+    "public_routes": {
+      "dify_root": 200,
+      "openclaw_lab": 200,
+      "openclaw_api_me_unauth": 401,
+      "bridge_healthz": 200,
+      "huahuo_user_web_id_4": 200
+    },
+    "public_smoke": {
+      "summary": "tmp/playwright-public-browser/20260607T092855Z/summary.json",
+      "status": "PASS",
+      "expected_user_web": "https://www.huahuoai.com/?id=4"
+    },
+    "openclaw_ps": "openclaw-video-openclaw-bridge-1 openclaw-video-openclaw-bridge:fast Up 20 minutes 127.0.0.1:18181->3000/tcp\nopenclaw-video-video-analysis-worker-1 openclaw-video-video-analysis-worker Up 3 hours\nopenclaw-video-dify-openclaw-bridge-1 3d23d8c1f2b9 Up 8 hours 127.0.0.1:18182->3000/tcp\nopenclaw-video-openclaw-gateway-1 openclaw-video-openclaw-gateway Up 20 hours 18789/tcp\nopenclaw-video-bridge-postgres-1 postgres:15-alpine Up 20 hours (healthy) 5432/tcp\ndocker-nginx-1 nginx:latest Up 5 months 0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp, 80/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp\ndocker-api-1 langgenius/dify-api:1.11.2 Up 5 months 5001/tcp\ndocker-web-1 langgenius/dify-web:1.11.2 Up 5 months (unhealthy) 3000/tcp"
+  },
+  "ui_acceptance": {
+    "schema": "openclaw-ui-productized-root-acceptance.v1",
+    "captured_at": "2026-06-07T09:44:00.000Z",
+    "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+    "deployed_release": "c9aaaa8c6655",
+    "screenshots": {
+      "desktop": "artifacts/evidence/phase4/openclaw-ui-productized-root-desktop-20260607.png",
+      "mobile": "artifacts/evidence/phase4/openclaw-ui-productized-root-mobile-20260607.png"
+    },
+    "desktop": {
+      "title": "OpenClaw Lab",
+      "url": "https://www.huahuoai.com/ai/openclaw-lab/",
+      "flowCount": 5,
+      "panelCount": 5,
+      "resultCardCount": 3,
+      "diagnosticsOpen": true,
+      "rawResponsePresent": true,
+      "sourceTabsPresent": true,
+      "linkActive": true,
+      "uploadHidden": true,
+      "missingIds": [],
+      "horizontalOverflow": false,
+      "overflowing": [],
+      "viewport": {
+        "width": 1440,
+        "height": 1100,
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      },
+      "uiText": {
+        "authStatus": "Authenticated",
+        "runState": "Acceptance PASS",
+        "authMetric": "Authenticated",
+        "jobMetric": "redacted",
+        "outputMetric": "Acceptance PASS",
+        "analysisMetric": "Acceptance PASS",
+        "sourceMetric": "Awaiting source",
+        "resultMetric": "Session ready",
+        "outputSummary": "Post-login acceptance PASS: 16 checks, 0 failed."
+      },
+      "flow": {
+        "loginDone": true,
+        "sessionDone": true,
+        "sourceActive": true,
+        "analyzeActive": false,
+        "resultActive": false
+      }
+    },
+    "mobile": {
+      "title": "OpenClaw Lab",
+      "url": "https://www.huahuoai.com/ai/openclaw-lab/",
+      "flowCount": 5,
+      "panelCount": 5,
+      "resultCardCount": 3,
+      "diagnosticsOpen": true,
+      "rawResponsePresent": true,
+      "sourceTabsPresent": true,
+      "linkActive": true,
+      "uploadHidden": true,
+      "missingIds": [],
+      "horizontalOverflow": false,
+      "overflowing": [
+        {
+          "tag": "INPUT",
+          "id": "sessionId",
+          "note": "internal UUID text scroll only; document width stayed equal to viewport"
+        }
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 900,
+        "scrollWidth": 390,
+        "clientWidth": 390
+      },
+      "uiText": {
+        "authStatus": "Authenticated",
+        "runState": "Acceptance PASS",
+        "authMetric": "Authenticated",
+        "jobMetric": "redacted",
+        "outputMetric": "Acceptance PASS",
+        "analysisMetric": "Acceptance PASS",
+        "sourceMetric": "Awaiting source",
+        "resultMetric": "Session ready",
+        "outputSummary": "Post-login acceptance PASS: 16 checks, 0 failed."
+      },
+      "flow": {
+        "loginDone": true,
+        "sessionDone": true,
+        "sourceActive": true,
+        "analyzeActive": false,
+        "resultActive": false
+      }
+    },
+    "login": {
+      "authenticated": true,
+      "runState": "Authenticated",
+      "passwordCleared": true,
+      "accountRecorded": false
+    },
+    "session": {
+      "created": true,
+      "idLength": 36
+    },
+    "post_login_acceptance": {
+      "overall": "PASS",
+      "checkCount": 16,
+      "checks": [
+        {
+          "name": "identity_diagnostics",
+          "status": 200
+        },
+        {
+          "name": "me",
+          "status": 200
+        },
+        {
+          "name": "random_session_404",
+          "status": 404
+        },
+        {
+          "name": "random_job_404",
+          "status": 404
+        },
+        {
+          "name": "random_result_404",
+          "status": 404
+        },
+        {
+          "name": "create_session",
+          "status": 201
+        },
+        {
+          "name": "non_allowlisted_domain_submitted",
+          "status": 202
+        },
+        {
+          "name": "non_allowlisted_domain_terminal",
+          "status": "failed"
+        },
+        {
+          "name": "localhost_blocked_submitted",
+          "status": 202
+        },
+        {
+          "name": "localhost_blocked_terminal",
+          "status": "failed"
+        },
+        {
+          "name": "cloud_metadata_blocked_submitted",
+          "status": 202
+        },
+        {
+          "name": "cloud_metadata_blocked_terminal",
+          "status": "failed"
+        },
+        {
+          "name": "tiny_upload_submitted",
+          "status": 202
+        },
+        {
+          "name": "tiny_upload_terminal",
+          "status": "succeeded"
+        },
+        {
+          "name": "tiny_upload_result",
+          "status": 200
+        },
+        {
+          "name": "messages_visible_to_owner",
+          "status": 200
+        }
+      ],
+      "allPass": true
+    },
+    "console_observed": {
+      "expected_security_test_errors_seen": true,
+      "page_js_error_seen": false
+    },
+    "cookies_recorded": false,
+    "secrets_recorded": false,
+    "headers_recorded": false,
+    "local_storage_values_recorded": false,
+    "account_recorded": false,
+    "password_recorded": false,
+    "assertions": {
+      "page_loaded": true,
+      "workflow_present": true,
+      "source_tabs_present": true,
+      "result_cards_present": true,
+      "diagnostics_available": true,
+      "raw_json_secondary": true,
+      "desktop_no_horizontal_overflow": true,
+      "mobile_no_horizontal_overflow": true,
+      "required_ids_present": true,
+      "login_authenticated": true,
+      "session_created": true,
+      "post_login_acceptance_all_pass": true
+    }
+  },
+  "policy": {
+    "local_test_loop_used": false,
+    "authoritative_environment": "root",
+    "ui_debug_completed_before_root_testing": true,
+    "dify_core_restarted": false,
+    "dify_core_rebuilt": false,
+    "dify_web_login_required": false,
+    "openclaw_owned_login_only": true,
+    "video_link_read_mode": true,
+    "douyin_browser_login_required": false,
+    "secrets_recorded": false,
+    "account_recorded": false,
+    "password_recorded": false,
+    "cookies_recorded": false,
+    "headers_recorded": false
+  }
 }

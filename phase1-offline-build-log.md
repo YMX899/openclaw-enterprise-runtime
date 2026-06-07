@@ -563,8 +563,10 @@ Decision:
   SSH aliases. Production Dify host root/AI-01 must not be used as a substitute
   for Phase 1.5 isolated Docker validation.
 
-New handoff:
-  phase1.5-isolated-host-handoff.md
+Retired handoff:
+  phase1.5-isolated-host-handoff.md was removed after the 2026-06-07 root-first,
+  OpenClaw-owned-login and video link-read plan replaced the old isolated-host
+  handoff instructions.
 ```
 
 Updated local evidence after OpenClaw security gate and sanitized real sample

@@ -26,7 +26,7 @@ def pass_audit(*, include_git_clean=False):
         {"gate_id": "douyin_artifact", "status": "PASS"},
         {"gate_id": "video_link_read_mode", "status": "PASS"},
         {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
-        {"gate_id": "authenticated_dify_baseline", "status": "PASS"},
+        {"gate_id": "openclaw_owned_login", "status": "PASS"},
         {"gate_id": "openresty_no_route_change", "status": "PASS"},
     ]
     if include_git_clean:
@@ -37,7 +37,7 @@ def pass_audit(*, include_git_clean=False):
 def no_go_audit(*, include_git_clean=False):
     gates = [
         {"gate_id": "phase1_5_exit_proof", "status": "NO_GO"},
-        {"gate_id": "authenticated_dify_baseline", "status": "NO_GO"},
+        {"gate_id": "openclaw_owned_login", "status": "NO_GO"},
     ]
     if include_git_clean:
         gates.append({"gate_id": "git_clean", "status": "PASS"})
@@ -50,7 +50,7 @@ def no_go_link_mode_and_auth_audit(*, include_git_clean=False):
         {"gate_id": "douyin_artifact", "status": "PASS"},
         {"gate_id": "video_link_read_mode", "status": "NO_GO"},
         {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
-        {"gate_id": "authenticated_dify_baseline", "status": "NO_GO"},
+        {"gate_id": "openclaw_owned_login", "status": "NO_GO"},
         {"gate_id": "openresty_no_route_change", "status": "PASS"},
     ]
     if include_git_clean:
@@ -64,7 +64,7 @@ def no_go_only_link_mode_audit(*, include_git_clean=False):
         {"gate_id": "douyin_artifact", "status": "PASS"},
         {"gate_id": "video_link_read_mode", "status": "NO_GO"},
         {"gate_id": "phase1_5_exit_proof", "status": "PASS"},
-        {"gate_id": "authenticated_dify_baseline", "status": "PASS"},
+        {"gate_id": "openclaw_owned_login", "status": "PASS"},
         {"gate_id": "openresty_no_route_change", "status": "PASS"},
     ]
     if include_git_clean:
@@ -193,7 +193,7 @@ class RootDeployPreflightTests(unittest.TestCase):
         statuses = {check["check_id"]: check for check in report["checks"]}
         self.assertEqual(report["overall"], "NO_GO")
         self.assertEqual(statuses["production_readiness"]["status"], "NO_GO")
-        self.assertIn("authenticated_dify_baseline", statuses["production_readiness"]["evidence"])
+        self.assertIn("openclaw_owned_login", statuses["production_readiness"]["evidence"])
         self.assertIn("video_link_read_mode", statuses["production_readiness"]["evidence"])
 
     def test_link_mode_gate_blocks_when_it_is_the_only_missing_gate(self):

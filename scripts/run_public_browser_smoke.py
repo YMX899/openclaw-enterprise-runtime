@@ -41,7 +41,7 @@ TARGETS = {
         "url": "https://www.huahuoai.com/?id=4",
         "wait_ms": "1000",
         "expected_statuses": {
-            "GET https://www.huahuoai.com/ai/": 200,
+            "GET https://www.huahuoai.com/": 200,
         },
     },
     "huahuo-admin-configuration": {

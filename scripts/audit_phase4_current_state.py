@@ -29,8 +29,8 @@ EXPECTED_DIFY_CORE = {
     "web": ("62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36", "2026-01-05T11:17:19.85303869Z"),
     "nginx": ("8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe", "2026-01-05T11:17:20.937420886Z"),
 }
-EXPECTED_CURRENT_RELEASE = "/app/bin/openclaw-video/releases/94fdd79b29a0"
-EXPECTED_PREVIOUS_RELEASE = "/app/bin/openclaw-video/releases/f1ba8273e7b6"
+EXPECTED_CURRENT_RELEASE = "/app/bin/openclaw-video/releases/c9aaaa8c6655"
+EXPECTED_PREVIOUS_RELEASE = "/app/bin/openclaw-video/releases/94fdd79b29a0"
 
 
 @dataclass(frozen=True)
@@ -223,15 +223,16 @@ def check_chrome_runner_ready(repo: Path) -> GateResult:
         return GateResult("chrome_post_login_runner", "NO_GO", f"missing {path.name}")
     text = _read(path)
     required = [
-        "openclaw-chrome-post-login-acceptance.v1",
         "openclaw-ui-productized-root-acceptance.v1",
         "runHuahuoPostLoginAcceptance",
         "runOpenClawProductizedLoginAcceptance",
         "Post-Login Acceptance",
-        "PENDING_LOGIN",
+        "PENDING_CREDENTIALS",
         "secrets_recorded: false",
         "headers_recorded: false",
         "local_storage_values_recorded: false",
+        "account_recorded: false",
+        "password_recorded: false",
     ]
     missing = [item for item in required if item not in text]
     forbidden = [
@@ -248,7 +249,7 @@ def check_chrome_runner_ready(repo: Path) -> GateResult:
         return GateResult("chrome_post_login_runner", "NO_GO", "runner missing required sanitized markers")
     if found_forbidden:
         return GateResult("chrome_post_login_runner", "NO_GO", "runner contains forbidden browser/session access")
-    return GateResult("chrome_post_login_runner", "PASS", "Chrome helper is present and sanitized")
+    return GateResult("chrome_post_login_runner", "PASS", "OpenClaw login helper is present and sanitized")
 
 
 def check_public_smoke_summary(path: Path | None) -> GateResult:
@@ -365,8 +366,6 @@ def audit(repo: Path, *, smoke_summary: Path | None = None, include_git_clean: b
     statuses = {gate.status for gate in gates}
     if "NO_GO" in statuses:
         overall = "NO_GO"
-    elif "PENDING_LOGIN" in statuses:
-        overall = "PENDING_LOGIN"
     elif "WARN" in statuses:
         overall = "WARN"
     else:

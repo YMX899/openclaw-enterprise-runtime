@@ -145,9 +145,9 @@ OPENCLAW_PRODUCTIZED_ROUTE_PASS = """
 """
 
 
-LEGACY_DIFY_BROWSER_BASELINE_PASS = """
+LEGACY_BROWSER_LOGIN_BASELINE_PASS = """
 {
-  "schema": "dify-authenticated-baseline-browser-acceptance.v1",
+  "schema": "legacy-browser-login-baseline.v1",
   "status": "PASS",
   "authenticated_baseline": true,
   "existing_app_message": true,
@@ -176,7 +176,7 @@ class ProductionReadinessAuditTests(unittest.TestCase):
         self.assertEqual(statuses["douyin_artifact"], "PASS")
         self.assertEqual(statuses["video_link_read_mode"], "PASS")
         self.assertEqual(statuses["phase1_5_exit_proof"], "PASS")
-        self.assertEqual(statuses["authenticated_dify_baseline"], "PASS")
+        self.assertEqual(statuses["openclaw_owned_login"], "PASS")
 
     def test_all_markers_present_is_go(self):
         with TemporaryDirectory() as tmp:
@@ -308,27 +308,27 @@ video link-read mode gate: ADOPTED
         self.assertEqual(result.status, "PASS")
         self.assertIn("link-read mode", result.evidence)
 
-    def test_legacy_dify_console_attempt_no_longer_satisfies_login_gate(self):
+    def test_legacy_console_attempt_no_longer_satisfies_login_gate(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
-            write(repo / "dify-public-baseline.md", "authenticated_baseline: BLOCKED\n")
+            write(repo / "legacy-public-baseline.md", "authenticated_baseline: BLOCKED\n")
             write(
-                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-attempt-20260607.json",
+                repo / "artifacts/evidence/phase4/legacy-console-baseline-attempt-20260607.json",
                 """
 {
-  "schema": "dify-authenticated-baseline-attempt.v1",
+  "schema": "legacy-console-baseline-attempt.v1",
   "status": "blocked",
   "reason": "The current Chrome profile is not authenticated.",
-  "final_url": "https://ai001.huahuoai.com/signin"
+  "final_url": "https://example.invalid/signin"
 }
 """,
             )
 
-            result = audit_module.check_authenticated_dify_baseline(repo)
+            result = audit_module.check_openclaw_owned_login(repo)
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("productized UI acceptance", result.evidence)
-        self.assertIn("legacy ai001", result.evidence)
+        self.assertIn("legacy console", result.evidence)
 
     def test_openclaw_standalone_login_evidence_no_longer_passes(self):
         with TemporaryDirectory() as tmp:
@@ -356,7 +356,7 @@ video link-read mode gate: ADOPTED
 """,
             )
 
-            result = audit_module.check_authenticated_dify_baseline(repo)
+            result = audit_module.check_openclaw_owned_login(repo)
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("pre-productized evidence no longer satisfy", result.evidence)
@@ -369,7 +369,7 @@ video link-read mode gate: ADOPTED
                 OPENCLAW_PRODUCTIZED_UI_PASS,
             )
 
-            result = audit_module.check_authenticated_dify_baseline(repo)
+            result = audit_module.check_openclaw_owned_login(repo)
 
         self.assertEqual(result.status, "PASS")
         self.assertIn("productized UI", result.evidence)
@@ -383,23 +383,23 @@ video link-read mode gate: ADOPTED
                 payload,
             )
 
-            result = audit_module.check_authenticated_dify_baseline(repo)
+            result = audit_module.check_openclaw_owned_login(repo)
 
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("productized UI evidence did not pass", result.evidence)
 
-    def test_legacy_dify_browser_evidence_no_longer_passes_gate(self):
+    def test_legacy_browser_evidence_no_longer_passes_gate(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-browser-acceptance-20260607.json",
-                LEGACY_DIFY_BROWSER_BASELINE_PASS,
+                repo / "artifacts/evidence/phase4/legacy-browser-login-baseline-20260607.json",
+                LEGACY_BROWSER_LOGIN_BASELINE_PASS,
             )
 
-            result = audit_module.check_authenticated_dify_baseline(repo)
+            result = audit_module.check_openclaw_owned_login(repo)
 
         self.assertEqual(result.status, "NO_GO")
-        self.assertIn("legacy ai001", result.evidence)
+        self.assertIn("legacy console", result.evidence)
 
     def test_productized_route_evidence_allows_current_openclaw_route(self):
         with TemporaryDirectory() as tmp:
