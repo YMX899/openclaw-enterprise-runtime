@@ -80,6 +80,28 @@ decision: approve_exception
 """
 
 
+DIFY_BROWSER_BASELINE_PASS = """
+{
+  "schema": "dify-authenticated-baseline-browser-acceptance.v1",
+  "status": "PASS",
+  "authenticated_baseline": true,
+  "existing_app_message": true,
+  "streaming_reply": true,
+  "refresh": true,
+  "history": true,
+  "logout": true,
+  "profile_401": true,
+  "new_5xx_none": true,
+  "cookies_recorded": false,
+  "headers_recorded": false,
+  "local_storage_values_recorded": false,
+  "session_storage_values_recorded": false,
+  "tokens_recorded": false,
+  "passwords_recorded": false
+}
+"""
+
+
 class ProductionReadinessAuditTests(unittest.TestCase):
     def test_current_repo_is_no_go(self):
         report = audit_module.audit(Path(__file__).resolve().parents[2])
@@ -290,6 +312,33 @@ new 5xx: NONE
         self.assertEqual(result.status, "NO_GO")
         self.assertIn("authenticated public Dify baseline blocked", result.evidence)
         self.assertIn("signin", result.evidence)
+
+    def test_dify_authenticated_browser_evidence_can_pass(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(
+                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-browser-acceptance-20260607.json",
+                DIFY_BROWSER_BASELINE_PASS,
+            )
+
+            result = audit_module.check_authenticated_dify_baseline(repo)
+
+        self.assertEqual(result.status, "PASS")
+        self.assertIn("browser evidence", result.evidence)
+
+    def test_dify_authenticated_browser_evidence_rejects_sensitive_recording(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            payload = DIFY_BROWSER_BASELINE_PASS.replace('"cookies_recorded": false', '"cookies_recorded": true')
+            write(
+                repo / "artifacts/evidence/phase4/dify-authenticated-baseline-browser-acceptance-20260607.json",
+                payload,
+            )
+
+            result = audit_module.check_authenticated_dify_baseline(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("did not pass", result.evidence)
 
     def test_openclaw_security_requires_triage_when_decision_approved(self):
         with TemporaryDirectory() as tmp:

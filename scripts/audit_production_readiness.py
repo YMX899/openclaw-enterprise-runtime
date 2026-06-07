@@ -214,6 +214,36 @@ def check_phase1_5_exit(repo: Path) -> GateResult:
 
 
 def check_authenticated_dify_baseline(repo: Path) -> GateResult:
+    evidence_path = repo / "artifacts" / "evidence" / "phase4" / "dify-authenticated-baseline-browser-acceptance-20260607.json"
+    if evidence_path.exists():
+        try:
+            evidence = json.loads(_read(evidence_path))
+        except json.JSONDecodeError:
+            return GateResult("authenticated_dify_baseline", "NO_GO", "Dify baseline evidence is not valid JSON")
+        safe_flags = (
+            evidence.get("cookies_recorded") is False
+            and evidence.get("headers_recorded") is False
+            and evidence.get("local_storage_values_recorded") is False
+            and evidence.get("session_storage_values_recorded") is False
+            and evidence.get("tokens_recorded") is False
+            and evidence.get("passwords_recorded") is False
+        )
+        if (
+            evidence.get("schema") == "dify-authenticated-baseline-browser-acceptance.v1"
+            and evidence.get("status") == "PASS"
+            and evidence.get("authenticated_baseline") is True
+            and evidence.get("existing_app_message") is True
+            and evidence.get("streaming_reply") is True
+            and evidence.get("refresh") is True
+            and evidence.get("history") is True
+            and evidence.get("logout") is True
+            and evidence.get("profile_401") is True
+            and evidence.get("new_5xx_none") is True
+            and safe_flags
+        ):
+            return GateResult("authenticated_dify_baseline", "PASS", "authenticated Dify browser evidence passed")
+        return GateResult("authenticated_dify_baseline", "NO_GO", "authenticated Dify browser evidence did not pass required checks")
+
     path = repo / "dify-public-baseline.md"
     if not path.exists():
         return GateResult("authenticated_dify_baseline", "NO_GO", f"missing {path}")
