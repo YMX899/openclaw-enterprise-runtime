@@ -1199,3 +1199,121 @@ password, model key, database URL, private key, .env content or full request
 header was recorded.
 ```
 ```
+
+## Phase 4 Video Link Read Check Deployment - 2026-06-07
+
+Scope:
+
+```text
+scheme change: Douyin account login abandoned; video link-read mode active
+OpenClaw page: standalone account/password login only
+Dify Web login: not required for this OpenClaw flow
+root deployment: direct sidecar deployment allowed under relaxed development gates
+```
+
+Version:
+
+```text
+commit=f1ba8273e7b64a918ab7f8b1bd2c666dfc52f8cf
+tag: phase4-video-link-read-check-20260607
+bundle: tmp\root-private-sidecar-bundles\openclaw-root-private-sidecar-f1ba8273e7b6.tar.gz
+bundle_sha256=f857cb869511f0f8e86ddcfeab759c737978d62f93884fdc4a2876be87964b8e
+previous=/app/bin/openclaw-video/releases/bea6534980dc
+current=/app/bin/openclaw-video/releases/f1ba8273e7b6
+```
+
+Root deployment result:
+
+```text
+bridge_fast_rebuild=PASS
+release_has_probe=yes
+release_has_vendor=yes
+health={"status":"ok","component":"openclaw-bridge","dify_api_base":"http://api:5001","identity_provider":"huahuo_front"}
+ai_openclaw_lab=200
+openclaw_lab=200
+openclaw_api_me_unauth=401
+read_check_unauth_status=401
+huahuo_ai=200
+```
+
+Dify core container invariant after deployment:
+
+```text
+/docker-api-1 1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631 2026-01-05T11:17:20.555976179Z running
+/docker-web-1 62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36 2026-01-05T11:17:19.85303869Z running
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe 2026-01-05T11:17:20.937420886Z running
+```
+
+Chrome OpenClaw read-check evidence:
+
+```text
+page_url=https://www.huahuoai.com/ai/openclaw-lab/
+page_title=OpenClaw Lab
+auth_status=Authenticated
+read_link_button_present=true
+video link read check PASS
+api_status=200
+schema_version=openclaw-video-link-read-check.v1
+canonical_host=www.douyin.com
+resolver=douyin_chong.UniversalVideoResolver
+direct_video_candidate_count=2
+direct_video_host_present=true
+playwm_host_present=true
+content_type_present=true
+duration_seconds_present=true
+size_bytes_present=true
+eligible_for_model_analysis=true
+run_state=Link readable
+summary=Video link read check PASS: 2 direct candidates, model not invoked.
+console_error_count=0
+```
+
+Sanitization boundary:
+
+```text
+raw_input_url_leaked=false
+raw_url_recorded=false
+direct_video_url_recorded=false
+direct_mp4_or_m3u8_leaked=false
+account_recorded=false
+password_recorded=false
+cookies_recorded=false
+headers_recorded=false
+tokens_recorded=false
+model_invoked=false
+```
+
+Fresh public browser smoke:
+
+```text
+Command: python scripts\run_public_browser_smoke.py --timeout-seconds 90
+Run dir: tmp\playwright-public-browser\20260607T065801Z
+Overall: PASS
+Targets: openclaw-standalone-lab, openclaw-lab, openclaw-api-me-unauthenticated,
+huahuo-user-web, huahuo-admin-configuration
+http_5xx_count: 0
+gateway_direct_request_count: 0
+token_url_leak_count: 0
+headers_recorded: false
+bodies_recorded: false
+secrets_recorded: false
+```
+
+UI design agent evidence:
+
+```text
+review: artifacts/evidence/phase4/openclaw-ui-design-director-review-20260607.md
+desktop screenshot: artifacts/evidence/phase4/openclaw-ui-screenshot-public-20260607.png
+mobile screenshot: artifacts/evidence/phase4/openclaw-ui-screenshot-public-mobile-20260607.png
+current UI score: 70/100
+conclusion: functionally acceptable for Phase 4, not yet full iOS-level visual polish
+next UI-only path: stepper workflow, Diagnostics drawer, Raw JSON detail tab, result summary cards
+```
+
+Current remaining boundary:
+
+```text
+The video link-read stage is now independently proven on root and Chrome.
+Deep model analysis was intentionally not invoked by read-check.
+The earlier Ark 401 remains an external model-credential/configuration gate for full analysis jobs, not a Douyin-login, Dify-Web-login, or REAL_SAMPLE_EVIDENCE blocker.
+```

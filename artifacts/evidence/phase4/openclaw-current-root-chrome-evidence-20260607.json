@@ -1,9 +1,12 @@
 {
   "schema": "openclaw-current-root-chrome-evidence.v1",
-  "created_at": "2026-06-07T06:21:54.6944170Z",
+  "created_at": "2026-06-07T06:58:30Z",
   "status": "PASS",
   "root_runtime": {
-    "current_release": "/app/bin/openclaw-video/releases/bea6534980dc",
+    "current_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+    "previous_release": "/app/bin/openclaw-video/releases/bea6534980dc",
+    "release_has_video_link_probe": true,
+    "release_has_douyin_chong_vendor": true,
     "gateway_version": "OpenClaw 2026.3.13 (61d171a)",
     "dify_core": {
       "api": {
@@ -36,7 +39,7 @@
   },
   "chrome_visible_acceptance": {
     "schema": "openclaw-current-chrome-visible-acceptance.v1",
-    "created_at": "2026-06-07T06:16:49.629Z",
+    "created_at": "2026-06-07T06:57:40Z",
     "lab_url": "https://www.huahuoai.com/ai/openclaw-lab/",
     "status": "PASS",
     "lab_has_login_form": true,
@@ -77,11 +80,50 @@
     "local_storage_values_recorded": false
   },
   "public_smoke": {
-    "summary_path": "tmp\\playwright-public-browser\\20260607T061801Z\\summary.json",
+    "summary_path": "tmp\\playwright-public-browser\\20260607T065801Z\\summary.json",
     "status": "PASS",
     "secrets_recorded": false,
     "headers_recorded": false,
     "bodies_recorded": false
+  },
+  "video_link_read_check": {
+    "schema": "openclaw-video-link-read-check-root-chrome-evidence.v1",
+    "api_status": 200,
+    "auth_status": "Authenticated",
+    "auth_metric": "Authenticated",
+    "read_link_button_present": true,
+    "schema_version": "openclaw-video-link-read-check.v1",
+    "status": "PASS",
+    "canonical_host": "www.douyin.com",
+    "redirect_hop_count": 0,
+    "redirect_chain_hosts": [
+      "www.douyin.com"
+    ],
+    "resolved_ip_count": 18,
+    "resolver": "douyin_chong.UniversalVideoResolver",
+    "video_id_present": true,
+    "direct_video_candidate_count": 2,
+    "direct_video_host_present": true,
+    "playwm_host_present": true,
+    "content_type_present": true,
+    "duration_seconds_present": true,
+    "size_bytes_present": true,
+    "video_url_source": "direct",
+    "eligible_for_model_analysis": true,
+    "raw_url_recorded": false,
+    "direct_video_url_recorded": false,
+    "cookies_recorded": false,
+    "headers_recorded": false,
+    "tokens_recorded": false,
+    "model_invoked": false,
+    "raw_input_url_leaked": false,
+    "test_account_leaked": false,
+    "password_leaked": false,
+    "direct_mp4_or_m3u8_leaked": false,
+    "cookie_value_recorded": false,
+    "authorization_word_in_output": false,
+    "summary_text": "Video link read check PASS: 2 direct candidates, model not invoked.",
+    "run_state": "Link readable"
   },
   "video_link_read_scope": {
     "mode": "ADOPTED",
@@ -89,6 +131,7 @@
     "real_sample_evidence_required": false,
     "runtime_path_verified_by_tests": true,
     "latest_real_sample_attempt": "blocked_by_model_auth_401",
+    "latest_read_check": "PASS",
     "model_auth_is_current_external_configuration_gate": true,
     "raw_url_recorded": false,
     "secret_file_contents_recorded": false,

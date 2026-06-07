@@ -31,6 +31,7 @@ EXPECTED_DIFY_CORE = {
     "web": ("62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36", "2026-01-05T11:17:19.85303869Z"),
     "nginx": ("8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe", "2026-01-05T11:17:20.937420886Z"),
 }
+EXPECTED_CURRENT_RELEASE = "/app/bin/openclaw-video/releases/f1ba8273e7b6"
 
 
 @dataclass(frozen=True)
@@ -81,11 +82,14 @@ def check_phase4_deployment_evidence(repo: Path) -> GateResult:
         return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {path.name}")
     text = _read(path)
     required = [
-        r"current=/app/bin/openclaw-video/releases/bea6534980dc",
+        r"current=/app/bin/openclaw-video/releases/f1ba8273e7b6",
         r"tag:\s*phase4-openclaw-ui-workbench-20260607",
+        r"tag:\s*phase4-video-link-read-check-20260607",
         r"ai_openclaw_lab=200",
         r"openclaw_lab=200",
         r"openclaw_api_me_unauth=401",
+        r"read_check_unauth_status=401",
+        r"video link read check PASS",
         r"huahuo_ai=200",
         r"docker-api-1\s+.*2026-01-05T11:17:20\.555976179Z\s+running",
         r"docker-web-1\s+.*2026-01-05T11:17:19\.85303869Z\s+running",
@@ -114,6 +118,7 @@ def check_current_root_chrome_evidence(repo: Path) -> GateResult:
     dify_core = root.get("dify_core") or {}
     smoke = payload.get("public_smoke") or {}
     video_scope = payload.get("video_link_read_scope") or {}
+    read_check = payload.get("video_link_read_check") or {}
 
     dify_ok = True
     for name, (expected_id, expected_started_at) in EXPECTED_DIFY_CORE.items():
@@ -137,12 +142,27 @@ def check_current_root_chrome_evidence(repo: Path) -> GateResult:
         and video_scope.get("headers_recorded") is False
         and video_scope.get("cookies_recorded") is False
         and video_scope.get("tokens_recorded") is False
+        and read_check.get("raw_url_recorded") is False
+        and read_check.get("direct_video_url_recorded") is False
+        and read_check.get("cookies_recorded") is False
+        and read_check.get("headers_recorded") is False
+        and read_check.get("tokens_recorded") is False
+        and read_check.get("model_invoked") is False
+        and read_check.get("raw_input_url_leaked") is False
+        and read_check.get("test_account_leaked") is False
+        and read_check.get("password_leaked") is False
+        and read_check.get("direct_mp4_or_m3u8_leaked") is False
+        and read_check.get("cookie_value_recorded") is False
+        and read_check.get("authorization_word_in_output") is False
     )
 
     checks = [
         payload.get("schema") == "openclaw-current-root-chrome-evidence.v1",
         payload.get("status") == "PASS",
-        root.get("current_release") == "/app/bin/openclaw-video/releases/bea6534980dc",
+        root.get("current_release") == EXPECTED_CURRENT_RELEASE,
+        root.get("previous_release") == "/app/bin/openclaw-video/releases/bea6534980dc",
+        root.get("release_has_video_link_probe") is True,
+        root.get("release_has_douyin_chong_vendor") is True,
         root.get("gateway_version") == "OpenClaw 2026.3.13 (61d171a)",
         dify_ok,
         "127.0.0.1:18181" in str(ports.get("bridge", "")),
@@ -167,6 +187,21 @@ def check_current_root_chrome_evidence(repo: Path) -> GateResult:
         video_scope.get("douyin_login_required") is False,
         video_scope.get("real_sample_evidence_required") is False,
         video_scope.get("runtime_path_verified_by_tests") is True,
+        video_scope.get("latest_read_check") == "PASS",
+        read_check.get("schema") == "openclaw-video-link-read-check-root-chrome-evidence.v1",
+        read_check.get("api_status") == 200,
+        read_check.get("auth_status") == "Authenticated",
+        read_check.get("read_link_button_present") is True,
+        read_check.get("schema_version") == "openclaw-video-link-read-check.v1",
+        read_check.get("status") == "PASS",
+        read_check.get("canonical_host") == "www.douyin.com",
+        read_check.get("direct_video_candidate_count", 0) >= 1,
+        read_check.get("direct_video_host_present") is True,
+        read_check.get("playwm_host_present") is True,
+        read_check.get("content_type_present") is True,
+        read_check.get("duration_seconds_present") is True,
+        read_check.get("size_bytes_present") is True,
+        read_check.get("eligible_for_model_analysis") is True,
         safe_flags,
     ]
     if not all(checks):

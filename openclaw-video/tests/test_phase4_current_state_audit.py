@@ -55,7 +55,10 @@ CURRENT_ROOT_CHROME_PASS = {
     "schema": "openclaw-current-root-chrome-evidence.v1",
     "status": "PASS",
     "root_runtime": {
-        "current_release": "/app/bin/openclaw-video/releases/bea6534980dc",
+        "current_release": "/app/bin/openclaw-video/releases/f1ba8273e7b6",
+        "previous_release": "/app/bin/openclaw-video/releases/bea6534980dc",
+        "release_has_video_link_probe": True,
+        "release_has_douyin_chong_vendor": True,
         "gateway_version": "OpenClaw 2026.3.13 (61d171a)",
         "dify_core": {
             "api": {
@@ -112,11 +115,47 @@ CURRENT_ROOT_CHROME_PASS = {
         "headers_recorded": False,
         "bodies_recorded": False,
     },
+    "video_link_read_check": {
+        "schema": "openclaw-video-link-read-check-root-chrome-evidence.v1",
+        "api_status": 200,
+        "auth_status": "Authenticated",
+        "auth_metric": "Authenticated",
+        "read_link_button_present": True,
+        "schema_version": "openclaw-video-link-read-check.v1",
+        "status": "PASS",
+        "canonical_host": "www.douyin.com",
+        "redirect_hop_count": 0,
+        "redirect_chain_hosts": ["www.douyin.com"],
+        "resolved_ip_count": 18,
+        "resolver": "douyin_chong.UniversalVideoResolver",
+        "video_id_present": True,
+        "direct_video_candidate_count": 2,
+        "direct_video_host_present": True,
+        "playwm_host_present": True,
+        "content_type_present": True,
+        "duration_seconds_present": True,
+        "size_bytes_present": True,
+        "video_url_source": "direct",
+        "eligible_for_model_analysis": True,
+        "raw_url_recorded": False,
+        "direct_video_url_recorded": False,
+        "cookies_recorded": False,
+        "headers_recorded": False,
+        "tokens_recorded": False,
+        "model_invoked": False,
+        "raw_input_url_leaked": False,
+        "test_account_leaked": False,
+        "password_leaked": False,
+        "direct_mp4_or_m3u8_leaked": False,
+        "cookie_value_recorded": False,
+        "authorization_word_in_output": False,
+    },
     "video_link_read_scope": {
         "mode": "ADOPTED",
         "douyin_login_required": False,
         "real_sample_evidence_required": False,
         "runtime_path_verified_by_tests": True,
+        "latest_read_check": "PASS",
         "raw_url_recorded": False,
         "secret_file_contents_recorded": False,
         "headers_recorded": False,
@@ -127,11 +166,14 @@ CURRENT_ROOT_CHROME_PASS = {
 
 
 PHASE4_BASE = """
-current=/app/bin/openclaw-video/releases/bea6534980dc
+current=/app/bin/openclaw-video/releases/f1ba8273e7b6
 tag: phase4-openclaw-ui-workbench-20260607
+tag: phase4-video-link-read-check-20260607
 ai_openclaw_lab=200
 openclaw_lab=200
 openclaw_api_me_unauth=401
+read_check_unauth_status=401
+video link read check PASS
 huahuo_ai=200
 /docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
 /docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running
