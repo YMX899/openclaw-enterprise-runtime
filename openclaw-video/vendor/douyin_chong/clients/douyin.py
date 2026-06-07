@@ -139,6 +139,7 @@ class DouyinVideoResolver:
     def _extract_video_id(self, url: str) -> str:
         patterns = (
             r"/video/(\d+)",
+            r"/note/(\d+)",
             r"/share/video/(\d+)",
             r"[?&]modal_id=(\d+)",
             r"[?&]vid=(\d+)",
@@ -246,7 +247,15 @@ class DouyinVideoResolver:
         normalized_url: str,
         share_url: str,
     ) -> list[str]:
-        video_id = self._extract_video_id(source_url)
+        last_error: Exception | None = None
+        for candidate_url in (source_url, normalized_url, share_url):
+            try:
+                video_id = self._extract_video_id(candidate_url)
+                break
+            except ValueError as exc:
+                last_error = exc
+        else:
+            raise ValueError(f"Could not extract video id from URL: {source_url}") from last_error
         candidates = [
             share_url,
             normalized_url,

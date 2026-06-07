@@ -96,8 +96,13 @@ services:
         APT_DEBIAN_MIRROR: ${APT_DEBIAN_MIRROR:-http://deb.debian.org/debian}
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://deb.debian.org/debian-security}
         NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     environment:
       DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
+      DOUYIN_CHONG_PYTHONPATH: /app/vendor
+      MAX_DOWNLOAD_BYTES: "536870912"
+      MAX_VIDEO_DURATION_SECONDS: "60"
+      MAX_VIDEO_FRAMES: "1200"
     volumes:
       - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
       - ./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro

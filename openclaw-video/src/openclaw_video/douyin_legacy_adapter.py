@@ -8,8 +8,11 @@ import os
 from pathlib import Path
 import sys
 from typing import Any, Callable
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
+from .url_guard import UrlRejected, validate_video_url_with_redirects
 
 
 class LegacyAdapterError(RuntimeError):
@@ -79,6 +82,48 @@ def _size_bytes(video: Any) -> int | None:
     return None
 
 
+def _canonicalize_input_for_resolver(input_url: str) -> str:
+    host = (urlparse(input_url).hostname or "").lower()
+    if host != "v.douyin.com":
+        return input_url
+    try:
+        return validate_video_url_with_redirects(input_url).canonical
+    except UrlRejected as exc:
+        raise LegacyAdapterError("video URL failed redirect validation") from exc
+
+
+def _probe_stream_size_bytes(url: str, *, max_bytes: int, timeout_seconds: float = 30.0) -> int:
+    if not url:
+        raise LegacyAdapterError("video size is unavailable")
+    request = Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+            ),
+            "Referer": "https://www.douyin.com/",
+        },
+    )
+    total = 0
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise LegacyAdapterError("video size exceeds limit")
+    except LegacyAdapterError:
+        raise
+    except Exception as exc:
+        raise LegacyAdapterError("video size is unavailable") from exc
+    if total <= 0:
+        raise LegacyAdapterError("video size is unavailable")
+    return total
+
+
 def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
     duration = _duration_seconds(video)
     if duration is None:
@@ -90,7 +135,11 @@ def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
         raise LegacyAdapterError("video frame budget exceeds limit")
     size = _size_bytes(video)
     if size is None:
-        raise LegacyAdapterError("video size is unavailable")
+        size = _probe_stream_size_bytes(str(getattr(video, "video_url", "") or ""), max_bytes=limits.max_download_bytes)
+        try:
+            object.__setattr__(video, "size_mb", size / 1024 / 1024)
+        except Exception:
+            pass
     if size > limits.max_download_bytes:
         raise LegacyAdapterError("video size exceeds limit")
 
@@ -245,7 +294,8 @@ def run_adapter(
         read_timeout=args.read_timeout,
         retries=args.retries,
     )
-    video = UniversalVideoResolver().resolve(args.input_url)
+    resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
+    video = UniversalVideoResolver().resolve(resolver_input_url)
     _enforce_limits(video, limits)
     video_urls = [
         url

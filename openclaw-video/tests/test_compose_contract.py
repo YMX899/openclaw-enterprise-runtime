@@ -1,7 +1,6 @@
 from pathlib import Path
 from hashlib import sha256
 import json
-import subprocess
 import unittest
 
 
@@ -89,6 +88,10 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("refusing to use unsafe OpenClaw home directory", entrypoint)
         self.assertIn('mkdir -p "$HOME/.openclaw" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME"', entrypoint)
         self.assertIn('chown -R "$APP_UID:$APP_GID" "$HOME"', entrypoint)
+        self.assertIn('DOUYIN_CHONG_PYTHONPATH="${DOUYIN_CHONG_PYTHONPATH:-/app/vendor}"', entrypoint)
+        self.assertIn('MAX_DOWNLOAD_BYTES="${MAX_DOWNLOAD_BYTES:-536870912}"', entrypoint)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS="${MAX_VIDEO_DURATION_SECONDS:-60}"', entrypoint)
+        self.assertIn('MAX_VIDEO_FRAMES="${MAX_VIDEO_FRAMES:-1200}"', entrypoint)
         self.assertIn("HOME=/var/lib/openclaw", dockerfile)
         self.assertIn("XDG_CONFIG_HOME=/var/lib/openclaw/.config", dockerfile)
         self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
@@ -309,6 +312,14 @@ class ComposeContractTests(unittest.TestCase):
             compose,
         )
         self.assertIn("NPM_CONFIG_REGISTRY: ${NPM_CONFIG_REGISTRY:-}", compose)
+        self.assertIn("PIP_INDEX_URL: ${PIP_INDEX_URL:-}", compose)
+        self.assertIn("install -y --no-install-recommends ca-certificates git openssh-client python3 python3-pip", gateway)
+        self.assertIn("COPY pyproject.toml /app/", gateway)
+        self.assertIn("COPY src /app/src", gateway)
+        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", gateway)
+        self.assertIn("DOUYIN_CHONG_PYTHONPATH=/app/vendor", gateway)
+        self.assertIn("openclaw-agent-video-analyze --help", gateway)
+        self.assertIn("openclaw-agent-video-analyze", (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertNotIn("public.ecr.aws", compose)
         self.assertNotIn("pypi.tuna.tsinghua.edu.cn", compose)
 
@@ -354,14 +365,7 @@ class ComposeContractTests(unittest.TestCase):
         self.assertEqual(set(entries), expected_files)
         for relative, expected_digest in entries.items():
             path = vendor_root / Path(relative)
-            try:
-                data = subprocess.check_output(
-                    ["git", "show", f"HEAD:openclaw-video/vendor/douyin_chong/{relative}"],
-                    cwd=Path(__file__).resolve().parents[2],
-                    stderr=subprocess.DEVNULL,
-                )
-            except (FileNotFoundError, subprocess.CalledProcessError):
-                data = path.read_bytes()
+            data = path.read_bytes()
             actual_digest = sha256(data).hexdigest()
             with self.subTest(relative=relative):
                 self.assertEqual(actual_digest, expected_digest)

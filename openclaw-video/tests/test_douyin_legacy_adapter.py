@@ -6,7 +6,12 @@ import unittest
 from unittest.mock import patch
 
 import openclaw_video.douyin_legacy_adapter as adapter_module
-from openclaw_video.douyin_legacy_adapter import LegacyAdapterError, _load_legacy_components, run_adapter
+from openclaw_video.douyin_legacy_adapter import (
+    LegacyAdapterError,
+    _canonicalize_input_for_resolver,
+    _load_legacy_components,
+    run_adapter,
+)
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,47 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(AppConfig.__name__, "AppConfig")
         self.assertEqual(UniversalVideoResolver.__name__, "UniversalVideoResolver")
         self.assertEqual(ArkVideoClient.__name__, "ArkVideoClient")
+
+    def test_vendored_douyin_resolver_builds_shortlink_candidates_from_redirect_url(self):
+        from douyin_chong.clients.douyin import DouyinVideoResolver
+
+        resolver = DouyinVideoResolver()
+        candidates = resolver._build_page_candidates(
+            source_url="https://v.douyin.com/lx-ONOPrxjU/",
+            normalized_url="https://v.douyin.com/lx-ONOPrxjU/",
+            share_url="https://www.iesdouyin.com/share/video/7648317087237562266/?from_ssr=1",
+        )
+
+        self.assertIn("https://www.iesdouyin.com/share/video/7648317087237562266/", candidates)
+
+    def test_vendored_douyin_resolver_extracts_note_id(self):
+        from douyin_chong.clients.douyin import DouyinVideoResolver
+
+        resolver = DouyinVideoResolver()
+
+        self.assertEqual(
+            resolver._extract_video_id("https://www.douyin.com/note/7648317087237562266?previous_page=web_code_link"),
+            "7648317087237562266",
+        )
+
+    def test_shortlink_is_canonicalized_before_legacy_resolver(self):
+        with patch(
+            "openclaw_video.douyin_legacy_adapter.validate_video_url_with_redirects"
+        ) as validator:
+            validator.return_value = type(
+                "Validated",
+                (),
+                {"canonical": "https://www.iesdouyin.com/share/video/7648317087237562266/?from_ssr=1"},
+            )()
+            self.assertEqual(
+                _canonicalize_input_for_resolver("https://v.douyin.com/lx-ONOPrxjU/"),
+                "https://www.iesdouyin.com/share/video/7648317087237562266/?from_ssr=1",
+            )
+
+        self.assertEqual(
+            _canonicalize_input_for_resolver("https://www.douyin.com/video/7648317087237562266"),
+            "https://www.douyin.com/video/7648317087237562266",
+        )
 
     def test_writes_committed_result_schema_without_default_env(self):
         with TemporaryDirectory() as tmp:
@@ -178,6 +224,58 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     ],
                     component_loader=fake_components,
                 )
+
+    def test_unknown_size_uses_bounded_stream_probe(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            output_json = Path(tmp) / "result.json"
+            FakeResolver.video = FakeVideo(size_mb=None)
+
+            with patch(
+                "openclaw_video.douyin_legacy_adapter._probe_stream_size_bytes",
+                return_value=1536,
+            ) as probe:
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(output_json),
+                        "--max-bytes", "2000000",
+                        "--max-duration-seconds", "60",
+                        "--max-frames", "1200",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        probe.assert_called_once_with("https://video.example/video.mp4", max_bytes=2000000)
+        self.assertEqual(payload["raw_tool_result"]["size_bytes"], 1536)
+        self.assertEqual(payload["schema_version"], "openclaw-video-result.v1")
+
+    def test_unknown_size_probe_failure_fails_closed(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            FakeResolver.video = FakeVideo(size_mb=None)
+
+            with patch(
+                "openclaw_video.douyin_legacy_adapter._probe_stream_size_bytes",
+                side_effect=LegacyAdapterError("video size exceeds limit"),
+            ):
+                with self.assertRaises(LegacyAdapterError):
+                    run_adapter(
+                        [
+                            "--input-url", "https://www.douyin.com/video/1",
+                            "--output-json", str(Path(tmp) / "result.json"),
+                            "--max-bytes", "2000000",
+                            "--max-duration-seconds", "60",
+                            "--max-frames", "1200",
+                            "--env-file", str(env_file),
+                            "--no-shell",
+                        ],
+                        component_loader=fake_components,
+                    )
 
     def test_empty_legacy_output_fails_closed(self):
         with TemporaryDirectory() as tmp:

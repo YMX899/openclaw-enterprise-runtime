@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 openclaw-douyin-adapter = "openclaw_video.douyin_legacy_adapter:main"
+openclaw-agent-video-analyze = "openclaw_video.agent_video_cli:main"
 
 [project.optional-dependencies]
 dev = [
