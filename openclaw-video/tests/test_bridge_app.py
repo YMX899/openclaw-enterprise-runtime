@@ -91,6 +91,43 @@ class FailingProbeHuahuoClient:
         }
 
 
+class RefreshingDifyClient:
+    async def resolve_identity(self, headers):
+        from openclaw_video.dify_client import DifyIdentityContext
+
+        return DifyIdentityContext(
+            profile={"id": "account-a"},
+            workspaces={"data": [{"id": "tenant-a", "current": True}]},
+            set_cookie_headers=(
+                "access_token=fresh-access; Path=/; HttpOnly",
+                "refresh_token=fresh-refresh; Path=/; HttpOnly",
+            ),
+            refreshed=True,
+        )
+
+    async def safe_identity_probe(self, headers):
+        return {
+            "provider": "dify",
+            "identity_headers_present": True,
+            "cookie_names": ["refresh_token"],
+            "authorization_present": False,
+            "authorization_generated_from_cookie": False,
+            "csrf_header_present": False,
+            "profile_http_status": 401,
+            "profile_body_keys": [],
+            "workspaces_http_status": 401,
+            "workspaces_body_keys": [],
+            "refresh_attempted": True,
+            "refresh_http_status": 200,
+            "refresh_set_cookie_names": ["access_token", "refresh_token"],
+            "retry_profile_http_status": 200,
+            "retry_profile_body_keys": ["id"],
+            "retry_workspaces_http_status": 200,
+            "retry_workspaces_body_keys": ["data"],
+            "error_stage": None,
+        }
+
+
 class FakeGateway:
     def __init__(self):
         self.requests = []
@@ -444,6 +481,57 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(len(body["principal_id"]), 64)
         self.assertNotIn("account-a", response.text)
         self.assertNotIn("tenant-a", response.text)
+
+    def test_dify_refresh_cookies_are_forwarded_without_echoing_values(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=RefreshingDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.get(
+            "/console/api/openclaw-api/me",
+            headers={"Cookie": "refresh_token=stale-refresh"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["authenticated"], True)
+        set_cookie = response.headers.get("set-cookie", "")
+        self.assertIn("access_token=fresh-access", set_cookie)
+        self.assertIn("refresh_token=fresh-refresh", set_cookie)
+        self.assertNotIn("fresh-access", response.text)
+        self.assertNotIn("fresh-refresh", response.text)
+        self.assertNotIn("stale-refresh", response.text)
+
+    def test_identity_diagnostics_can_resolve_after_dify_refresh(self):
+        from openclaw_video.bridge_app import create_app
+
+        client = TestClient(
+            create_app(
+                dify=RefreshingDifyClient(),
+                session_store=InMemorySessionStore(),
+                job_store=InMemoryJobStore(),
+                identity_secret="test-secret",
+            )
+        )
+        response = client.get(
+            "/console/api/openclaw-api/identity/diagnostics",
+            headers={"Cookie": "refresh_token=stale-refresh"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["authenticated"], True)
+        self.assertEqual(body["profile_ok"], True)
+        self.assertEqual(body["workspace_ok"], True)
+        self.assertEqual(body["provider_probe"]["refresh_attempted"], True)
+        self.assertNotIn("fresh-access", response.text)
+        self.assertNotIn("fresh-refresh", response.text)
+        self.assertNotIn("stale-refresh", response.text)
 
     def test_huahuo_identity_diagnostics_probe_is_safe_when_profile_fails(self):
         from openclaw_video.bridge_app import create_app

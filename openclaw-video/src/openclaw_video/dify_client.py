@@ -33,6 +33,14 @@ HUAHUO_APP_UUID_HEADER = "x-huahuo-app-uuid"
 HUAHUO_REFRESH_TOKEN_HEADER = "x-huahuo-refresh-token"
 
 
+@dataclass(frozen=True)
+class DifyIdentityContext:
+    profile: dict
+    workspaces: object
+    set_cookie_headers: tuple[str, ...] = ()
+    refreshed: bool = False
+
+
 def identity_headers(headers: Mapping[str, str]) -> dict[str, str]:
     """Return only the browser headers needed for Dify identity lookup.
 
@@ -90,6 +98,57 @@ def _dify_access_token_from_cookie(headers: Mapping[str, str]) -> str:
         if value:
             return value
     return ""
+
+
+def _cookie_dict(cookie_header: str) -> dict[str, str]:
+    cookies: dict[str, str] = {}
+    parsed = SimpleCookie()
+    try:
+        parsed.load(cookie_header)
+    except Exception:
+        parsed = SimpleCookie()
+    for name, morsel in parsed.items():
+        cookies[name] = morsel.value
+    if cookies:
+        return cookies
+    for item in cookie_header.split(";"):
+        key, sep, value = item.partition("=")
+        if sep and key.strip():
+            cookies[key.strip()] = value.strip()
+    return cookies
+
+
+def _set_cookie_names(set_cookie_headers: list[str] | tuple[str, ...]) -> list[str]:
+    names: list[str] = []
+    for header in set_cookie_headers:
+        parsed = SimpleCookie()
+        try:
+            parsed.load(header)
+        except Exception:
+            parsed = SimpleCookie()
+        for name in parsed.keys():
+            names.append(name)
+    return sorted(set(names))
+
+
+def _headers_with_set_cookie_values(headers: Mapping[str, str], set_cookie_headers: list[str] | tuple[str, ...]) -> dict[str, str]:
+    refreshed = {str(key): str(value) for key, value in headers.items()}
+    cookies = _cookie_dict(_header_value(headers, "cookie"))
+    for header in set_cookie_headers:
+        parsed = SimpleCookie()
+        try:
+            parsed.load(header)
+        except Exception:
+            continue
+        for name, morsel in parsed.items():
+            if morsel.value:
+                cookies[name] = morsel.value
+    if cookies:
+        refreshed["Cookie"] = "; ".join(f"{name}={value}" for name, value in cookies.items())
+    csrf_token = cookies.get("csrf_token") or cookies.get("__Host-csrf_token") or cookies.get("__Secure-csrf_token")
+    if csrf_token:
+        refreshed["X-CSRF-Token"] = csrf_token
+    return refreshed
 
 
 def dify_identity_material_present(headers: Mapping[str, str]) -> bool:
@@ -194,6 +253,41 @@ class DifyClient:
             response.raise_for_status()
             return response.json()
 
+    async def _refresh_console_tokens(self, headers: Mapping[str, str]) -> tuple[str, ...]:
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=self.timeout_seconds,
+            transport=self.transport,
+        ) as client:
+            response = await client.post("/console/api/refresh-token", headers=identity_headers(headers))
+            if response.status_code in {401, 403}:
+                raise PermissionError("dify refresh required")
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict) or payload.get("result") != "success":
+                raise PermissionError("dify refresh failed")
+            set_cookie_headers = tuple(response.headers.get_list("set-cookie"))
+            if not set_cookie_headers:
+                raise PermissionError("dify refresh did not return cookies")
+            return set_cookie_headers
+
+    async def resolve_identity(self, headers: Mapping[str, str]) -> DifyIdentityContext:
+        try:
+            profile = await self.profile(headers)
+            workspaces = await self.workspaces(headers)
+            return DifyIdentityContext(profile=profile, workspaces=workspaces)
+        except PermissionError:
+            set_cookie_headers = await self._refresh_console_tokens(headers)
+            refreshed_headers = _headers_with_set_cookie_values(headers, set_cookie_headers)
+            profile = await self.profile(refreshed_headers)
+            workspaces = await self.workspaces(refreshed_headers)
+            return DifyIdentityContext(
+                profile=profile,
+                workspaces=workspaces,
+                set_cookie_headers=set_cookie_headers,
+                refreshed=True,
+            )
+
     async def safe_identity_probe(self, headers: Mapping[str, str]) -> dict[str, object]:
         result: dict[str, object] = {
             "provider": "dify",
@@ -208,6 +302,13 @@ class DifyClient:
             "profile_body_keys": [],
             "workspaces_http_status": None,
             "workspaces_body_keys": [],
+            "refresh_attempted": False,
+            "refresh_http_status": None,
+            "refresh_set_cookie_names": [],
+            "retry_profile_http_status": None,
+            "retry_profile_body_keys": [],
+            "retry_workspaces_http_status": None,
+            "retry_workspaces_body_keys": [],
             "error_stage": None,
         }
         try:
@@ -234,6 +335,46 @@ class DifyClient:
                     workspaces_payload = workspaces_response.json()
                     if isinstance(workspaces_payload, dict):
                         result["workspaces_body_keys"] = sorted(str(key) for key in workspaces_payload.keys())
+                if profile_response.status_code in {401, 403}:
+                    result["refresh_attempted"] = True
+                    refresh_response = await client.post(
+                        "/console/api/refresh-token",
+                        headers=identity_headers(headers),
+                    )
+                    result["refresh_http_status"] = refresh_response.status_code
+                    if refresh_response.status_code in {401, 403}:
+                        result["error_stage"] = "refresh_http"
+                        return result
+                    refresh_payload = refresh_response.json()
+                    if not isinstance(refresh_payload, dict) or refresh_payload.get("result") != "success":
+                        result["error_stage"] = "refresh_payload"
+                        return result
+                    set_cookie_headers = tuple(refresh_response.headers.get_list("set-cookie"))
+                    result["refresh_set_cookie_names"] = _set_cookie_names(set_cookie_headers)
+                    if not set_cookie_headers:
+                        result["error_stage"] = "refresh_cookies"
+                        return result
+                    refreshed_headers = _headers_with_set_cookie_values(headers, set_cookie_headers)
+                    retry_profile_response = await client.get(
+                        "/console/api/account/profile",
+                        headers=identity_headers(refreshed_headers),
+                    )
+                    result["retry_profile_http_status"] = retry_profile_response.status_code
+                    if retry_profile_response.status_code not in {401, 403}:
+                        retry_profile_payload = retry_profile_response.json()
+                        if isinstance(retry_profile_payload, dict):
+                            result["retry_profile_body_keys"] = sorted(str(key) for key in retry_profile_payload.keys())
+                    retry_workspaces_response = await client.get(
+                        "/console/api/workspaces",
+                        headers=identity_headers(refreshed_headers),
+                    )
+                    result["retry_workspaces_http_status"] = retry_workspaces_response.status_code
+                    if retry_workspaces_response.status_code not in {401, 403}:
+                        retry_workspaces_payload = retry_workspaces_response.json()
+                        if isinstance(retry_workspaces_payload, dict):
+                            result["retry_workspaces_body_keys"] = sorted(
+                                str(key) for key in retry_workspaces_payload.keys()
+                            )
                 return result
         except httpx.HTTPError:
             result["error_stage"] = "network"

@@ -141,6 +141,94 @@ class DifyClientTests(unittest.TestCase):
         self.assertNotIn("cookie-secret", repr(probe))
         self.assertTrue(all(auth == "Bearer cookie-secret" for _, auth in requests))
 
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_dify_resolve_identity_refreshes_cookie_session_and_returns_set_cookie(self):
+        requests = []
+
+        def handler(request):
+            requests.append((request.method, request.url.path, request.headers.get("Authorization", "")))
+            if request.url.path == "/console/api/account/profile" and len(requests) == 1:
+                return httpx.Response(401, json={"code": "unauthorized"})
+            if request.url.path == "/console/api/refresh-token":
+                return httpx.Response(
+                    200,
+                    json={"result": "success"},
+                    headers=[
+                        ("Set-Cookie", "access_token=fresh-access; Path=/; HttpOnly"),
+                        ("Set-Cookie", "refresh_token=fresh-refresh; Path=/; HttpOnly"),
+                        ("Set-Cookie", "csrf_token=fresh-csrf; Path=/"),
+                    ],
+                )
+            if request.url.path == "/console/api/account/profile":
+                self.assertEqual(request.headers.get("Authorization"), "Bearer fresh-access")
+                return httpx.Response(200, json={"id": "account-a"})
+            if request.url.path == "/console/api/workspaces":
+                self.assertEqual(request.headers.get("Authorization"), "Bearer fresh-access")
+                return httpx.Response(200, json={"data": [{"id": "tenant-a", "current": True}]})
+            return httpx.Response(404)
+
+        client = DifyClient(
+            "https://ai001.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+
+        import asyncio
+
+        context = asyncio.run(client.resolve_identity({"Cookie": "refresh_token=refresh-secret"}))
+
+        self.assertEqual(context.profile, {"id": "account-a"})
+        self.assertEqual(context.workspaces, {"data": [{"id": "tenant-a", "current": True}]})
+        self.assertEqual(context.refreshed, True)
+        self.assertEqual(len(context.set_cookie_headers), 3)
+        self.assertIn(("POST", "/console/api/refresh-token", ""), requests)
+
+    @unittest.skipIf(httpx is None, "httpx is not installed")
+    def test_dify_safe_identity_probe_reports_refresh_shape_without_values(self):
+        profile_calls = 0
+
+        def handler(request):
+            nonlocal profile_calls
+            if request.url.path == "/console/api/account/profile":
+                profile_calls += 1
+                if profile_calls == 1:
+                    return httpx.Response(401, json={"code": "unauthorized"})
+                return httpx.Response(200, json={"id": "account-a", "email": "hidden"})
+            if request.url.path == "/console/api/workspaces" and profile_calls < 2:
+                return httpx.Response(401, json={"code": "unauthorized"})
+            if request.url.path == "/console/api/workspaces":
+                return httpx.Response(200, json={"data": [{"id": "tenant-a", "current": True}]})
+            if request.url.path == "/console/api/refresh-token":
+                return httpx.Response(
+                    200,
+                    json={"result": "success"},
+                    headers=[
+                        ("Set-Cookie", "access_token=fresh-access; Path=/; HttpOnly"),
+                        ("Set-Cookie", "refresh_token=fresh-refresh; Path=/; HttpOnly"),
+                        ("Set-Cookie", "csrf_token=fresh-csrf; Path=/"),
+                    ],
+                )
+            return httpx.Response(404)
+
+        client = DifyClient(
+            "https://ai001.huahuoai.com",
+            transport=httpx.MockTransport(handler),
+        )
+
+        import asyncio
+
+        probe = asyncio.run(client.safe_identity_probe({"Cookie": "refresh_token=refresh-secret"}))
+
+        self.assertEqual(probe["refresh_attempted"], True)
+        self.assertEqual(probe["refresh_http_status"], 200)
+        self.assertEqual(probe["refresh_set_cookie_names"], ["access_token", "csrf_token", "refresh_token"])
+        self.assertEqual(probe["retry_profile_http_status"], 200)
+        self.assertEqual(probe["retry_workspaces_http_status"], 200)
+        rendered = repr(probe)
+        self.assertNotIn("refresh-secret", rendered)
+        self.assertNotIn("fresh-access", rendered)
+        self.assertNotIn("fresh-refresh", rendered)
+        self.assertNotIn("fresh-csrf", rendered)
+
     def test_huahuo_authorization_header_matches_frontend_signing_shape(self):
         header = huahuo_authorization_header("HUAHUO-access", app_uuid="abc123", app_time_ms=123456)
 

@@ -766,6 +766,13 @@ def create_app(
     phase4_config = load_phase4_config()
     rate_limiter = SlidingWindowRateLimiter()
 
+    @app.middleware("http")
+    async def _forward_dify_refresh_cookies(request: Request, call_next: Any) -> Any:
+        response = await call_next(request)
+        for header in getattr(request.state, "dify_set_cookie_headers", []):
+            response.headers.append("set-cookie", header)
+        return response
+
     @app.exception_handler(Exception)
     async def _exception_handler(_: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(status_code=500, content={"error": safe_error_message(exc)})
@@ -821,6 +828,13 @@ def create_app(
         if not rate_limiter.allow(principal.principal_id, limit=rate_limit):
             raise HTTPException(status_code=429, detail="job submission rate limit exceeded")
 
+    def remember_dify_set_cookie_headers(request: Request, headers: Any) -> None:
+        safe_headers = [str(header) for header in (headers or []) if header]
+        if not safe_headers:
+            return
+        existing = list(getattr(request.state, "dify_set_cookie_headers", []))
+        request.state.dify_set_cookie_headers = existing + safe_headers
+
     @app.get("/health")
     async def health() -> dict[str, Any]:
         return health_payload()
@@ -849,6 +863,10 @@ def create_app(
                 profile = {"id": request.headers["x-test-account"]}
                 tenant_id = request.headers.get("x-test-tenant", "test-tenant")
                 workspaces = {"data": [{"id": tenant_id, "current": True}]}
+            elif hasattr(dify, "resolve_identity"):
+                identity_context = await dify.resolve_identity(request.headers)
+                remember_dify_set_cookie_headers(request, getattr(identity_context, "set_cookie_headers", ()))
+                profile, workspaces = identity_context.profile, identity_context.workspaces
             else:
                 profile, workspaces = await dify.profile(request.headers), await dify.workspaces(request.headers)
             principal = derive_principal(identity_secret, profile, workspaces)
@@ -914,7 +932,13 @@ def create_app(
                     result["provider_probe"] = await dify.safe_identity_probe(request.headers)
                 except Exception:
                     result["provider_probe"] = {"provider": identity_provider, "error_stage": "probe"}
-            profile = await dify.profile(request.headers)
+            if hasattr(dify, "resolve_identity"):
+                identity_context = await dify.resolve_identity(request.headers)
+                remember_dify_set_cookie_headers(request, getattr(identity_context, "set_cookie_headers", ()))
+                profile = identity_context.profile
+                result["_resolved_workspaces"] = identity_context.workspaces
+            else:
+                profile = await dify.profile(request.headers)
             result["profile_ok"] = True
         except PermissionError:
             result["failure_stage"] = "profile"
@@ -923,7 +947,9 @@ def create_app(
             result["failure_stage"] = "profile"
             return result
         try:
-            workspaces = await dify.workspaces(request.headers)
+            workspaces = result.pop("_resolved_workspaces", None)
+            if workspaces is None:
+                workspaces = await dify.workspaces(request.headers)
             result["current_workspace_count"] = current_workspace_count(workspaces)
             principal = derive_principal(identity_secret, profile, workspaces)
             result["workspace_ok"] = True
