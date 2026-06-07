@@ -52,8 +52,8 @@ SMOKE_PASS = {
 
 
 PHASE4_BASE = """
-current=/app/bin/openclaw-video/releases/14722e96e130
-tag: phase4-relaxed-root-testing-baseline-20260607
+current=/app/bin/openclaw-video/releases/bea6534980dc
+tag: phase4-openclaw-ui-workbench-20260607
 ai_openclaw_lab=200
 openclaw_lab=200
 openclaw_api_me_unauth=401
@@ -115,7 +115,7 @@ STANDALONE_LOGIN_PASS = {
 
 class Phase4CurrentStateAuditTests(unittest.TestCase):
     def test_current_repo_reports_current_gates_pass(self):
-        smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260607T052339Z" / "summary.json"
+        smoke = REPO_ROOT / "tmp" / "playwright-public-browser" / "20260607T060047Z" / "summary.json"
         report = phase4_audit.audit(REPO_ROOT, smoke_summary=smoke, include_git_clean=True)
         statuses = {gate["gate_id"]: gate["status"] for gate in report["gates"]}
 
@@ -139,7 +139,7 @@ class Phase4CurrentStateAuditTests(unittest.TestCase):
             )
             write(repo / "scripts/huahuo_post_login_acceptance_runner.mjs", RUNNER)
             write(
-                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
                 json.dumps(STANDALONE_LOGIN_PASS),
             )
             write(
@@ -171,7 +171,7 @@ no_browser_login_state: PASS
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)
             write(
-                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
                 json.dumps(STANDALONE_LOGIN_PASS),
             )
 
@@ -186,7 +186,7 @@ no_browser_login_state: PASS
             payload = dict(STANDALONE_LOGIN_PASS)
             payload["password_recorded"] = True
             write(
-                repo / "artifacts/evidence/phase4/openclaw-standalone-login-browser-acceptance-20260607.json",
+                repo / "artifacts/evidence/phase4/openclaw-ui-workbench-login-acceptance-root-20260607.json",
                 json.dumps(payload),
             )
 

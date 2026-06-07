@@ -18,6 +18,7 @@ RUNNER = REPO_ROOT / "scripts" / "huahuo_post_login_acceptance_runner.mjs"
 REAL_SAMPLE = REPO_ROOT / "artifacts" / "douyin_chong" / "REAL_SAMPLE_EVIDENCE.json"
 PRODUCTION_AUDIT = REPO_ROOT / "scripts" / "audit_production_readiness.py"
 STANDALONE_LOGIN_EVIDENCE_CANDIDATES = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-workbench-login-acceptance-root-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-root-20260607.json",
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-standalone-login-browser-acceptance-20260607.json",
 )
@@ -63,8 +64,8 @@ def check_phase4_deployment_evidence(repo: Path) -> GateResult:
         return GateResult("phase4_deployment_evidence", "NO_GO", f"missing {path.name}")
     text = _read(path)
     required = [
-        r"current=/app/bin/openclaw-video/releases/14722e96e130",
-        r"tag:\s*phase4-relaxed-root-testing-baseline-20260607",
+        r"current=/app/bin/openclaw-video/releases/bea6534980dc",
+        r"tag:\s*phase4-openclaw-ui-workbench-20260607",
         r"ai_openclaw_lab=200",
         r"openclaw_lab=200",
         r"openclaw_api_me_unauth=401",

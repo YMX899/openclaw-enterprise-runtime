@@ -952,4 +952,135 @@ OpenClaw Gateway and Bridge Postgres remained internal-only.
 No Cookie, Authorization header, CSRF value, browser storage value, account,
 password, model key, database URL, private key, .env content or full request
 header was recorded.
+
+## OpenClaw UI Workbench Root Deployment
+
+Date: 2026-06-07 Asia/Shanghai
+
+Scope:
+
+```text
+Improve the OpenClaw Lab page from an engineering test panel into a usable
+standalone login, conversation, video-job and acceptance workbench. Keep the
+OpenClaw web layer independent from Dify Web login.
+```
+
+Version:
+
+```text
+commit=bea6534980dc7d8752584624c8751d71e0f867c1
+tag: phase4-openclaw-ui-workbench-20260607
+bundle: tmp\root-private-sidecar-bundles\openclaw-root-private-sidecar-bea6534980dc.tar.gz
+bundle_sha256: 5f77d6dc0d2bacffbecf46352d22014bf2e65932a1027ddb0f4f45e01d23272f
+release: /app/bin/openclaw-video/releases/bea6534980dc
+previous: /app/bin/openclaw-video/releases/14722e96e130
+rollback marker: /app/bin/openclaw-video/previous-before-bea6534980dc.txt
+```
+
+Server deployment result:
+
+```text
+bridge_fast_rebuild=PASS
+current=/app/bin/openclaw-video/releases/bea6534980dc
+ai_openclaw_lab=200
+openclaw_lab=200
+openclaw_api_me_unauth=401
+huahuo_ai=200
+```
+
+Dify core container invariant after deployment:
+
+```text
+/docker-api-1   1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631  2026-01-05T11:17:20.555976179Z  running
+/docker-web-1   62c08605b5487328edea52d6d7b41e417d9b76c9114c826d0700f571d4871f36  2026-01-05T11:17:19.85303869Z   running unhealthy
+/docker-nginx-1 8bf3a9282c091194130ddcdfbffe50b52d27cb48727322c50679493308b70dbe  2026-01-05T11:17:20.937420886Z  running
+```
+
+Public UI verification:
+
+```text
+https://www.huahuoai.com/ai/openclaw-lab/ contains:
+Short video analysis workbench: true
+Job Result & Status: true
+Private session: true
+refreshMe({ quiet: true }): true
+```
+
+Public browser smoke:
+
+```text
+Command: python scripts\run_public_browser_smoke.py --timeout-seconds 90
+Run dir: tmp\playwright-public-browser\20260607T060047Z
+Overall: PASS
+Targets: openclaw-standalone-lab, openclaw-lab, openclaw-api-me-unauthenticated,
+huahuo-user-web, huahuo-admin-configuration
+http_5xx_count: 0
+gateway_direct_request_count: 0
+token_url_leak_count: 0
+headers_recorded: false
+bodies_recorded: false
+secrets_recorded: false
+```
+
+OpenClaw standalone login acceptance on the deployed UI:
+
+```json
+{
+  "schema": "openclaw-standalone-login-browser-acceptance.v1",
+  "status": "PASS",
+  "lab_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "lab_has_login_form": true,
+  "login_status": 200,
+  "auth_status_text": "Authenticated",
+  "login_authenticated": true,
+  "login_principal_len": 64,
+  "diagnostics": {
+    "status": 200,
+    "authenticated": true,
+    "openclaw_session_present": true,
+    "auth_mode": "openclaw_session",
+    "huahuo_access_token_present": false,
+    "huahuo_app_uuid_present": false,
+    "profile_ok": true,
+    "workspace_ok": true,
+    "access_ok": true,
+    "provider_probe_present": false,
+    "failure_stage": null
+  },
+  "post_login_acceptance": {
+    "overall": "PASS",
+    "step_count": 16,
+    "failed_steps": []
+  },
+  "console_error_count": 0,
+  "account_recorded": false,
+  "password_recorded": false,
+  "cookies_recorded": false,
+  "headers_recorded": false,
+  "secrets_recorded": false,
+  "local_storage_values_recorded": false
+}
+```
+
+Local verification before deployment:
+
+```text
+270 tests OK
+phase4 current-state audit: PASS
+production readiness audit: GO
+desktop screenshot: no horizontal overflow; Video URL visible in first viewport
+mobile screenshot: no horizontal overflow; login buttons fit within viewport
+```
+
+Safety notes:
+
+```text
+No Dify compose file was modified.
+No Dify api/web/nginx container was restarted, rebuilt or recreated.
+Only OpenClaw Bridge was rebuilt/recreated.
+OpenClaw Gateway, Worker and Bridge Postgres remained internal-only.
+No Cookie, Authorization header, CSRF value, browser storage value, account,
+password, model key, database URL, private key, .env content or full request
+header was recorded.
+```
 ```
