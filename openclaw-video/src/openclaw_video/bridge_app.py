@@ -1311,20 +1311,190 @@ LAB_PAGE_HTML = """<!doctype html>
     .cg-conversation .message.user {
       justify-self: end;
     }
-    .cg-next-action { margin: 0 24px 8px; }
+    /* ===== ChatGPT-style logged-in layout ===== */
+    .chat-app {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: 100vh;
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+    }
+    .cg-sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      max-height: 100vh;
+      border-right: 1px solid var(--border);
+      background: #f7f7f8;
+      padding: 12px 10px;
+      gap: 10px;
+    }
+    .cg-sidebar.locked { opacity: .55; pointer-events: none; }
+    .cg-sidebar-top { display: grid; gap: 10px; }
+    .cg-brand { gap: 10px; padding: 4px 6px; }
+    .cg-brand .brand-mark { width: 34px; height: 34px; border-radius: 9px; }
+    .cg-brand h2 { font-size: 15px; }
+    .cg-new-chat {
+      width: 100%; min-height: 44px; justify-content: flex-start;
+      background: #fff; color: var(--ink); border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm); font-weight: 600;
+    }
+    .cg-new-chat:hover { background: #fff; border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+    .cg-session-list {
+      flex: 1 1 auto;
+      margin-top: 4px;
+      max-height: none;
+      overflow: auto;
+      padding-right: 2px;
+      display: grid;
+      gap: 2px;
+      align-content: start;
+    }
+    .cg-session-list .session-item {
+      min-height: 40px; border: 0; border-radius: 8px; padding: 8px 10px;
+      background: transparent; box-shadow: none; font-size: 13.5px; font-weight: 500;
+    }
+    .cg-session-list .session-item:hover { background: #ececf1; border: 0; }
+    .cg-session-list .session-item.active { background: #e3e3e8; color: var(--ink); border: 0; }
+    .cg-session-list .session-item span { font-size: 11px; }
+    .cg-sidebar-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .cg-sidebar-footer .status { flex: 0 1 auto; font-size: 12px; min-height: 30px; }
+    .cg-sidebar-footer button { min-height: 38px; }
+    .cg-main {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+      max-height: 100vh;
+      min-width: 0;
+      background: #fff;
+    }
+    .cg-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--faint);
+    }
+    .cg-topbar-title h1 { font-size: 16px; font-weight: 650; letter-spacing: -.2px; color: var(--ink); }
+    .cg-topbar-status { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .cg-conversation {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      max-height: none;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 26px 0 8px;
+      gap: 0;
+      display: block;
+    }
+    /* ChatGPT message rows: full-width band, centered content */
+    .cg-conversation .message {
+      display: block;
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 16px 0;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--ink);
+      animation: msg-in .3s var(--ease) both;
+    }
+    .cg-conversation .message.assistant { background: #f7f7f8; }
+    .cg-conversation .message.user { background: transparent; }
+    .cg-conversation .message::before {
+      content: attr(data-role-label);
+      display: block;
+      max-width: 768px;
+      margin: 0 auto 6px;
+      padding: 0 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .3px;
+    }
+    .cg-conversation .message > .cg-msg-inner {
+      max-width: 768px;
+      margin: 0 auto;
+      padding: 0 20px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .cg-msg-attachment {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 8px; padding: 8px 12px;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      background: #fff; font-size: 13px; color: var(--ink);
+    }
+    .cg-msg-attachment::before { content: "🎬"; }
+    .cg-shots {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      max-width: 768px;
+    }
+    .cg-shots img {
+      width: 100%; height: 84px; object-fit: cover;
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      cursor: pointer; transition: transform .15s var(--ease);
+    }
+    .cg-shots img:hover { transform: scale(1.03); }
+    .cg-progress {
+      max-width: 768px; margin: 10px 0 0;
+    }
+    .cg-progress-bar {
+      height: 8px; border-radius: var(--r-pill);
+      background: #e6e8ee; overflow: hidden;
+    }
+    .cg-progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #2563ff, #14b8a6);
+      border-radius: var(--r-pill);
+      transition: width .4s var(--ease);
+    }
+    .cg-progress-fill.indeterminate {
+      width: 40% !important;
+      animation: cg-indeterminate 1.2s var(--ease) infinite;
+    }
+    @keyframes cg-indeterminate {
+      0% { margin-left: -40%; }
+      100% { margin-left: 100%; }
+    }
+    .cg-progress-label { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+    .cg-composer-wrap {
+      padding: 10px 20px 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0), #fff 40%);
+    }
     .cg-composer {
-      margin: 0 24px 10px;
+      max-width: 768px;
+      margin: 0 auto;
       border: 1px solid var(--border-strong);
-      border-radius: var(--r-lg);
+      border-radius: 26px;
       background: #fff;
       box-shadow: var(--shadow-md);
-      padding: 10px 12px;
+      padding: 8px 8px 8px 8px;
     }
     .cg-attachment {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 8px;
+      margin: 2px 6px 8px;
       padding: 6px 10px;
       border: 1px solid #cad9ff;
       border-radius: var(--r-pill);
@@ -1342,30 +1512,41 @@ LAB_PAGE_HTML = """<!doctype html>
     }
     .cg-attachment-clear:hover { background: rgba(37,99,255,.2); transform: none; box-shadow: none; }
     .cg-link-hint {
-      margin: 0 0 8px; padding: 6px 10px;
+      margin: 2px 6px 8px; padding: 6px 10px;
       border-radius: var(--r-xs); background: #eefaf4; color: var(--success);
       font-size: 12.5px; font-weight: 650;
     }
-    .cg-composer-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+    .cg-composer-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: end; }
     .cg-attach-btn {
-      min-height: 44px; width: 44px; min-width: 44px; padding: 0;
-      font-size: 22px; line-height: 1; border-radius: var(--r-sm);
-      background: #f2f5fb; color: #42526a; border: 1px solid var(--border); box-shadow: none;
+      min-height: 40px; width: 40px; min-width: 40px; padding: 0;
+      font-size: 22px; line-height: 1; border-radius: var(--r-pill);
+      background: transparent; color: #5e6a7d; border: 0; box-shadow: none;
     }
-    .cg-attach-btn:hover { background: #e8eef7; color: var(--ink); transform: none; box-shadow: none; }
+    .cg-attach-btn:hover { background: #f0f2f6; color: var(--ink); transform: none; box-shadow: none; }
     .cg-input {
-      min-height: 44px; max-height: 200px; resize: none; border-radius: var(--r-sm);
-      border-color: var(--border); background: #fff; line-height: 1.5;
+      min-height: 40px; max-height: 220px; resize: none;
+      border: 0; border-radius: 0; background: transparent;
+      box-shadow: none; padding: 9px 4px; line-height: 1.5; font-size: 15px;
     }
-    .cg-send { min-width: 88px; min-height: 44px; }
-    .cg-composer-help { margin: 8px 2px 0; color: var(--muted); font-size: 12px; }
+    .cg-input:hover { border: 0; }
+    .cg-input:focus-visible { outline: none; box-shadow: none; border: 0; }
+    .cg-send {
+      min-width: 40px; width: 40px; min-height: 40px; padding: 0;
+      border-radius: var(--r-pill); font-size: 18px; line-height: 1;
+      background: var(--ink); color: #fff; box-shadow: none;
+    }
+    .cg-send:hover { background: #000; transform: none; box-shadow: none; }
+    .cg-send:disabled { background: #d4d8e0; color: #fff; }
+    .cg-composer-help { max-width: 768px; margin: 8px auto 0; text-align: center; color: var(--muted); font-size: 12px; }
     .cg-dev-drawer {
-      margin: 0 24px 16px;
+      margin: 0 20px 16px;
+      max-width: 768px;
       border: 1px solid var(--border);
       border-radius: var(--r-md);
       background: var(--surface-soft);
       overflow: hidden;
     }
+    .cg-main > .cg-dev-drawer { margin-left: auto; margin-right: auto; width: calc(100% - 40px); }
     .cg-dev-drawer summary {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
       cursor: pointer; list-style: none; padding: 12px 14px;
@@ -1384,15 +1565,16 @@ LAB_PAGE_HTML = """<!doctype html>
       .chat-app { grid-template-columns: 1fr; }
       .cg-sidebar {
         min-height: 0;
+        max-height: 34vh;
         border-right: 0;
         border-bottom: 1px solid var(--border);
-        max-height: 38vh;
       }
-      .cg-main { min-height: 62vh; max-height: none; }
+      .cg-main { min-height: 66vh; max-height: none; }
+      .cg-conversation .message::before,
+      .cg-conversation .message > .cg-msg-inner { padding: 0 16px; }
+      .cg-composer, .cg-composer-help, .cg-dev-drawer { max-width: none; }
     }
-    .chat-main textarea.cg-input-removed {
-      min-height: 78px;
-    }
+
     @media (max-width: 960px) {
       .workbench { grid-template-columns: 1fr; }
       .chat-app .workbench { grid-template-columns: 1fr; }
@@ -1565,7 +1747,7 @@ LAB_PAGE_HTML = """<!doctype html>
         </div>
         <button id="createSession" class="cg-new-chat primary-flow" type="button">＋ 新建对话</button>
       </div>
-      <div class="cg-session-meta">
+      <div class="cg-session-meta sr-only">
         <label for="sessionTitle">新会话标题</label>
         <input id="sessionTitle" value="短视频分析">
         <label for="sessionId" class="technical-label">当前会话 ID</label>
@@ -1583,16 +1765,16 @@ LAB_PAGE_HTML = """<!doctype html>
     <section class="cg-main" aria-label="OpenClaw 中文聊天分析界面">
       <header class="cg-topbar">
         <div class="cg-topbar-title">
-          <h1>短视频分析对话</h1>
-          <p id="cgFlowHint" class="cg-flow-hint">粘贴抖音视频链接或上传视频文件，也可以直接提问。</p>
+          <h1 id="cgConvTitle">OpenClaw</h1>
         </div>
         <div class="cg-topbar-status" aria-label="OpenClaw 运行状态">
           <div id="runState" class="run-state todo">等待登录</div>
           <button id="refreshMe" class="secondary" type="button">刷新</button>
         </div>
+        <p id="cgFlowHint" class="sr-only">粘贴抖音视频链接或上传视频文件，也可以直接提问。</p>
       </header>
 
-      <nav class="flow-steps cg-flow-steps" aria-label="分析流程">
+      <nav class="flow-steps cg-flow-steps" aria-label="分析流程" hidden>
         <div id="flowLogin" class="flow-step active" data-step="1">登录</div>
         <div id="flowSession" class="flow-step" data-step="2">会话</div>
         <div id="flowSource" class="flow-step" data-step="3">来源</div>
@@ -1601,27 +1783,30 @@ LAB_PAGE_HTML = """<!doctype html>
       </nav>
 
       <div id="conversation" class="cg-conversation conversation" aria-live="polite">
-        <div class="message assistant">登录后可以新建对话，直接粘贴抖音视频链接、上传视频文件，或就分析结果继续追问。</div>
+        <div class="message assistant" data-role-label="OpenClaw"><div class="cg-msg-inner">你好，我是 OpenClaw 短视频分析助手。把抖音视频链接粘贴进下方输入框，或点击 ＋ 上传视频文件，我就开始分析；也可以直接提问。</div></div>
       </div>
 
-      <div id="nextAction" class="next-action cg-next-action"><span>下一步</span>请先登录进入分析工作台。</div>
+      <div id="nextAction" class="next-action cg-next-action" hidden><span>下一步</span>请先登录进入分析工作台。</div>
 
-      <div class="cg-composer">
-        <div id="composerAttachment" class="cg-attachment" hidden>
-          <span id="composerAttachmentName" class="cg-attachment-name">未选择文件</span>
-          <button id="composerAttachmentClear" class="cg-attachment-clear" type="button" aria-label="移除附件">×</button>
+      <div class="cg-composer-wrap">
+        <div class="cg-composer">
+          <div id="composerAttachment" class="cg-attachment" hidden>
+            <span id="composerAttachmentName" class="cg-attachment-name">未选择文件</span>
+            <button id="composerAttachmentClear" class="cg-attachment-clear" type="button" aria-label="移除附件">×</button>
+          </div>
+          <div id="composerLinkHint" class="cg-link-hint" hidden>检测到视频链接，将作为视频来源分析。</div>
+          <div class="cg-composer-row">
+            <button id="composerAttach" class="cg-attach-btn" type="button" aria-label="上传视频文件" title="上传视频文件">＋</button>
+            <textarea id="prompt" class="cg-input" rows="1" placeholder="给 OpenClaw 发送消息，或粘贴抖音视频链接…"></textarea>
+            <button id="sendChat" class="cg-send" type="button" aria-label="发送" title="发送">↑</button>
+          </div>
         </div>
-        <div id="composerLinkHint" class="cg-link-hint" hidden>检测到视频链接，将作为视频来源分析。</div>
-        <div class="cg-composer-row">
-          <button id="composerAttach" class="cg-attach-btn" type="button" aria-label="上传视频文件" title="上传视频文件">＋</button>
-          <textarea id="prompt" class="cg-input" rows="1" placeholder="粘贴抖音视频链接、上传视频，或直接输入问题…">请分析这个视频。</textarea>
-          <button id="sendChat" class="cg-send primary-flow" type="button" aria-label="发送">发送</button>
-        </div>
-        <p class="cg-composer-help">先读取链接，确认可解析后再提交模型分析；上传视频作为备用入口。</p>
+        <p class="cg-composer-help">OpenClaw 可能会出错，请核对重要信息。视频分析结果以页面展示为准。</p>
       </div>
 
       <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm" class="sr-only" tabindex="-1" aria-hidden="true">
       <input id="videoUrl" type="hidden" value="">
+      <input id="prompt-default" type="hidden" value="请分析这个视频。">
 
       <details id="devDrawer" class="cg-dev-drawer">
         <summary>
@@ -1989,8 +2174,80 @@ LAB_PAGE_HTML = """<!doctype html>
     function pushMessage(role, text) {
       const node = document.createElement('div');
       node.className = 'message ' + role;
-      node.textContent = text;
+      node.setAttribute('data-role-label', role === 'user' ? '你' : 'OpenClaw');
+      const inner = document.createElement('div');
+      inner.className = 'cg-msg-inner';
+      inner.textContent = text;
+      node.appendChild(inner);
       conversation.appendChild(node);
+      conversation.scrollTop = conversation.scrollHeight;
+      return node;
+    }
+    function messageInner(node) {
+      return node ? node.querySelector('.cg-msg-inner') : null;
+    }
+    function addAttachmentChip(node, name) {
+      const inner = messageInner(node);
+      if (!inner) return;
+      const chip = document.createElement('div');
+      chip.className = 'cg-msg-attachment';
+      chip.textContent = name;
+      inner.appendChild(chip);
+      conversation.scrollTop = conversation.scrollHeight;
+    }
+    function attachProgress(node, label) {
+      const inner = messageInner(node);
+      if (!inner) return null;
+      const wrap = document.createElement('div');
+      wrap.className = 'cg-progress';
+      const bar = document.createElement('div');
+      bar.className = 'cg-progress-bar';
+      const fill = document.createElement('div');
+      fill.className = 'cg-progress-fill indeterminate';
+      bar.appendChild(fill);
+      const lab = document.createElement('p');
+      lab.className = 'cg-progress-label';
+      lab.textContent = label || '处理中…';
+      wrap.appendChild(bar);
+      wrap.appendChild(lab);
+      inner.appendChild(wrap);
+      conversation.scrollTop = conversation.scrollHeight;
+      return {
+        set(pct, text) {
+          fill.classList.remove('indeterminate');
+          fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+          if (text) lab.textContent = text;
+        },
+        indeterminate(text) {
+          fill.classList.add('indeterminate');
+          if (text) lab.textContent = text;
+        },
+        done(text) {
+          fill.classList.remove('indeterminate');
+          fill.style.width = '100%';
+          if (text) lab.textContent = text;
+        },
+        fail(text) {
+          fill.classList.remove('indeterminate');
+          fill.style.background = 'var(--danger)';
+          if (text) lab.textContent = text;
+        },
+        remove() { wrap.remove(); }
+      };
+    }
+    function addScreenshots(node, urls) {
+      const inner = messageInner(node);
+      if (!inner || !Array.isArray(urls) || !urls.length) return;
+      const grid = document.createElement('div');
+      grid.className = 'cg-shots';
+      urls.forEach(u => {
+        const img = document.createElement('img');
+        img.src = u;
+        img.loading = 'lazy';
+        img.addEventListener('click', () => window.open(u, '_blank'));
+        grid.appendChild(img);
+      });
+      inner.appendChild(grid);
       conversation.scrollTop = conversation.scrollHeight;
     }
     function formatSessionTime(value) {
@@ -2578,6 +2835,29 @@ LAB_PAGE_HTML = """<!doctype html>
       }
       });
     }
+    function uploadVideoWithProgress(file, sessionId, content, progress) {
+      return new Promise((resolve) => {
+        const form = new FormData();
+        form.append('session_id', sessionId);
+        form.append('content', content || '请分析上传的视频。');
+        form.append('video', file);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', apiPrefix + '/uploads', true);
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = (e) => {
+          if (progress && e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progress.set(pct, '上传中… ' + pct + '%');
+          }
+        };
+        xhr.onload = () => {
+          let body; try { body = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch { body = { text: xhr.responseText }; }
+          resolve({ status: xhr.status, body });
+        };
+        xhr.onerror = () => resolve({ status: 0, body: {} });
+        xhr.send(form);
+      });
+    }
     async function uploadJob() {
       return withBusy('上传视频', async () => {
       const fileInput = document.getElementById('videoFile');
@@ -2588,18 +2868,7 @@ LAB_PAGE_HTML = """<!doctype html>
         setRunState('需要输入', 'fail');
         return;
       }
-      const form = new FormData();
-      form.append('session_id', sessionId);
-      form.append('content', document.getElementById('prompt').value || '请分析上传的视频。');
-      form.append('video', file);
-      const response = await fetch(apiPrefix + '/uploads', {
-        method: 'POST',
-        credentials: 'include',
-        body: form
-      });
-      const text = await response.text();
-      let body;
-      try { body = text ? JSON.parse(text) : {}; } catch { body = { text }; }
+      const { status, body } = await uploadVideoWithProgress(file, sessionId, document.getElementById('prompt').value, null);
       if (body.job && body.job.job_id) {
         linkReadable = false;
         setCurrentJob(body.job.job_id);
@@ -2607,12 +2876,10 @@ LAB_PAGE_HTML = """<!doctype html>
         sourceMetric.textContent = '上传已接收';
         resultMetric.textContent = '等待中';
         activateFlow(3);
-        pushMessage('user', '已上传视频文件进行分析。');
-        pushMessage('assistant', '上传已接收。请刷新状态查看 worker 进度和结果。');
       } else {
         setRunState('需要处理', 'fail');
       }
-      show({ status: response.status, body });
+      show({ status, body });
       });
     }
     async function uploadTinySmoke() {
@@ -2707,9 +2974,20 @@ LAB_PAGE_HTML = """<!doctype html>
       setRunState(job && terminalStatuses.has(job.status) ? '任务已结束' : '任务运行中', job && terminalStatuses.has(job.status) ? 'fail' : 'busy');
       });
     }
-    async function autoPollCurrentJob() {
+    function extractScreenshots(result) {
+      // Pull any frame/screenshot URLs from the sanitized result payload if present.
+      const r = result && result.body && result.body.result && result.body.result.result;
+      if (!r) return [];
+      const urls = [];
+      const collect = (arr) => { if (Array.isArray(arr)) arr.forEach(u => { if (typeof u === 'string' && /^https?:|^\//.test(u)) urls.push(u); }); };
+      collect(r.frame_urls); collect(r.screenshots); collect(r.frames);
+      if (r.signals && Array.isArray(r.signals.frame_urls)) collect(r.signals.frame_urls);
+      return urls.slice(0, 8);
+    }
+    async function autoPollCurrentJob(progress, assistantNode) {
       if (!currentJobId) return;
       const jobId = currentJobId;
+      if (progress) progress.indeterminate('正在分析视频…');
       for (let attempt = 0; attempt < 60; attempt += 1) {
         await delay(2000);
         if (currentJobId !== jobId) return;
@@ -2720,8 +2998,17 @@ LAB_PAGE_HTML = """<!doctype html>
         if (!job) continue;
         if (job.status === 'succeeded') {
           const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
+          if (progress) progress.done('分析完成');
           const summary = result.body.result && result.body.result.result && result.body.result.result.summary;
-          pushMessage('assistant', summary ? ('分析完成。' + summary) : '分析完成，结果已就绪。可展开“诊断与结果明细”查看结构化结果。');
+          const shots = extractScreenshots(result);
+          if (assistantNode) {
+            const inner = messageInner(assistantNode);
+            if (inner) inner.firstChild ? (inner.childNodes[0].textContent = summary || '分析完成，结果已就绪。') : (inner.textContent = summary || '分析完成，结果已就绪。');
+            if (shots.length) addScreenshots(assistantNode, shots);
+          } else {
+            const node = pushMessage('assistant', summary || '分析完成，结果已就绪。');
+            if (shots.length) addScreenshots(node, shots);
+          }
           show({ job: poll, result });
           setRunState('结果已就绪', 'ok');
           resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
@@ -2729,13 +3016,17 @@ LAB_PAGE_HTML = """<!doctype html>
           return;
         }
         if (terminalStatuses.has(job.status)) {
-          pushMessage('assistant', buildJobErrorReply(job.error_code));
+          if (progress) progress.fail('分析未完成');
+          const reply = buildJobErrorReply(job.error_code);
+          if (assistantNode) { const inner = messageInner(assistantNode); if (inner) inner.childNodes[0] ? (inner.childNodes[0].textContent = reply) : (inner.textContent = reply); }
+          else pushMessage('assistant', reply);
           show({ job: poll });
           setRunState('任务结束', 'fail');
           resultMetric.textContent = job.status;
           return;
         }
       }
+      if (progress) progress.fail('分析超时，请稍后重试');
     }
     function buildJobErrorReply(errorCode) {
       const map = {
@@ -2746,20 +3037,62 @@ LAB_PAGE_HTML = """<!doctype html>
       return map[errorCode] || '分析任务未能完成。可以稍后重试，或换一条视频链接。';
     }
     async function handleComposerSend() {
+      const promptText = document.getElementById('prompt').value.trim();
+      // Upload path
       if (composerMode === 'upload' && attachedFile) {
-        await uploadJob();
+        const sessionId = document.getElementById('sessionId').value;
+        if (!sessionId) { setNextAction('请先登录并新建对话。'); return; }
+        const fileName = attachedFile.name;
+        const userNode = pushMessage('user', promptText || '请分析我上传的视频。');
+        addAttachmentChip(userNode, fileName);
+        const assistantNode = pushMessage('assistant', '已收到视频文件，正在上传…');
+        const progress = attachProgress(assistantNode, '准备上传…');
+        document.getElementById('prompt').value = '';
+        updateComposerMode();
+        const { body } = await uploadVideoWithProgress(attachedFile, sessionId, promptText || '请分析上传的视频。', progress);
         setAttachedFile(null);
-        autoPollCurrentJob();
-        return;
-      }
-      if (composerMode === 'link') {
-        const read = await readVideoLink();
-        if (linkReadable) {
-          await submitJob();
-          autoPollCurrentJob();
+        if (body.job && body.job.job_id) {
+          setCurrentJob(body.job.job_id);
+          progress.indeterminate('上传完成，正在分析视频…');
+          activateFlow(3);
+          await autoPollCurrentJob(progress, assistantNode);
+        } else {
+          progress.fail('上传失败，请重试');
         }
         return;
       }
+      // Video link path
+      if (composerMode === 'link') {
+        const sessionId = document.getElementById('sessionId').value;
+        if (!sessionId) { setNextAction('请先登录并新建对话。'); return; }
+        const link = document.getElementById('videoUrl').value;
+        const userNode = pushMessage('user', promptText || '请分析这个视频。');
+        addAttachmentChip(userNode, link);
+        const assistantNode = pushMessage('assistant', '正在读取视频链接…');
+        const progress = attachProgress(assistantNode, '读取链接中…');
+        document.getElementById('prompt').value = '';
+        const read = await api(apiPrefix + '/video-link/read-check', { method: 'POST', body: JSON.stringify({ video_url: link }) });
+        show({ status: read.status, video_link_read_check: read.body });
+        if (read.status === 200 && read.body.status === 'PASS') {
+          linkReadable = true;
+          progress.indeterminate('链接可读取，正在提交分析…');
+          const jobRes = await api(apiPrefix + '/jobs', { method: 'POST', body: JSON.stringify({ session_id: sessionId, video_url: link, content: promptText || '请分析这个视频。' }) });
+          if (jobRes.body.job && jobRes.body.job.job_id) {
+            setCurrentJob(jobRes.body.job.job_id);
+            activateFlow(3);
+            await autoPollCurrentJob(progress, assistantNode);
+          } else {
+            progress.fail('提交分析失败，请重试');
+          }
+        } else {
+          progress.fail('链接无法读取');
+          const inner = messageInner(assistantNode);
+          if (inner) inner.childNodes[0].textContent = buildJobErrorReply('url_rejected');
+        }
+        updateComposerMode();
+        return;
+      }
+      // Plain chat path
       await sendChat();
     }
     document.getElementById('composerAttach').addEventListener('click', () => videoFileInput.click());
