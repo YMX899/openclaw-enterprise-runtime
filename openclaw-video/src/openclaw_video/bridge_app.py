@@ -2721,7 +2721,7 @@ LAB_PAGE_HTML = """<!doctype html>
         if (job.status === 'succeeded') {
           const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
           const summary = result.body.result && result.body.result.result && result.body.result.result.summary;
-          pushMessage('assistant', summary ? ('分析完成：\n\n' + summary) : '分析完成，结果已就绪。可展开“诊断与结果明细”查看结构化结果。');
+          pushMessage('assistant', summary ? ('分析完成。' + summary) : '分析完成，结果已就绪。可展开“诊断与结果明细”查看结构化结果。');
           show({ job: poll, result });
           setRunState('结果已就绪', 'ok');
           resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
