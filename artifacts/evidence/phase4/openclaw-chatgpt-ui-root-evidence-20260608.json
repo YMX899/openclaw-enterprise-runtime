@@ -1,0 +1,50 @@
+{
+  "schema": "openclaw-chatgpt-ui-root-evidence.v1",
+  "captured_at": "2026-06-08T02:40:00.000Z",
+  "milestone": "M1 - ChatGPT-style logged-in UI + in-chat video input",
+  "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "deployed_release": "video-agent-fix-20260608T0001",
+  "bridge_image": "openclaw-video-openclaw-bridge:fast",
+  "commits": ["b3f5373", "03bcf48"],
+  "summary": "Logged-in surface redesigned to a two-column ChatGPT-style layout (session sidebar + single conversation column + bottom composer). Video link and file upload now happen inside the chat composer; sending routes to read-check+analyze, upload, or chat with auto-polling that posts results into the conversation. Diagnostics/acceptance/raw-JSON moved into a secondary developer drawer. A literal-newline JS bug found by real login testing was fixed.",
+  "public_routes": {
+    "huahuo_root_status": 200,
+    "openclaw_lab_status": 200,
+    "openclaw_api_me_unauthenticated_status": 401
+  },
+  "dify_invariants": {
+    "api_web_nginx_container_ids_unchanged": true,
+    "api_web_nginx_started_at_unchanged": true,
+    "started_at_reference": "2026-01-05T11:17:xxZ",
+    "note": "Only openclaw-bridge was recreated."
+  },
+  "real_login_acceptance": {
+    "method": "headless browser against live page",
+    "landing_loaded": true,
+    "login_modal_opens_on_click": true,
+    "authenticated_after_submit": true,
+    "chat_app_visible": true,
+    "page_js_errors": 0,
+    "console_errors_observed": ["unauthenticated /me 401 before login", "optional resource 404"],
+    "account_recorded": false,
+    "password_recorded": false
+  },
+  "chat_layout": {
+    "horizontal_overflow_px": 0,
+    "sidebar_width_px": 280,
+    "composer_visible": true,
+    "conversation_single_column": true,
+    "send_button_enabled_after_session": true
+  },
+  "composer_in_chat_video_input": {
+    "douyin_link_auto_detected": true,
+    "link_hint_shown_for_link": true,
+    "link_hint_hidden_for_plain_text": true,
+    "attach_button_present": true
+  },
+  "preserved_automation_selectors": true,
+  "ui_contract_tests_pass": true,
+  "secrets_recorded": false,
+  "cookies_recorded": false,
+  "headers_recorded": false
+}
