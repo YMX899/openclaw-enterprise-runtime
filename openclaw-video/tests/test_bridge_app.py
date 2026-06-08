@@ -150,7 +150,10 @@ class FakeGateway:
 
     async def chat(self, request):
         self.requests.append(request)
-        return GatewayChatResult(content=f"reply to {request.content}", raw={"content": f"reply to {request.content}"})
+        # Extract original user message (persona prefix is stripped for predictable reply).
+        user_part = request.content.split("用户消息：")[-1].strip() if "用户消息：" in request.content else request.content
+        content = f"reply to {user_part}"
+        return GatewayChatResult(content=content, raw={"content": content})
 
 
 def video_link_read_check_fixture():
@@ -295,7 +298,8 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("apiPrefix + '/chat'", response.text)
         self.assertIn("apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages'", response.text)
         self.assertIn("apiPrefix + '/sessions'", response.text)
-        self.assertIn("先读取链接，确认可解析后再提交模型分析", response.text)
+        self.assertIn("视频链接读取", response.text)
+        self.assertIn("未调用模型", response.text)
         self.assertIn("refreshMe({ quiet: true })", response.text)
         self.assertIn("loginAccount", response.text)
         self.assertIn("loginPassword", response.text)
@@ -1385,7 +1389,9 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(len(gateway.requests), 1)
         request = gateway.requests[0]
         self.assertEqual(request.session_id, session["id"])
-        self.assertEqual(request.content, "hello")
+        # First turn: content has the persona prefix + original message.
+        self.assertIn("hello", request.content)
+        self.assertIn("短视频", request.content)
         self.assertEqual(request.history, ())
         self.assertNotIn("tenant-a", request.routing_user)
         self.assertNotIn("account-a", request.routing_user)

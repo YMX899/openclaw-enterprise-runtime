@@ -58,6 +58,12 @@ from .session_store import (
 from .upload_store import UploadStoreError, delete_upload_uri, store_upload_fileobj
 from .url_guard import UrlRejected
 from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_video_link
+from .agent_persona import (
+    GREETING,
+    build_agent_message,
+    detect_intent,
+    guardrail_for_message,
+)
 
 
 def _serialize_dt(value: Any) -> str | None:
@@ -3790,11 +3796,34 @@ def create_app(
             raise HTTPException(status_code=404, detail="session not found") from exc
         except MessageValidationError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        # ── Bridge-side guardrails (M2) ──────────────────────────────────
+        # Rule 1: non-douyin URL or profile link → fixed reply, skip agent.
+        guardrail = guardrail_for_message(content)
+        if guardrail is not None:
+            assistant_message = session_store.add_message(
+                session_id, principal.principal_id, "assistant", guardrail.content,
+            )
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": _serialize_message(assistant_message),
+                    "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
+                },
+            )
+
+        # Rule 2: detect intent; inject persona on first turn so the agent
+        # has a fixed short-video-coach identity from the start.
+        intent = detect_intent(content)
+        is_first_turn = not any(msg for msg in history if msg.role == "user")
+        agent_content = build_agent_message(content, is_first_turn=is_first_turn)
+
+        # ── OpenClaw Gateway agent call ──────────────────────────────────
         chat_request = GatewayChatRequest(
             routing_user=session.openclaw_routing_user,
             session_id=session.id,
             message_id=user_message.id,
-            content=user_message.content,
+            content=agent_content,
             history=tuple({"role": item.role, "content": item.content} for item in history),
         )
         try:
@@ -3814,6 +3843,7 @@ def create_app(
             content={
                 "message": _serialize_message(assistant_message),
                 "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
+                "_intent": intent,
             },
         )
 
