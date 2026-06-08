@@ -1227,6 +1227,172 @@ LAB_PAGE_HTML = """<!doctype html>
     .chat-main textarea {
       min-height: 78px;
     }
+    /* ===== ChatGPT-style logged-in layout ===== */
+    .chat-app {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 0;
+    }
+    .cg-sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      border-right: 1px solid var(--border);
+      background: linear-gradient(180deg, #fbfcff, #f4f6fb);
+      padding: 16px 14px;
+      gap: 14px;
+    }
+    .cg-sidebar.locked { opacity: .55; pointer-events: none; }
+    .cg-sidebar-top { display: grid; gap: 12px; }
+    .cg-brand { gap: 10px; }
+    .cg-new-chat { width: 100%; min-height: 44px; }
+    .cg-session-meta { display: grid; gap: 4px; }
+    .cg-session-meta label { margin: 6px 0 2px; }
+    .cg-session-list {
+      flex: 1 1 auto;
+      margin-top: 4px;
+      max-height: none;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .cg-sidebar-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .cg-sidebar-footer .status { flex: 0 1 auto; }
+    .cg-sidebar-footer button { min-height: 40px; }
+    .cg-main {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto auto auto;
+      min-height: 100vh;
+      max-height: 100vh;
+      min-width: 0;
+      background: var(--surface);
+    }
+    .cg-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 24px 12px;
+      border-bottom: 1px solid var(--faint);
+    }
+    .cg-topbar-title h1 { font-size: 19px; letter-spacing: -.3px; }
+    .cg-flow-hint { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .cg-topbar-status { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .cg-flow-steps { margin: 12px 24px 4px; }
+    .cg-conversation {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      max-height: none;
+      min-height: 0;
+      overflow: auto;
+      padding: 18px 24px;
+      gap: 14px;
+      align-content: start;
+    }
+    .cg-conversation .message {
+      max-width: min(100%, 760px);
+      font-size: 14.5px;
+      box-shadow: var(--shadow-sm);
+    }
+    .cg-conversation .message.assistant {
+      justify-self: start;
+    }
+    .cg-conversation .message.user {
+      justify-self: end;
+    }
+    .cg-next-action { margin: 0 24px 8px; }
+    .cg-composer {
+      margin: 0 24px 10px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--r-lg);
+      background: #fff;
+      box-shadow: var(--shadow-md);
+      padding: 10px 12px;
+    }
+    .cg-attachment {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 6px 10px;
+      border: 1px solid #cad9ff;
+      border-radius: var(--r-pill);
+      background: var(--primary-soft);
+      color: var(--primary-strong);
+      font-size: 12.5px;
+      font-weight: 650;
+      max-width: 100%;
+    }
+    .cg-attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+    .cg-attachment-clear {
+      min-height: 22px; width: 22px; min-width: 22px; padding: 0;
+      border-radius: var(--r-pill); font-size: 15px; line-height: 1;
+      background: rgba(37,99,255,.12); color: var(--primary-strong); box-shadow: none; border: 0;
+    }
+    .cg-attachment-clear:hover { background: rgba(37,99,255,.2); transform: none; box-shadow: none; }
+    .cg-link-hint {
+      margin: 0 0 8px; padding: 6px 10px;
+      border-radius: var(--r-xs); background: #eefaf4; color: var(--success);
+      font-size: 12.5px; font-weight: 650;
+    }
+    .cg-composer-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+    .cg-attach-btn {
+      min-height: 44px; width: 44px; min-width: 44px; padding: 0;
+      font-size: 22px; line-height: 1; border-radius: var(--r-sm);
+      background: #f2f5fb; color: #42526a; border: 1px solid var(--border); box-shadow: none;
+    }
+    .cg-attach-btn:hover { background: #e8eef7; color: var(--ink); transform: none; box-shadow: none; }
+    .cg-input {
+      min-height: 44px; max-height: 200px; resize: none; border-radius: var(--r-sm);
+      border-color: var(--border); background: #fff; line-height: 1.5;
+    }
+    .cg-send { min-width: 88px; min-height: 44px; }
+    .cg-composer-help { margin: 8px 2px 0; color: var(--muted); font-size: 12px; }
+    .cg-dev-drawer {
+      margin: 0 24px 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      background: var(--surface-soft);
+      overflow: hidden;
+    }
+    .cg-dev-drawer summary {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      cursor: pointer; list-style: none; padding: 12px 14px;
+      font-weight: 700; color: var(--ink);
+    }
+    .cg-dev-drawer summary::-webkit-details-marker { display: none; }
+    .cg-dev-drawer summary::after {
+      content: "展开"; min-width: 56px; text-align: center;
+      border: 1px solid var(--border); border-radius: var(--r-pill);
+      padding: 4px 9px; color: #526176; background: #fff; font-size: 12px; font-weight: 650;
+    }
+    .cg-dev-drawer[open] summary::after { content: "收起"; }
+    .cg-dev-body { padding: 0 14px 14px; }
+    .cg-dev-actions { margin-top: 10px; }
+    @media (max-width: 960px) {
+      .chat-app { grid-template-columns: 1fr; }
+      .cg-sidebar {
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        max-height: 38vh;
+      }
+      .cg-main { min-height: 62vh; max-height: none; }
+    }
+    .chat-main textarea.cg-input-removed {
+      min-height: 78px;
+    }
     @media (max-width: 960px) {
       .workbench { grid-template-columns: 1fr; }
       .chat-app .workbench { grid-template-columns: 1fr; }
@@ -1387,117 +1553,82 @@ LAB_PAGE_HTML = """<!doctype html>
     </div>
   </section>
 
-  <main id="chatApp" class="shell chat-app" hidden>
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark" aria-hidden="true">OC</div>
-        <div class="brand-copy">
-          <p class="eyebrow">OpenClaw 分析工作台</p>
-          <h1>短视频分析对话</h1>
-          <p class="brand-subtitle">新建对话、读取视频链接、查看历史记录，并在同一个界面里追踪分析结果。</p>
-        </div>
-      </div>
-      <div class="top-status" aria-label="OpenClaw 运行状态">
-        <div id="runState" class="run-state todo">等待登录</div>
-        <div id="authStatus" class="status todo">未登录</div>
-        <button id="refreshMe" class="secondary">刷新状态</button>
-        <button id="logoutButton" class="secondary">退出</button>
-      </div>
-    </header>
-
-    <nav class="flow-steps" aria-label="分析流程">
-      <div id="flowLogin" class="flow-step active" data-step="1">登录</div>
-      <div id="flowSession" class="flow-step" data-step="2">会话</div>
-      <div id="flowSource" class="flow-step" data-step="3">来源</div>
-      <div id="flowAnalyze" class="flow-step" data-step="4">分析</div>
-      <div id="flowResult" class="flow-step" data-step="5">结果</div>
-    </nav>
-
-    <div class="workbench" aria-label="OpenClaw 中文聊天分析界面">
-      <aside id="sessionPanel" class="panel session-sidebar locked" aria-labelledby="sessionHeading">
-        <div class="sidebar-heading">
-          <div>
-            <p class="eyebrow">会话</p>
-            <h2 id="sessionHeading">历史对话</h2>
+  <main id="chatApp" class="chat-app" hidden>
+    <aside id="sessionPanel" class="cg-sidebar locked" aria-labelledby="sessionHeading">
+      <div class="cg-sidebar-top">
+        <div class="brand cg-brand">
+          <div class="brand-mark" aria-hidden="true">OC</div>
+          <div class="brand-copy">
+            <p class="eyebrow">OpenClaw</p>
+            <h2 id="sessionHeading">短视频分析</h2>
           </div>
-          <button id="createSession" class="primary-flow">新建对话</button>
         </div>
+        <button id="createSession" class="cg-new-chat primary-flow" type="button">＋ 新建对话</button>
+      </div>
+      <div class="cg-session-meta">
         <label for="sessionTitle">新会话标题</label>
         <input id="sessionTitle" value="短视频分析">
         <label for="sessionId" class="technical-label">当前会话 ID</label>
         <input id="sessionId" class="technical-field" autocomplete="off" placeholder="创建会话后自动写入">
-        <div id="sessionList" class="session-list" aria-live="polite">
-          <button type="button" class="session-item empty">登录后显示历史对话</button>
-        </div>
-      </aside>
+      </div>
+      <div id="sessionList" class="cg-session-list session-list" aria-label="历史对话" aria-live="polite">
+        <button type="button" class="session-item empty">登录后显示历史对话</button>
+      </div>
+      <div class="cg-sidebar-footer">
+        <div id="authStatus" class="status todo">未登录</div>
+        <button id="logoutButton" class="secondary" type="button">退出登录</button>
+      </div>
+    </aside>
 
-      <section id="conversationPanel" class="panel chat-main locked" aria-labelledby="conversationHeading">
-        <div class="chat-heading">
-          <div>
-            <p class="eyebrow">聊天</p>
-            <h2 id="conversationHeading">分析对话</h2>
-          </div>
-          <button id="refreshMessages" class="secondary" type="button">刷新历史</button>
+    <section class="cg-main" aria-label="OpenClaw 中文聊天分析界面">
+      <header class="cg-topbar">
+        <div class="cg-topbar-title">
+          <h1>短视频分析对话</h1>
+          <p id="cgFlowHint" class="cg-flow-hint">粘贴抖音视频链接或上传视频文件，也可以直接提问。</p>
         </div>
-        <div id="conversation" class="conversation" aria-live="polite">
-          <div class="message assistant">登录后可以新建对话、提交视频链接，并围绕分析结果继续追问。</div>
+        <div class="cg-topbar-status" aria-label="OpenClaw 运行状态">
+          <div id="runState" class="run-state todo">等待登录</div>
+          <button id="refreshMe" class="secondary" type="button">刷新</button>
         </div>
-        <div class="composer-actions">
-          <div>
-            <label for="prompt">输入问题或分析要求</label>
-            <textarea id="prompt">请分析这个视频。</textarea>
-          </div>
-          <button id="sendChat" class="primary-flow" type="button">发送</button>
-        </div>
-      </section>
+      </header>
 
-      <aside class="tool-stack" aria-label="视频分析工具与结果">
-        <section id="videoPanel" class="panel locked" aria-labelledby="videoHeading">
-          <div class="section-heading">
-            <div>
-              <div class="step-title">
-                <span class="step-index">03</span>
-                <h2 id="videoHeading">视频分析</h2>
-              </div>
-              <p class="section-note">优先使用视频链接读取；上传作为备用入口。</p>
-            </div>
-          </div>
-          <div class="source-tabs" role="tablist" aria-label="视频来源">
-            <button id="linkSourceTab" class="source-tab active" type="button" role="tab" aria-selected="true" aria-controls="linkSourcePanel">链接</button>
-            <button id="uploadSourceTab" class="source-tab" type="button" role="tab" aria-selected="false" aria-controls="uploadSourcePanel">上传</button>
-          </div>
-          <div id="linkSourcePanel" class="source-panel" role="tabpanel" aria-labelledby="linkSourceTab">
-            <label for="videoUrl">视频链接</label>
-            <input id="videoUrl" placeholder="https://v.douyin.com/...">
-            <p class="field-help">先读取链接，确认可解析后再提交模型分析。</p>
-            <div class="actions">
-              <button id="readVideoLink" class="secondary">读取链接</button>
-              <button id="submitJob" class="primary-flow">分析视频</button>
-              <button id="pollJob" class="secondary">刷新状态</button>
-            </div>
-          </div>
-          <div id="uploadSourcePanel" class="source-panel" role="tabpanel" aria-labelledby="uploadSourceTab" hidden>
-            <label for="videoFile">视频文件</label>
-            <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm">
-            <p class="field-help">支持 MP4、MOV、WebM，受服务器上传大小限制保护。</p>
-            <div class="actions">
-              <button id="uploadJob" class="primary-flow">分析上传</button>
-              <button id="uploadSmoke" class="secondary">上传检查</button>
-            </div>
-          </div>
-        </section>
+      <nav class="flow-steps cg-flow-steps" aria-label="分析流程">
+        <div id="flowLogin" class="flow-step active" data-step="1">登录</div>
+        <div id="flowSession" class="flow-step" data-step="2">会话</div>
+        <div id="flowSource" class="flow-step" data-step="3">来源</div>
+        <div id="flowAnalyze" class="flow-step" data-step="4">分析</div>
+        <div id="flowResult" class="flow-step" data-step="5">结果</div>
+      </nav>
 
-        <section class="panel output-panel" aria-labelledby="outputHeading">
-          <div class="section-heading">
-            <div>
-              <div class="step-title">
-                <span class="step-index">05</span>
-                <h2 id="outputHeading">结果与状态</h2>
-              </div>
-              <p class="section-note">先看摘要；必要时展开脱敏明细。</p>
-            </div>
-          </div>
-          <div id="nextAction" class="next-action"><span>下一步</span>请先登录进入分析工作台。</div>
+      <div id="conversation" class="cg-conversation conversation" aria-live="polite">
+        <div class="message assistant">登录后可以新建对话，直接粘贴抖音视频链接、上传视频文件，或就分析结果继续追问。</div>
+      </div>
+
+      <div id="nextAction" class="next-action cg-next-action"><span>下一步</span>请先登录进入分析工作台。</div>
+
+      <div class="cg-composer">
+        <div id="composerAttachment" class="cg-attachment" hidden>
+          <span id="composerAttachmentName" class="cg-attachment-name">未选择文件</span>
+          <button id="composerAttachmentClear" class="cg-attachment-clear" type="button" aria-label="移除附件">×</button>
+        </div>
+        <div id="composerLinkHint" class="cg-link-hint" hidden>检测到视频链接，将作为视频来源分析。</div>
+        <div class="cg-composer-row">
+          <button id="composerAttach" class="cg-attach-btn" type="button" aria-label="上传视频文件" title="上传视频文件">＋</button>
+          <textarea id="prompt" class="cg-input" rows="1" placeholder="粘贴抖音视频链接、上传视频，或直接输入问题…">请分析这个视频。</textarea>
+          <button id="sendChat" class="cg-send primary-flow" type="button" aria-label="发送">发送</button>
+        </div>
+        <p class="cg-composer-help">先读取链接，确认可解析后再提交模型分析；上传视频作为备用入口。</p>
+      </div>
+
+      <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm" class="sr-only" tabindex="-1" aria-hidden="true">
+      <input id="videoUrl" type="hidden" value="">
+
+      <details id="devDrawer" class="cg-dev-drawer">
+        <summary>
+          <span>诊断与结果明细</span>
+          <span class="summary-note">验证工具 · 链接读取 · 任务状态 · 验收 · 原始 JSON</span>
+        </summary>
+        <div class="cg-dev-body">
           <div class="result-overview" aria-label="结果概览">
             <div class="result-card">
               <span>身份</span>
@@ -1530,29 +1661,30 @@ LAB_PAGE_HTML = """<!doctype html>
               <strong id="outputMetric">就绪</strong>
             </div>
           </div>
-          <div id="outputSummary" class="output-summary">登录后新建对话，再添加视频链接或上传文件。</div>
+          <div id="outputSummary" class="output-summary">登录后新建对话，再粘贴视频链接或上传文件。</div>
+          <div class="actions cg-dev-actions">
+            <button id="readVideoLink" class="secondary" type="button">读取链接</button>
+            <button id="submitJob" class="secondary" type="button">分析视频</button>
+            <button id="pollJob" class="secondary" type="button">刷新状态</button>
+            <button id="uploadJob" class="secondary" type="button">分析上传</button>
+            <button id="uploadSmoke" class="secondary" type="button">上传检查</button>
+            <button id="refreshMessages" class="secondary" type="button">刷新历史</button>
+          </div>
+          <div class="actions cg-dev-actions">
+            <button id="identityDiagnostics" class="secondary" type="button">身份诊断</button>
+            <button id="runSelfTest" class="secondary" type="button">自检</button>
+            <button id="runSecurityTest" class="secondary" type="button">安全检查</button>
+            <button id="runPostLoginAcceptance" class="secondary" type="button">登录后验收</button>
+          </div>
           <details class="raw-response">
             <summary>开发详情：脱敏响应</summary>
             <pre id="output">{}</pre>
           </details>
-          <details id="validationTools" class="diagnostics-panel">
-            <summary>
-              <span>验证工具</span>
-              <span class="summary-note">诊断与验收</span>
-            </summary>
-            <div class="operator-actions">
-              <div class="actions">
-                <button id="identityDiagnostics" class="secondary">身份诊断</button>
-                <button id="runSelfTest" class="secondary">自检</button>
-                <button id="runSecurityTest" class="secondary">安全检查</button>
-                <button id="runPostLoginAcceptance" class="secondary">登录后验收</button>
-              </div>
-            </div>
-          </details>
-        </section>
-      </aside>
-    </div>
+        </div>
+      </details>
+    </section>
   </main>
+
   <script>
     const output = document.getElementById('output');
     const landingPage = document.getElementById('landingPage');
@@ -1577,10 +1709,15 @@ LAB_PAGE_HTML = """<!doctype html>
       document.getElementById('flowAnalyze'),
       document.getElementById('flowResult')
     ];
-    const linkSourceTab = document.getElementById('linkSourceTab');
-    const uploadSourceTab = document.getElementById('uploadSourceTab');
-    const linkSourcePanel = document.getElementById('linkSourcePanel');
-    const uploadSourcePanel = document.getElementById('uploadSourcePanel');
+    const linkSourcePanel = null;
+    const uploadSourcePanel = null;
+    let attachedFile = null;
+    let composerMode = 'chat';
+    const composerAttachment = document.getElementById('composerAttachment');
+    const composerAttachmentName = document.getElementById('composerAttachmentName');
+    const composerLinkHint = document.getElementById('composerLinkHint');
+    const videoFileInput = document.getElementById('videoFile');
+    const VIDEO_LINK_RE = /(https?:\/\/[^\s]*douyin\.com[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+)/i;
     let currentJobId = '';
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
@@ -1654,22 +1791,36 @@ LAB_PAGE_HTML = """<!doctype html>
         activateFlow(0);
       }
     }
-    function setSourceMode(mode) {
-      const upload = mode === 'upload';
-      linkSourceTab.classList.toggle('active', !upload);
-      uploadSourceTab.classList.toggle('active', upload);
-      linkSourceTab.setAttribute('aria-selected', upload ? 'false' : 'true');
-      uploadSourceTab.setAttribute('aria-selected', upload ? 'true' : 'false');
-      linkSourcePanel.hidden = upload;
-      uploadSourcePanel.hidden = !upload;
-      sourceMetric.textContent = upload ? '已选择上传' : '已选择链接';
+    function detectVideoLink(text) {
+      const match = (text || '').match(VIDEO_LINK_RE);
+      return match ? match[0] : '';
+    }
+    function updateComposerMode() {
+      const text = document.getElementById('prompt').value || '';
+      const link = detectVideoLink(text);
+      if (attachedFile) {
+        composerMode = 'upload';
+      } else if (link) {
+        composerMode = 'link';
+        document.getElementById('videoUrl').value = link;
+      } else {
+        composerMode = 'chat';
+        document.getElementById('videoUrl').value = '';
+      }
+      if (composerLinkHint) composerLinkHint.hidden = !(composerMode === 'link');
       moveToSourceIfReady();
       syncActionAvailability();
+    }
+    function setAttachedFile(file) {
+      attachedFile = file || null;
+      if (composerAttachment) composerAttachment.hidden = !attachedFile;
+      if (composerAttachmentName) composerAttachmentName.textContent = attachedFile ? attachedFile.name : '未选择文件';
+      updateComposerMode();
     }
     function syncActionAvailability() {
       const authenticated = isAuthenticated();
       const sessionReady = hasSession();
-      const uploadMode = !uploadSourcePanel.hidden;
+      const uploadMode = composerMode === 'upload';
       const chatReady = authenticated && sessionReady;
       document.getElementById('logoutButton').disabled = !authenticated;
       document.getElementById('refreshMe').disabled = false;
@@ -1692,17 +1843,17 @@ LAB_PAGE_HTML = """<!doctype html>
         setPrimaryAction('createSession');
         setNextAction('新建或选择一个历史对话，用来保存链接、上传、消息和结果。');
       } else if (currentJobId) {
-        setPrimaryAction('pollJob');
-        setNextAction('刷新当前任务状态；完成后即可查看结果。');
+        setPrimaryAction('sendChat');
+        setNextAction('分析任务进行中，完成后结果会自动出现在对话里。');
       } else if (uploadMode) {
-        setPrimaryAction('uploadJob');
-        setNextAction('选择视频文件，然后提交上传分析。');
-      } else if (linkReadable) {
-        setPrimaryAction('submitJob');
-        setNextAction('链接读取通过，可以提交模型分析。');
+        setPrimaryAction('sendChat');
+        setNextAction('已选择视频文件，点击发送即可提交分析。');
+      } else if (composerMode === 'link') {
+        setPrimaryAction('sendChat');
+        setNextAction('检测到视频链接，点击发送将先读取链接再提交分析。');
       } else {
-        setPrimaryAction('readVideoLink');
-        setNextAction('先读取视频链接，确认可解析后再提交模型分析。');
+        setPrimaryAction('sendChat');
+        setNextAction('粘贴抖音视频链接、上传视频，或直接输入问题后发送。');
       }
     }
     function setPreLoginView() {
@@ -2556,8 +2707,77 @@ LAB_PAGE_HTML = """<!doctype html>
       setRunState(job && terminalStatuses.has(job.status) ? '任务已结束' : '任务运行中', job && terminalStatuses.has(job.status) ? 'fail' : 'busy');
       });
     }
-    linkSourceTab.addEventListener('click', () => setSourceMode('link'));
-    uploadSourceTab.addEventListener('click', () => setSourceMode('upload'));
+    async function autoPollCurrentJob() {
+      if (!currentJobId) return;
+      const jobId = currentJobId;
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await delay(2000);
+        if (currentJobId !== jobId) return;
+        let poll;
+        try { poll = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId)); }
+        catch { continue; }
+        const job = poll.body.job || null;
+        if (!job) continue;
+        if (job.status === 'succeeded') {
+          const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
+          const summary = result.body.result && result.body.result.result && result.body.result.result.summary;
+          pushMessage('assistant', summary ? ('分析完成：\n\n' + summary) : '分析完成，结果已就绪。可展开“诊断与结果明细”查看结构化结果。');
+          show({ job: poll, result });
+          setRunState('结果已就绪', 'ok');
+          resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
+          activateFlow(4);
+          return;
+        }
+        if (terminalStatuses.has(job.status)) {
+          pushMessage('assistant', buildJobErrorReply(job.error_code));
+          show({ job: poll });
+          setRunState('任务结束', 'fail');
+          resultMetric.textContent = job.status;
+          return;
+        }
+      }
+    }
+    function buildJobErrorReply(errorCode) {
+      const map = {
+        url_rejected: '这个链接没有通过安全校验或无法解析。请发抖音单条视频页链接（形如 https://www.douyin.com/video/xxxx），不要发主页或非抖音链接。',
+        tool_timeout: '这条视频解析超时了。可以稍后重试，或换一条更短的单条视频链接。',
+        tool_failed: '这条视频暂时没能成功解析，所以我不能假装看过它。可以确认视频未被删除/设为私密，或换完整视频页链接重试。'
+      };
+      return map[errorCode] || '分析任务未能完成。可以稍后重试，或换一条视频链接。';
+    }
+    async function handleComposerSend() {
+      if (composerMode === 'upload' && attachedFile) {
+        await uploadJob();
+        setAttachedFile(null);
+        autoPollCurrentJob();
+        return;
+      }
+      if (composerMode === 'link') {
+        const read = await readVideoLink();
+        if (linkReadable) {
+          await submitJob();
+          autoPollCurrentJob();
+        }
+        return;
+      }
+      await sendChat();
+    }
+    document.getElementById('composerAttach').addEventListener('click', () => videoFileInput.click());
+    videoFileInput.addEventListener('change', () => {
+      const file = videoFileInput.files && videoFileInput.files[0];
+      setAttachedFile(file || null);
+    });
+    document.getElementById('composerAttachmentClear').addEventListener('click', () => {
+      videoFileInput.value = '';
+      setAttachedFile(null);
+    });
+    document.getElementById('prompt').addEventListener('input', updateComposerMode);
+    document.getElementById('prompt').addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        if (!document.getElementById('sendChat').disabled) handleComposerSend();
+      }
+    });
     document.getElementById('openLogin').addEventListener('click', openLoginPanel);
     document.getElementById('closeLogin').addEventListener('click', closeLoginPanel);
     window.addEventListener('openclaw:open-login', openLoginPanel);
@@ -2579,17 +2799,13 @@ LAB_PAGE_HTML = """<!doctype html>
     document.getElementById('createSession').addEventListener('click', createSession);
     document.getElementById('readVideoLink').addEventListener('click', readVideoLink);
     document.getElementById('submitJob').addEventListener('click', submitJob);
-    document.getElementById('sendChat').addEventListener('click', sendChat);
+    document.getElementById('sendChat').addEventListener('click', handleComposerSend);
     document.getElementById('refreshMessages').addEventListener('click', refreshMessages);
     document.getElementById('uploadJob').addEventListener('click', uploadJob);
     document.getElementById('uploadSmoke').addEventListener('click', uploadTinySmoke);
     document.getElementById('pollJob').addEventListener('click', pollJob);
     document.getElementById('sessionId').addEventListener('input', () => {
       if (isAuthenticated()) setAuthenticatedView();
-      syncActionAvailability();
-    });
-    document.getElementById('videoUrl').addEventListener('input', () => {
-      linkReadable = false;
       syncActionAvailability();
     });
     setPreLoginView();
