@@ -77,9 +77,10 @@ class VideoAnalysisWorker:
                 "duration_seconds": None,
             },
             "summary": (
-                "Uploaded video received and validated at file level. The V1 upload path verifies async jobs, "
-                "owner isolation, persisted job state, and worker processing; deeper visual understanding can be "
-                "connected as the next analyzer step."
+                "已收到你上传的视频文件，并完成接收校验（文件有效、大小在限制范围内）。"
+                "上传的视频会进入专门的视频处理流程做后续分析，分析能力完善后，"
+                "这里会直接给出画面、动作、结构和改进建议。"
+                "如果想立即获得完整的逐条分析，建议先用抖音视频链接，让我先读取并解析画面内容。"
             ),
             "signals": {
                 "hook": None,
