@@ -1,0 +1,28 @@
+{
+  "schema": "openclaw-chatgpt-faithful-ui-root-evidence.v1",
+  "captured_at": "2026-06-08T03:30:00.000Z",
+  "milestone": "M1.1 - faithful ChatGPT-style UI + upload progress + inline screenshots",
+  "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "deployed_release": "video-agent-fix-20260608T0001",
+  "bridge_image": "openclaw-video-openclaw-bridge:fast",
+  "commit": "af527f7",
+  "summary": "Logged-in UI reworked to a faithful ChatGPT layout: step indicator and metric cards removed from the main view, narrow 260px sidebar, centered single-column conversation (768px content width) with per-message role labels and alternating row bands, centered pill composer with round send button. Upload shows a real XHR progress bar inside the assistant message; analysis renders a progress phase and inline screenshot thumbnails when the result payload exposes frame URLs (upload path is file-level validation only, so it produces no frames by design).",
+  "public_routes": { "huahuo_root_status": 200, "openclaw_lab_status": 200, "openclaw_api_me_unauthenticated_status": 401 },
+  "dify_invariants": { "api_web_nginx_unchanged": true, "started_at_reference": "2026-01-05T11:17:xxZ", "only_bridge_recreated": true },
+  "layout": { "horizontal_overflow_px": 0, "flow_steps_hidden": true, "sidebar_width_px": 260, "composer_centered": true, "composer_content_width_px": 768, "send_button_round": true },
+  "real_upload_e2e": {
+    "method": "headless browser, real account login, real 28.6MB mp4 upload",
+    "login_chat_visible": true,
+    "session_created": true,
+    "attachment_chip_shown": true,
+    "upload_progress_bar_shown": true,
+    "analysis_reached_terminal": "结果已就绪 / 分析完成",
+    "page_js_errors": 0,
+    "screenshots_for_upload": 0,
+    "screenshots_note": "upload analyzer is file-level validation by design; no frames produced. inline screenshot grid is wired for results that expose frame URLs.",
+    "account_recorded": false,
+    "password_recorded": false,
+    "video_path_recorded": false
+  },
+  "secrets_recorded": false, "cookies_recorded": false, "headers_recorded": false
+}
