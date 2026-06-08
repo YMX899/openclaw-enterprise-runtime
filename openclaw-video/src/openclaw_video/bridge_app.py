@@ -1483,6 +1483,9 @@ LAB_PAGE_HTML = """<!doctype html>
       100% { margin-left: 100%; }
     }
     .cg-progress-label { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+    .cg-progress-label-done { color: var(--success); font-weight: 650; }
+    .cg-progress-label-failed { color: var(--danger); font-weight: 650; }
+    .cg-progress-done, .cg-progress-failed { margin-top: 8px; }
     .cg-composer-wrap {
       padding: 10px 20px 14px;
       background: linear-gradient(180deg, rgba(255,255,255,0), #fff 40%);
@@ -2229,14 +2232,20 @@ LAB_PAGE_HTML = """<!doctype html>
           if (text) lab.textContent = text;
         },
         done(text) {
-          fill.classList.remove('indeterminate');
-          fill.style.width = '100%';
-          if (text) lab.textContent = text;
+          // Remove the progress bar entirely and show a clean done line,
+          // so a full bar never lingers and looks "stuck".
+          wrap.classList.add('cg-progress-done');
+          bar.remove();
+          lab.textContent = (text ? ('✓ ' + text) : '✓ 已完成');
+          lab.classList.add('cg-progress-label-done');
+          conversation.scrollTop = conversation.scrollHeight;
         },
         fail(text) {
-          fill.classList.remove('indeterminate');
-          fill.style.background = 'var(--danger)';
-          if (text) lab.textContent = text;
+          wrap.classList.add('cg-progress-failed');
+          bar.remove();
+          lab.textContent = (text ? ('✕ ' + text) : '✕ 未完成');
+          lab.classList.add('cg-progress-label-failed');
+          conversation.scrollTop = conversation.scrollHeight;
         },
         remove() { wrap.remove(); }
       };
