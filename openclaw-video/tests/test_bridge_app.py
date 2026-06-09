@@ -1,4 +1,7 @@
 import os
+# Tests assume "new session has no messages" baseline; the production greeting
+# injection is enabled separately via env var or create_app(inject_session_greeting=True).
+os.environ.setdefault("BRIDGE_INJECT_SESSION_GREETING", "0")
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory

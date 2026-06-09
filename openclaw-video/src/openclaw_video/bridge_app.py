@@ -59,8 +59,9 @@ from .upload_store import UploadStoreError, delete_upload_uri, store_upload_file
 from .url_guard import UrlRejected
 from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_video_link
 from .agent_persona import (
-    GREETING,
+    NEW_SESSION_GREETING,
     build_agent_message,
+    derive_state,
     detect_intent,
     guardrail_for_message,
 )
@@ -3189,6 +3190,7 @@ def create_app(
     gateway: Any | None = None,
     openclaw_authenticator: Any | None = None,
     identity_secret: str | None = None,
+    inject_session_greeting: bool | None = None,
 ) -> FastAPI:
     app = FastAPI(title="OpenClaw Dify Bridge", version="0.1.0")
     identity_provider = os.environ.get("BRIDGE_IDENTITY_PROVIDER", "dify").strip().lower()
@@ -3203,6 +3205,8 @@ def create_app(
     gateway = gateway or OpenClawGatewayWsClient.from_environment()
     openclaw_authenticator = openclaw_authenticator or default_openclaw_authenticator()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
+    if inject_session_greeting is None:
+        inject_session_greeting = os.environ.get("BRIDGE_INJECT_SESSION_GREETING", "1").lower() in {"1", "true", "yes"}
     enable_test_identity_headers = os.environ.get("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", "").lower() in {"1", "true", "yes"}
     test_identity_secret = os.environ.get("BRIDGE_TEST_IDENTITY_SECRET", "")
     enable_dify_provider_identity = os.environ.get("OPENCLAW_ENABLE_DIFY_PROVIDER_IDENTITY", "0").lower() in {
@@ -3551,6 +3555,16 @@ def create_app(
             routing_user,
             session_id=session_id,
         )
+        # M2: post a greeting message to guide the user every time a new
+        # conversation is opened. Failures are non-fatal — the session itself
+        # is created either way.
+        if inject_session_greeting:
+            try:
+                session_store.add_message(
+                    session.id, principal.principal_id, "assistant", NEW_SESSION_GREETING,
+                )
+            except Exception:
+                pass
         return {"session": _serialize_session(session)}
 
     @app.get("/openclaw-api/sessions/{session_id}/messages")
@@ -3821,11 +3835,37 @@ def create_app(
                 },
             )
 
-        # Rule 2: detect intent; inject persona on first turn so the agent
-        # has a fixed short-video-coach identity from the start.
+        # Rule 2: detect intent + derive conversation state, then inject persona
+        # on first turn (and a compact state hint on subsequent turns).
         intent = detect_intent(content)
         is_first_turn = not any(msg for msg in history if msg.role == "user")
-        agent_content = build_agent_message(content, is_first_turn=is_first_turn)
+        # Inspect history for the latest video job state (terminal/failed).
+        has_terminal_video = any(
+            getattr(msg, "job_id", None) for msg in history
+        )
+        video_failed = False
+        try:
+            for msg in reversed(history):
+                jid = getattr(msg, "job_id", None)
+                if not jid:
+                    continue
+                try:
+                    job = job_store.get_job(jid, principal.principal_id)
+                except (JobNotFound, JobOwnershipError):
+                    continue
+                status = getattr(job.status, "value", str(job.status))
+                if status in {"failed", "timed_out", "cancelled"}:
+                    video_failed = True
+                break
+        except Exception:
+            pass
+        state = derive_state(
+            has_user_history=not is_first_turn,
+            has_terminal_video=has_terminal_video,
+            video_failed=video_failed,
+            intent=intent,
+        )
+        agent_content = build_agent_message(content, is_first_turn=is_first_turn, state=state)
 
         # ── OpenClaw Gateway agent call ──────────────────────────────────
         chat_request = GatewayChatRequest(
