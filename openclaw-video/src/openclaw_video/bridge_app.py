@@ -1912,7 +1912,7 @@ LAB_PAGE_HTML = """<!doctype html>
     const composerAttachmentName = document.getElementById('composerAttachmentName');
     const composerLinkHint = document.getElementById('composerLinkHint');
     const videoFileInput = document.getElementById('videoFile');
-    const VIDEO_LINK_RE = /(https?:\/\/[^\s]*douyin\.com[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+)/i;
+    const VIDEO_LINK_RE = /(https?:\/\/(?:[\w.-]*\.)?douyin\.com\/(?!user\/)[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+)/i;
     let currentJobId = '';
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
@@ -2453,7 +2453,9 @@ LAB_PAGE_HTML = """<!doctype html>
         sourceMetric.textContent = '等待视频来源';
         resultMetric.textContent = '会话已就绪';
         activateFlow(2);
-        renderMessages([]);
+        // Load messages from the server so the per-session greeting (if any)
+        // posted by the Bridge appears in the conversation.
+        await refreshMessages({ quiet: true });
       } else {
         setRunState('需要处理', 'fail');
       }

@@ -191,7 +191,7 @@ def guardrail_for_message(text: str) -> GuardrailReply | None:
         return GuardrailReply(
             content=(
                 f"这个链接看起来是{platform}的，第一版只支持抖音视频链接，"
-                "还不能读取或转录其他平台的视频，也不会假装已经看过它。\n\n"
+                "暂时还不能读取或解析其他平台的视频，也不会假装已经看过它。\n\n"
                 "你可以发抖音单条视频链接（形如 https://www.douyin.com/video/xxxx），"
                 "或者把视频内容大概描述给我，我可以先从选题、开头和结构上帮你判断。"
             ),
