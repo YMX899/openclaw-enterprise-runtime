@@ -8,6 +8,9 @@ codex-browser-cookies.db
 *.p12
 *.pfx
 
+# Test account credentials — operational input only, never commit
+agent.md
+
 # Temporary scratch files
 tmp/
 .phase1-sandbox/

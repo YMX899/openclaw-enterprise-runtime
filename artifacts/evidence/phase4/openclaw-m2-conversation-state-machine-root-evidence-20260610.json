@@ -1,0 +1,42 @@
+{
+  "schema": "openclaw-m2-conversation-state-machine-root-evidence.v1",
+  "date": "2026-06-10",
+  "timezone": "Asia/Shanghai",
+  "environment": "root (AI-01)",
+  "milestone": "M2 续 — 完整会话状态机与分支对话（第一版方案第 10/11/13 章）",
+  "design": {
+    "stage_storage": "derived from persisted message + job history (no DB schema change)",
+    "branch_replies": "hybrid — fixed Bridge copy for guidance/guardrail/error, agent-generated coaching for feedback_given/follow_up with the real analysis summary injected"
+  },
+  "secrets_recorded": false,
+  "notes_on_redaction": "No account/password/cookie/token/URL/model key recorded. Assistant reply text not stored verbatim; only pass/fail + bounded structural facts.",
+  "deploy": {
+    "changed_files": ["openclaw_video/agent_persona.py", "openclaw_video/bridge_app.py"],
+    "method": "LF-normalized upload to current release src + py_compile + root_rebuild_bridge_fast.sh",
+    "rebuild_result": "bridge_fast_rebuild=PASS (only openclaw-bridge container recreated)"
+  },
+  "local_tests": "301 tests; only the pre-existing unrelated failure test_identity_diagnostics_fails_closed_for_multiple_current_workspaces remains; the prior _intent schema-contract regression is fixed.",
+  "public_route_invariants": {"openclaw_page": 200, "unauthenticated_openclaw_api": 401},
+  "dify_core_invariants": {
+    "unchanged_by_this_deploy": true,
+    "docker-api-1_startedAt": "2026-06-09T13:36:22Z (pre-existing, not changed by this work)",
+    "docker-web-1_startedAt": "2026-01-05T11:17:19Z",
+    "docker-nginx-1_startedAt": "2026-01-05T11:17:20Z"
+  },
+  "conversation_e2e_checks": {
+    "all_passed": true,
+    "login_200": true,
+    "create_session_201": true,
+    "session_greeting": true,
+    "collecting_intent_fixed_reply": "我想做短视频 -> fixed guidance (赛道/目标用户/变现) — agent not called",
+    "response_has_no_intent_field": "response keys == {message, session}",
+    "waiting_for_video_fixed_reply": "帮我分析一个视频 (no link) -> fixed guidance to send douyin link or upload",
+    "non_douyin_guardrail": "YouTube link -> fixed unsupported-platform copy",
+    "profile_link_guardrail": "douyin /user/ link -> fixed profile-link copy",
+    "real_video_succeeded": "real douyin /video/ link analyzed (status=succeeded)",
+    "follow_up_grounded_in_analysis": "开头怎么改 -> 971-char coaching reply that referenced the actual analyzed video content (the real analysis summary was injected into the agent prompt by the Bridge)",
+    "note_failed": "douyin /note/ 图文 link -> job failed",
+    "error_recovery_reply": "post-failure text -> fixed error copy ('不会假装已经看过视频', guidance to resend a valid single-video link)"
+  },
+  "key_validation": "Follow-up coaching is grounded in the real worker/Doubao analysis (which is NOT in the Gateway agent memory) because the Bridge injects the analysis summary into the branch prompt — verified live by the reply naming actual lines from the analyzed video."
+}

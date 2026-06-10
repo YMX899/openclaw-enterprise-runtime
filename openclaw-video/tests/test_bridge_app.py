@@ -1438,6 +1438,115 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(gateway.requests[1].history[1]["content"], "reply to first")
         self.assertNotIn("second", [item["content"] for item in gateway.requests[1].history])
 
+    # --- M2 续: conversation state machine + branch routing -------------
+
+    def _chat_client(self, gateway):
+        from openclaw_video.bridge_app import create_app
+
+        return TestClient(
+            create_app(
+                dify=FakeDifyClient(),
+                session_store=self.sessions,
+                job_store=self.jobs,
+                gateway=gateway,
+                identity_secret="test-secret",
+            )
+        )
+
+    def _analysis_result(self, summary):
+        return {
+            "schema_version": "openclaw-video-result.v1",
+            "source": {"video_url_canonical": "https://v.douyin.com/abc", "platform": "douyin", "duration_seconds": 12},
+            "summary": summary,
+            "signals": {"hook": "ok"},
+            "raw_tool_result": {"ok": True},
+            "created_at": "2026-06-06T00:00:00Z",
+        }
+
+    def test_chat_collecting_intent_uses_fixed_reply_without_agent(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        r = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "我想做短视频"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("赛道", r.json()["message"]["content"])
+        self.assertEqual(len(gateway.requests), 0)  # fixed reply, agent not called
+        self.assertNotIn("_intent", r.json())  # schema contract: no extra field
+
+    def test_chat_waiting_for_video_fixed_reply_for_analysis_intent(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        # First casual turn -> new -> agent answers.
+        client.post("/openclaw-api/chat", json={"session_id": session["id"], "content": "你好"}, headers=self.auth("account-a"))
+        self.assertEqual(len(gateway.requests), 1)
+        # Now "analyze a video" with no link -> waiting_for_video fixed guidance, no agent call.
+        r = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "帮我分析一个视频"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("抖音", r.json()["message"]["content"])
+        self.assertIn("上传", r.json()["message"]["content"])
+        self.assertEqual(len(gateway.requests), 1)  # unchanged: no agent call this turn
+
+    def test_chat_follow_up_injects_real_analysis_summary(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        self.jobs.complete_job(job["job_id"], self._analysis_result("开头三秒用了悬念但选题偏窄"), "openclaw-video-result.v1")
+        r = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "开头怎么改"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(gateway.requests)
+        sent = gateway.requests[-1].content
+        self.assertIn("开头三秒用了悬念但选题偏窄", sent)  # real summary injected
+        self.assertIn("严格基于它回答", sent)
+
+    def test_chat_error_recovering_fixed_reply_on_failed_job(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        self.jobs.fail_job(job["job_id"], "tool_timeout")
+        r = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "怎么样了"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("没有在限定时间内完成", r.json()["message"]["content"])
+        self.assertEqual(len(gateway.requests), 0)  # error path is fixed copy, no agent
+
+    def test_chat_response_has_no_intent_field(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        r = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "你好"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(set(r.json().keys()), {"message", "session"})
+
     def test_cross_user_cannot_chat_with_other_users_session(self):
         from openclaw_video.bridge_app import create_app
 

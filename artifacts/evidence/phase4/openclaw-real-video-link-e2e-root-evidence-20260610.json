@@ -1,0 +1,62 @@
+{
+  "schema": "openclaw-real-video-link-e2e-root-evidence.v1",
+  "date": "2026-06-10",
+  "timezone": "Asia/Shanghai",
+  "environment": "root (AI-01)",
+  "base_url": "https://www.huahuoai.com",
+  "purpose": "Prove the douyin video-link analysis path works end-to-end through the real OpenClaw product API.",
+  "secrets_recorded": false,
+  "notes_on_redaction": "No account/password/cookie/token/database URL/model key recorded. No raw video URLs or resolved CDN direct URLs recorded. Model analysis text not stored verbatim; only length + sha256 + bounded structural fields.",
+  "input": {
+    "user_provided": "douyin share link (v.douyin.com short link)",
+    "canonical_kind": "/video/ (regular video, aweme_type=video)",
+    "canonical_video_id": "7648881101351999931"
+  },
+  "public_route_invariants": {
+    "huahuo_root": 200,
+    "openclaw_page": 200,
+    "unauthenticated_openclaw_api": 401
+  },
+  "dify_core_invariants": {
+    "checked": ["docker-api-1", "docker-web-1", "docker-nginx-1"],
+    "unchanged_by_this_test": true,
+    "docker-api-1_startedAt": "2026-06-09T13:36:22Z (already at this value before this session; not changed by this test)",
+    "docker-web-1_startedAt": "2026-01-05T11:17:19Z (anchor, unchanged)",
+    "docker-nginx-1_startedAt": "2026-01-05T11:17:20Z (anchor, unchanged)"
+  },
+  "flow": {
+    "login": {"http_status": 200, "authenticated": true},
+    "me": {"http_status": 200, "authenticated": true},
+    "create_session": {"http_status": 201},
+    "read_check": {
+      "http_status": 200,
+      "status": "PASS",
+      "redirect_hop_count": 2,
+      "resolved_ip_count": 8,
+      "video_id_present": true,
+      "direct_video_candidate_count": 2,
+      "content_type": "video/mp4",
+      "duration_seconds": 33.034,
+      "size_bytes": 6334603,
+      "eligible_for_model_analysis": true,
+      "raw_url_recorded": false,
+      "direct_video_url_recorded": false
+    },
+    "submit_job": {"http_status": 202, "initial_status": "queued"},
+    "poll_job": {"final_status": "succeeded", "approx_seconds_to_succeed": 45},
+    "result": {
+      "http_status": 200,
+      "schema_version": "openclaw-video-result.v1",
+      "platform": "douyin",
+      "duration_seconds": 33.034,
+      "summary_len": 1065,
+      "summary_sha256": "c5948fb3118e20a71577e9d393e83da1779d19f3c0b9cb22cbe6cd165a876aa4"
+    }
+  },
+  "reproducibility": "Three consecutive end-to-end runs all reached status=succeeded (job prefixes dc30728c, c6241220, 259871cb); the third captured the full analysis result payload.",
+  "diagnostic_findings": {
+    "video_path_health": "Regular douyin /video/ links resolve to a douyinvod.com CDN direct URL via the deployed vendored resolver (iesdouyin SSR _ROUTER_DATA extraction); Doubao (doubao-seed-2-0-pro) analyzes that URL directly and returns a structured Chinese short-video analysis.",
+    "image_text_notes_gap": "douyin /note/ image-text posts (aweme_type=2, e.g. OOTD slideshows) have video.duration=0 and no real video stream; the video path cannot analyze them. Supporting them needs an image_url (image-analysis) path, tracked as separate work.",
+    "reference_project": "D:/DESK/视频解析/源文件/tik douyin_chong is the upstream of the vendored copy; its extra robustness value is the inline base64 fallback (download bytes -> data: URL) for cases where Doubao cannot fetch a CDN URL."
+  }
+}

@@ -61,8 +61,12 @@ from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_v
 from .agent_persona import (
     NEW_SESSION_GREETING,
     build_agent_message,
+    build_branch_prompt,
+    current_video_from_history,
     derive_state,
     detect_intent,
+    error_reply_for,
+    fixed_state_reply,
     guardrail_for_message,
 )
 
@@ -3837,15 +3841,25 @@ def create_app(
                 },
             )
 
-        # Rule 2: detect intent + derive conversation state, then inject persona
-        # on first turn (and a compact state hint on subsequent turns).
+        # Rule 2: detect intent + derive conversation state. State is derived
+        # from persisted message + job history (no DB stage column). Deterministic
+        # guidance/error branches are answered with fixed Bridge copy; coaching
+        # branches (feedback_given / follow_up) call the agent with the real
+        # analysis summary injected.
         intent = detect_intent(content)
-        is_first_turn = not any(msg for msg in history if msg.role == "user")
-        # Inspect history for the latest video job state (terminal/failed).
-        has_terminal_video = any(
-            getattr(msg, "job_id", None) for msg in history
-        )
-        video_failed = False
+        is_first_turn = not any(msg.role == "user" for msg in history)
+        has_terminal_video = any(getattr(msg, "job_id", None) for msg in history)
+
+        def _job_status(job_id: str) -> str | None:
+            try:
+                job = job_store.get_job(job_id, principal.principal_id)
+            except (JobNotFound, JobOwnershipError):
+                return None
+            return getattr(job.status, "value", str(job.status))
+
+        # Latest video job (newest message with a job_id) → analyzing/failed signal.
+        latest_status: str | None = None
+        latest_error_code: str | None = None
         try:
             for msg in reversed(history):
                 jid = getattr(msg, "job_id", None)
@@ -3855,19 +3869,54 @@ def create_app(
                     job = job_store.get_job(jid, principal.principal_id)
                 except (JobNotFound, JobOwnershipError):
                     continue
-                status = getattr(job.status, "value", str(job.status))
-                if status in {"failed", "timed_out", "cancelled"}:
-                    video_failed = True
+                latest_status = getattr(job.status, "value", str(job.status))
+                latest_error_code = getattr(job, "error_code", None)
                 break
         except Exception:
             pass
+        video_failed = latest_status in {"failed", "timed_out", "cancelled"}
+        video_analyzing = latest_status in {"queued", "running"}
+        current_video_job_id, _current_video_url = current_video_from_history(history, _job_status)
+        has_current_video = current_video_job_id is not None
+
         state = derive_state(
             has_user_history=not is_first_turn,
             has_terminal_video=has_terminal_video,
             video_failed=video_failed,
             intent=intent,
+            has_current_video=has_current_video,
+            video_analyzing=video_analyzing,
         )
-        agent_content = build_agent_message(content, is_first_turn=is_first_turn, state=state)
+
+        # ── Branch A: deterministic Bridge reply (no agent call) ─────────
+        fixed_reply = error_reply_for(latest_error_code) if video_failed else fixed_state_reply(state, intent)
+        if fixed_reply is not None:
+            assistant_message = session_store.add_message(
+                session_id, principal.principal_id, "assistant", fixed_reply,
+            )
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": _serialize_message(assistant_message),
+                    "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
+                },
+            )
+
+        # ── Branch B: agent-generated reply ─────────────────────────────
+        if state in {"feedback_given", "follow_up"} and current_video_job_id:
+            analysis_summary: str | None = None
+            try:
+                video_result = job_store.get_result(current_video_job_id, principal.principal_id)
+                payload = getattr(video_result, "result", None)
+                if isinstance(payload, dict):
+                    analysis_summary = str(payload.get("summary") or "")
+            except (JobNotFound, JobOwnershipError):
+                pass
+            agent_content = build_branch_prompt(
+                content, state=state, intent=intent, analysis_summary=analysis_summary,
+            )
+        else:
+            agent_content = build_agent_message(content, is_first_turn=is_first_turn, state=state)
 
         # ── OpenClaw Gateway agent call ──────────────────────────────────
         chat_request = GatewayChatRequest(
@@ -3894,7 +3943,6 @@ def create_app(
             content={
                 "message": _serialize_message(assistant_message),
                 "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
-                "_intent": intent,
             },
         )
 

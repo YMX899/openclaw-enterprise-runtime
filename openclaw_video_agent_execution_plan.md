@@ -54,7 +54,170 @@ Rules:
 
 ## Video Analysis Boundary
 
-The active scheme is video link-read mode:
+### Direction update 2026-06-10 (user-confirmed)
+
+Doubao 2.0 (`doubao-seed-2-0-pro`) can analyze a video **directly from a video
+URL**. We do not download the user's video and then analyze frames locally.
+The product therefore supports exactly two input methods, both ending in a
+single Doubao-from-URL analysis call:
+
+1. **Video link** — user pastes a share/video link.
+2. **Video file upload** — user uploads a local video file.
+
+Flow contract (both methods):
+
+```text
+user sends video link OR uploads a video file
+-> OpenClaw agent recognizes a video input and calls the analysis tool
+-> the tool produces a Doubao-fetchable video URL
+     - link: Bridge URL guard -> redirect revalidation ->
+       douyin_chong UniversalVideoResolver -> direct CDN video URL
+     - upload: stored file is exposed as a Doubao-fetchable video URL
+-> ArkVideoClient.analyze(video_urls=[...]) — Doubao reads the URL directly
+-> structured analysis result returned to the conversation
+```
+
+Key points:
+
+- No "download the whole file, extract frames, then analyze" step. The model
+  reads the video from the URL itself. Any local byte read is only a bounded
+  safety probe (size/duration guard), not a precondition for analysis.
+- The Bridge URL guard + redirect revalidation stay — they are a **security
+  control** (SSRF/private-network/metadata defense), not a download step.
+- For douyin share links the resolver is still required, because a share link
+  is an HTML page, not a direct video URL Doubao can fetch.
+- For uploads, the open item is exposing the stored file as a URL the Volcano
+  Ark API can fetch (the upload path is currently a file-level-validation
+  placeholder and does not yet run a real Doubao analysis).
+- The agent only decides "this turn carries a video input -> call the tool";
+  it does not read or transcode the video itself. Rule-based detection and the
+  worker pipeline remain on the Bridge side.
+
+**Immediate task (this round, user-confirmed 2026-06-10):** prove the **link
+method** end-to-end on root — user pastes a real douyin link, the tool resolves
+it, Doubao analyzes from the resolved URL, and the structured result is returned
+into the conversation. Making the **upload method** run a real Doubao analysis
+(exposing the stored file as an Ark-fetchable URL) is deferred to a separate
+work item; the upload path stays as the file-level-validation placeholder for
+now.
+
+### Root test finding 2026-06-10 (link path)
+
+Ran the link path end-to-end on root with a real douyin share link
+(`v.douyin.com/...`). Result: the API plumbing is healthy but real analysis
+fails at the **resolver** layer.
+
+- Healthy: OpenClaw login `200`, `/me` `200`, create session `201`,
+  read-check `200`, job submit `202`, queue + worker pickup all work.
+- Read-check returned `status=WARN`: resolver produced `video_id` + 2 direct
+  candidates, but `duration_seconds=0.0`, `size_known=false`,
+  `eligible_for_model_analysis=false`.
+- Job failed in ~5s with `error_code=tool_failed`. Adapter stderr:
+  `video size is unavailable` — the local streaming size probe
+  (`_probe_stream_size_bytes` in `_enforce_limits`) could not read the
+  candidate URL.
+- Bypassing the size probe and calling Doubao directly returned
+  `400 InvalidParameter (param: video_url)` — Doubao's own fetch of the
+  candidate URL failed.
+- Reachability probe of both candidates: host `aweme.snssdk.com`, DNS + TCP
+  443 OK, but HTTP `404 Not Found`. `content_type=None`, `duration_ms=0`.
+
+Root cause: the vendored `douyin_chong` `UniversalVideoResolver` returns a
+degraded douyin detail response (a `play_addr` whose `url_list[0]` 404s, no
+duration). This is douyin web-API / anti-bot signature drift, **not** a Bridge,
+worker, or Doubao limitation. Doubao-from-URL works only when the resolver
+yields a publicly fetchable direct video URL; for this link it does not.
+
+Removing the local size-probe download (per the direction above) is still
+correct but is **not sufficient** — Doubao cannot fetch a 404 URL either. The
+real blocker is restoring correct douyin link resolution. Decision pending with
+the user on how to proceed (fix/refresh resolver signing, use a maintained
+parsing path, and/or prioritize the upload path which sidesteps douyin
+resolution).
+
+Follow-up test (does Doubao fetch the douyin link itself?): the user noted that
+Doubao should be able to take a video link directly. Tested all three readings
+against the deployed Ark `chat.completions` `video_url` path, same link:
+
+1. resolver direct URL (`aweme.snssdk.com`) as `video_url` → `400`, candidate
+   `404`.
+2. raw share link (`v.douyin.com/...`) and redirect-expanded
+   (`www.douyin.com/video/...`) as `video_url` → `400 InvalidParameter`,
+   message `Error while connecting: ... status code 444`. Doubao's fetcher
+   reaches douyin but douyin returns HTTP `444` (anti-bot connection close).
+3. link as plain text in the prompt (no `video_url` part) → model replies
+   "我无法访问该抖音视频链接对应的内容" — chat.completions does not browse.
+
+Consolidated root cause: **douyin anti-bot blocks programmatic access to the
+video stream — including Doubao's own server-side fetch (HTTP 444).** Doubao has
+no special ability to fetch douyin links via this path despite the shared
+ByteDance ownership. The link path therefore needs something that defeats
+douyin anti-bot to produce a clean Doubao-fetchable URL (the resolver's job,
+currently broken). The **upload path has no anti-bot wall** and is the most
+reliable route to a working analysis. (If a different Doubao video-understanding
+endpoint that natively accepts douyin links exists, that would change this —
+not the case for the deployed Ark chat.completions path.)
+
+### CORRECTED CONCLUSION 2026-06-10 (the earlier "resolver broken / anti-bot wall" was wrong)
+
+After reading the user's working reference project `D:\DESK\视频解析\源文件\tik`
+(`douyin_chong`, the upstream of our vendored copy) and isolating link types on
+root, the real situation is:
+
+- **Regular douyin `/video/` links already work end-to-end on root.** Tested the
+  DEPLOYED vendored resolver against `www.douyin.com/video/7590677612922457363`:
+  it resolved `duration=39846ms`, `video/mp4`, `9.28MB`, **a real
+  `douyinvod.com` CDN direct URL**, and Doubao returned a full 1564-char Chinese
+  analysis directly from that URL (tier-1, no fallback). The deployed pipeline is
+  NOT broken for videos.
+- **The user's test link `8KDNVUWc7dE` is NOT a video.** It canonicalizes to
+  `www.douyin.com/note/7648723208791056627`, and the note SSR payload shows
+  `aweme_type=2` (douyin **图文 / image-text post**), `images` present,
+  `video.duration=0`, desc `#今日穿搭灵感 #ootd女生穿搭 …`. It is an OOTD image
+  slideshow with background music — there is no video stream to analyze, which is
+  why every video path failed for it (the `aweme.snssdk.com` play endpoint 4xx’s
+  because there is no real video; for true videos that endpoint 302-redirects to
+  `douyinvod.com`).
+- The earlier "Timeout/444/404" results were all artifacts of feeding a 图文
+  note (or its HTML page) into a video path. They do **not** indicate a resolver
+  regression or an anti-bot wall for normal videos.
+- "照搬" the reference would not fix this link: the reference resolver is
+  video-only and does not even extract a `/note/` id; our deployed copy is
+  actually slightly newer (has `/note/` id handling) yet still cannot produce a
+  video for a 图文.
+
+Net: the link path for normal douyin videos is healthy. The real gap is
+**图文 (image-text) note support**, which needs a different path — send the note's
+`images[].url_list` as `image_url` content parts to Doubao (image analysis),
+not `video_url` (video analysis). The reference project's value for us is the
+**inline base64 fallback** (download bytes ourselves → `data:` URL) for the rare
+case where Doubao cannot fetch a valid CDN URL — a robustness add-on, not the
+fix for this link.
+
+My root testing did not restart/rebuild any Dify core container
+(`docker-api-1`/`web-1`/`nginx-1`).
+
+### Link path VERIFIED end-to-end on root 2026-06-10
+
+With a real douyin **video** link (user-provided, canonical
+`/video/7648881101351999931`, 33s, 6.04MB), the full product flow succeeded
+through the real OpenClaw API: login `200` → `/me` `200` → create session `201`
+→ read-check `PASS` (eligible_for_model_analysis=true) → submit job `202` →
+`queued → running → succeeded` (~45s) → result `200`
+(`schema_version=openclaw-video-result.v1`, `platform=douyin`,
+`summary_len=1065`, a full structured Chinese analysis). Reproduced across three
+consecutive runs. Public routes stayed `200/200/401` and Dify core container
+ids/StartedAt were unchanged. Sanitized evidence:
+`artifacts/evidence/phase4/openclaw-real-video-link-e2e-root-evidence-20260610.json`.
+
+Conclusion: the douyin **video**-link analysis path is working and verified.
+Remaining (separate, optional) work: **图文 (image-text) note support** via an
+`image_url` path, and the **inline base64 fallback** robustness add-on from the
+reference project.
+
+### Active scheme (security + resolution detail)
+
+The active scheme is video link-read / direct-URL mode:
 
 ```text
 user video link
@@ -63,7 +226,7 @@ user video link
 -> Worker
 -> douyin_chong UniversalVideoResolver
 -> direct video candidates
--> model-backed analysis
+-> Doubao analysis directly from the resolved URL
 ```
 
 Retired scheme:
