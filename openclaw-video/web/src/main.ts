@@ -346,9 +346,7 @@ const output = document.getElementById('output');
         inner.textContent = text;
       }
       node.appendChild(inner);
-      if (role === 'assistant') {
-        node.appendChild(buildMsgActions(node));
-      }
+      node.appendChild(buildMsgActions(node, role));
       conversation.appendChild(node);
       conversation.scrollTop = conversation.scrollHeight;
       return node;
@@ -466,45 +464,95 @@ const output = document.getElementById('output');
         else if (q) empty.textContent = '没有匹配“' + q + '”的对话';
         else empty.textContent = '还没有对话，点击上方“新建对话”开始。';
         sessionList.appendChild(empty);
+        updateBatchUi();
         return;
       }
       const activeId = document.getElementById('sessionId').value;
-      const order = ['今天', '昨天', '最近 7 天', '最近 30 天', '更早'];
-      const groups = {};
-      visible.forEach(s => {
-        const g = sessionGroup(s.updated_at || s.created_at);
-        (groups[g] = groups[g] || []).push(s);
-      });
-      order.forEach(g => {
-        if (!groups[g]) return;
+      const ov = id => sessionOverrides[id] || {};
+      const pinned = visible.filter(s => ov(s.id).pinned && !ov(s.id).archived);
+      const archived = visible.filter(s => ov(s.id).archived);
+      const normal = visible.filter(s => !ov(s.id).pinned && !ov(s.id).archived);
+
+      function renderRow(session) {
+        const row = document.createElement('div');
+        row.className = 'session-row' + (session.id === activeId ? ' active' : '');
+        if (batchMode) {
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'cg-row-check';
+          cb.checked = batchSelected.has(session.id);
+          cb.setAttribute('aria-label', '选择对话');
+          cb.addEventListener('click', e => e.stopPropagation());
+          cb.addEventListener('change', () => {
+            if (cb.checked) batchSelected.add(session.id); else batchSelected.delete(session.id);
+            updateBatchUi();
+          });
+          row.appendChild(cb);
+        }
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'session-item' + (session.id === activeId ? ' active' : '');
+        item.dataset.sessionId = session.id || '';
+        if (ov(session.id).pinned) {
+          const pin = document.createElement('span');
+          pin.className = 'session-pin';
+          pin.setAttribute('aria-label', '已置顶');
+          pin.innerHTML = '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M9 4h6l-1 6 3 3v1H7v-1l3-3-1-6z"></path></svg>';
+          item.appendChild(pin);
+        }
+        const title = document.createElement('span');
+        title.className = 'session-title';
+        title.textContent = sessionDisplayTitle(session);
+        item.appendChild(title);
+        item.addEventListener('click', () => {
+          if (batchMode) {
+            const cb = row.querySelector('.cg-row-check');
+            if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+            return;
+          }
+          selectSession(session);
+        });
+        const menuBtn = document.createElement('button');
+        menuBtn.type = 'button';
+        menuBtn.className = 'row-menu-btn';
+        menuBtn.setAttribute('aria-label', '对话操作');
+        menuBtn.setAttribute('aria-haspopup', 'menu');
+        menuBtn.innerHTML = '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg>';
+        menuBtn.addEventListener('click', e => { e.stopPropagation(); openSessionRowMenu(menuBtn, session); });
+        row.appendChild(item);
+        row.appendChild(menuBtn);
+        sessionList.appendChild(row);
+      }
+      function renderGroup(labelText, arr) {
+        if (!arr.length) return;
         const label = document.createElement('div');
         label.className = 'cg-group-label';
-        label.textContent = g;
+        label.textContent = labelText;
         sessionList.appendChild(label);
-        groups[g].forEach(session => {
-          const row = document.createElement('div');
-          row.className = 'session-row' + (session.id === activeId ? ' active' : '');
-          const item = document.createElement('button');
-          item.type = 'button';
-          item.className = 'session-item' + (session.id === activeId ? ' active' : '');
-          item.dataset.sessionId = session.id || '';
-          const title = document.createElement('span');
-          title.className = 'session-title';
-          title.textContent = sessionDisplayTitle(session);
-          item.appendChild(title);
-          item.addEventListener('click', () => selectSession(session));
-          const menuBtn = document.createElement('button');
-          menuBtn.type = 'button';
-          menuBtn.className = 'row-menu-btn';
-          menuBtn.setAttribute('aria-label', '对话操作');
-          menuBtn.setAttribute('aria-haspopup', 'menu');
-          menuBtn.innerHTML = '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><circle cx="5" cy="12" r="1.7"></circle><circle cx="12" cy="12" r="1.7"></circle><circle cx="19" cy="12" r="1.7"></circle></svg>';
-          menuBtn.addEventListener('click', e => { e.stopPropagation(); openSessionRowMenu(menuBtn, session); });
-          row.appendChild(item);
-          row.appendChild(menuBtn);
-          sessionList.appendChild(row);
-        });
-      });
+        arr.forEach(renderRow);
+      }
+
+      renderGroup('置顶', pinned);
+      const order = ['今天', '昨天', '最近 7 天', '最近 30 天', '更早'];
+      const groups = {};
+      normal.forEach(s => { const g = sessionGroup(s.updated_at || s.created_at); (groups[g] = groups[g] || []).push(s); });
+      order.forEach(g => renderGroup(g, groups[g] || []));
+      if (archived.length) {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'cg-archived-toggle';
+        toggle.textContent = (showArchived ? '隐藏已归档' : '显示已归档') + '（' + archived.length + '）';
+        toggle.addEventListener('click', () => { showArchived = !showArchived; renderSessions(knownSessions); });
+        sessionList.appendChild(toggle);
+        if (showArchived) renderGroup('已归档', archived);
+      }
+      updateBatchUi();
+    }
+    function updateBatchUi() {
+      const bar = document.getElementById('batchBar');
+      if (bar) bar.hidden = !batchMode;
+      const count = document.getElementById('batchCount');
+      if (count) count.textContent = '已选 ' + batchSelected.size;
     }
     function renderMessages(messages) {
       conversation.innerHTML = '';
@@ -1515,6 +1563,9 @@ const output = document.getElementById('output');
     // local session overrides (rename / delete). Session-scoped in-memory only —
     // the page keeps no browser storage by design; swappable to a backend prefs API later.
     let sessionOverrides = {};
+    let showArchived = false;
+    let batchMode = false;
+    const batchSelected = new Set();
     let _prefsLoaded = false;
     let _prefsSaveTimer = null;
     function persistOverrides() { savePrefs(); }
@@ -1542,6 +1593,11 @@ const output = document.getElementById('output');
     let rowMenuSession = null;
     function openSessionRowMenu(btn, session) {
       rowMenuSession = session;
+      const o = sessionOverrides[session.id] || {};
+      const pinLabel = sessionRowMenu.querySelector('[data-label="pin"]');
+      const archLabel = sessionRowMenu.querySelector('[data-label="archive"]');
+      if (pinLabel) pinLabel.textContent = o.pinned ? '取消置顶' : '置顶';
+      if (archLabel) archLabel.textContent = o.archived ? '取消归档' : '归档';
       placePop(sessionRowMenu, btn, { alignRight: true });
       showPop(sessionRowMenu, btn);
     }
@@ -1554,11 +1610,25 @@ const output = document.getElementById('output');
       setSessionOverride(s.id, { title: t });
       renderSessions(knownSessions);
       if (document.getElementById('sessionId').value === s.id) document.getElementById('cgConvTitle').textContent = t;
-      toast('已重命名（本地）', { type: 'success' });
+      toast('已重命名', { type: 'success' });
+    });
+    sessionRowMenu.querySelector('[data-row-action="pin"]').addEventListener('click', () => {
+      const s = rowMenuSession; closePop(); if (!s) return;
+      const pinned = !(sessionOverrides[s.id] && sessionOverrides[s.id].pinned);
+      setSessionOverride(s.id, { pinned });
+      renderSessions(knownSessions);
+      toast(pinned ? '已置顶' : '已取消置顶', { type: 'success' });
+    });
+    sessionRowMenu.querySelector('[data-row-action="archive"]').addEventListener('click', () => {
+      const s = rowMenuSession; closePop(); if (!s) return;
+      const archived = !(sessionOverrides[s.id] && sessionOverrides[s.id].archived);
+      setSessionOverride(s.id, { archived });
+      renderSessions(knownSessions);
+      toast(archived ? '已归档' : '已取消归档', { type: 'success' });
     });
     sessionRowMenu.querySelector('[data-row-action="delete"]').addEventListener('click', async () => {
       const s = rowMenuSession; closePop(); if (!s) return;
-      const ok = await openModal({ title: '删除对话', desc: '将从本地列表移除“' + sessionDisplayTitle(s) + '”。该操作仅在当前浏览器生效，不会删除服务器端记录。', danger: true, confirmText: '删除' });
+      const ok = await openModal({ title: '删除对话', desc: '将从你的会话列表移除“' + sessionDisplayTitle(s) + '”（云端记住，可撤销）。不会删除服务器端的原始记录。', danger: true, confirmText: '删除' });
       if (!ok) return;
       const prev = sessionOverrides[s.id] ? Object.assign({}, sessionOverrides[s.id]) : null;
       setSessionOverride(s.id, { deleted: true });
@@ -1568,7 +1638,7 @@ const output = document.getElementById('output');
         document.getElementById('cgConvTitle').textContent = 'OpenClaw';
       }
       renderSessions(knownSessions);
-      toast('已删除（本地）', {
+      toast('已删除', {
         type: 'success', actionLabel: '撤销', duration: 5000,
         onAction: () => {
           if (prev) sessionOverrides[s.id] = prev; else delete sessionOverrides[s.id];
@@ -1577,6 +1647,37 @@ const output = document.getElementById('output');
           toast('已撤销删除');
         }
       });
+    });
+    // batch management
+    document.getElementById('batchModeBtn').addEventListener('click', () => {
+      closePop(); batchMode = true; batchSelected.clear(); renderSessions(knownSessions);
+    });
+    document.getElementById('batchCancel').addEventListener('click', () => {
+      batchMode = false; batchSelected.clear();
+      const sa = document.getElementById('batchSelectAll'); if (sa) sa.checked = false;
+      renderSessions(knownSessions);
+    });
+    document.getElementById('batchSelectAll').addEventListener('change', e => {
+      batchSelected.clear();
+      if (e.target.checked) visibleSessions(knownSessions).forEach(s => batchSelected.add(s.id));
+      renderSessions(knownSessions);
+    });
+    document.getElementById('batchDelete').addEventListener('click', async () => {
+      if (!batchSelected.size) { toast('未选择对话'); return; }
+      const n = batchSelected.size;
+      const ok = await openModal({ title: '批量删除', desc: '将从你的会话列表移除所选 ' + n + ' 个对话（云端记住）。不会删除服务器端的原始记录。', danger: true, confirmText: '删除 ' + n + ' 个' });
+      if (!ok) return;
+      const cur = document.getElementById('sessionId').value;
+      batchSelected.forEach(id => setSessionOverride(id, { deleted: true }));
+      if (batchSelected.has(cur)) {
+        document.getElementById('sessionId').value = '';
+        conversation.innerHTML = '';
+        document.getElementById('cgConvTitle').textContent = 'OpenClaw';
+      }
+      batchSelected.clear(); batchMode = false;
+      const sa = document.getElementById('batchSelectAll'); if (sa) sa.checked = false;
+      renderSessions(knownSessions);
+      toast('已删除 ' + n + ' 个对话', { type: 'success' });
     });
 
     // session search (client-side filter)
@@ -1611,18 +1712,50 @@ const output = document.getElementById('output');
         const ok = document.execCommand('copy'); ta.remove(); return ok;
       } catch (e) { return false; }
     }
-    function buildMsgActions(node) {
+    function prevUserText(node) {
+      let p = node ? node.previousElementSibling : null;
+      while (p) {
+        if (p.classList && p.classList.contains('message') && p.classList.contains('user')) {
+          return p._rawText != null ? p._rawText : (messageInner(p) ? messageInner(p).textContent : '');
+        }
+        p = p.previousElementSibling;
+      }
+      return '';
+    }
+    function buildMsgActions(node, role) {
       const bar = document.createElement('div');
       bar.className = 'cg-msg-actions';
-      const copyBtn = document.createElement('button');
-      copyBtn.type = 'button'; copyBtn.title = '复制'; copyBtn.setAttribute('aria-label', '复制消息');
-      copyBtn.innerHTML = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg><span>复制</span>';
-      copyBtn.addEventListener('click', () => {
+      const mk = (label, svg, onClick) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.title = label; b.setAttribute('aria-label', label);
+        b.innerHTML = svg + '<span>' + label + '</span>';
+        b.addEventListener('click', onClick);
+        return b;
+      };
+      const ICON_COPY = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>';
+      const ICON_REGEN = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"></path></svg>';
+      const ICON_EDIT = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>';
+      const ICON_DEL = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path></svg>';
+      bar.appendChild(mk('复制', ICON_COPY, () => {
         const inner = messageInner(node);
         const txt = (node && node._rawText != null) ? node._rawText : (inner ? inner.textContent : '');
         copyText(txt).then(ok => toast(ok ? '已复制' : '复制失败', { type: ok ? 'success' : 'error' }));
-      });
-      bar.appendChild(copyBtn);
+      }));
+      if (role === 'assistant') {
+        bar.appendChild(mk('重新生成', ICON_REGEN, () => {
+          const t = prevUserText(node);
+          if (!t) { toast('没有可重发的上一条消息'); return; }
+          promptEl.value = t; updateComposerMode(); autosizePrompt();
+          handleComposerSend();
+        }));
+      } else {
+        bar.appendChild(mk('编辑重发', ICON_EDIT, () => {
+          const t = (node && node._rawText != null) ? node._rawText : (messageInner(node) ? messageInner(node).textContent : '');
+          promptEl.value = t; updateComposerMode(); autosizePrompt(); promptEl.focus();
+          toast('已载入到输入框，编辑后发送');
+        }));
+      }
+      bar.appendChild(mk('删除', ICON_DEL, () => { node.remove(); }));
       return bar;
     }
 

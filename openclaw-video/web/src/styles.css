@@ -1620,3 +1620,18 @@
 .cg-msg-inner hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
 .cg-msg-inner > :first-child { margin-top: 0; }
 .cg-msg-inner > :last-child { margin-bottom: 0; }
+
+/* ===== Stage 4: pin / archive / batch ===== */
+.cg-batch-bar { display: flex; align-items: center; gap: 8px; padding: 7px 9px; margin: 0 2px 6px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-soft); font-size: 12.5px; }
+.cg-batch-bar[hidden] { display: none; }
+.cg-batch-all { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.cg-batch-count { color: var(--muted); }
+.cg-batch-del { margin-left: auto; border: none; background: var(--danger); color: #fff; padding: 5px 10px; border-radius: var(--r-xs); cursor: pointer; font-size: 12.5px; }
+.cg-batch-del:hover { filter: brightness(1.06); }
+.cg-batch-cancel { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 5px 10px; border-radius: var(--r-xs); cursor: pointer; font-size: 12.5px; }
+.cg-batch-cancel:hover { background: var(--faint); }
+.cg-row-check { margin: 0 2px 0 8px; flex: none; width: 16px; height: 16px; accent-color: var(--primary); }
+.session-pin { display: inline-flex; vertical-align: middle; margin-right: 5px; color: var(--primary); }
+.session-pin .ic { width: 13px; height: 13px; }
+.cg-archived-toggle { width: calc(100% - 4px); margin: 8px 2px 4px; padding: 7px 10px; border: 1px dashed var(--border); background: transparent; color: var(--muted); border-radius: var(--r-sm); cursor: pointer; font-size: 12.5px; text-align: center; }
+.cg-archived-toggle:hover { background: var(--faint); color: var(--text); }
