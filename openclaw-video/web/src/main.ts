@@ -1,4 +1,37 @@
 import './styles.css';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+
+marked.setOptions({ gfm: true, breaks: true });
+
+function renderMarkdownInto(inner, text) {
+  // Render assistant text as sanitized Markdown; fall back to plain text on error.
+  try {
+    const dirty = marked.parse(String(text || ''));
+    inner.innerHTML = DOMPurify.sanitize(dirty, { ADD_ATTR: ['target', 'rel'] });
+    inner.querySelectorAll('a[href]').forEach(a => { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener noreferrer'); });
+    enhanceCodeBlocks(inner);
+  } catch (e) {
+    inner.textContent = String(text || '');
+  }
+}
+
+function enhanceCodeBlocks(inner) {
+  inner.querySelectorAll('pre').forEach(pre => {
+    if (pre.querySelector('.code-copy-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'code-copy-btn';
+    btn.textContent = '复制';
+    btn.addEventListener('click', () => {
+      const code = pre.querySelector('code');
+      const text = code ? code.textContent : pre.textContent;
+      copyText(text).then(ok => { btn.textContent = ok ? '已复制' : '复制失败'; setTimeout(() => { btn.textContent = '复制'; }, 1400); });
+    });
+    pre.appendChild(btn);
+  });
+}
+
 
 const output = document.getElementById('output');
     const landingPage = document.getElementById('landingPage');
@@ -304,9 +337,14 @@ const output = document.getElementById('output');
       const node = document.createElement('div');
       node.className = 'message ' + role;
       node.setAttribute('data-role-label', role === 'user' ? '你' : 'OpenClaw');
+      node._rawText = text;
       const inner = document.createElement('div');
       inner.className = 'cg-msg-inner';
-      inner.textContent = text;
+      if (role === 'assistant') {
+        renderMarkdownInto(inner, text);
+      } else {
+        inner.textContent = text;
+      }
       node.appendChild(inner);
       if (role === 'assistant') {
         node.appendChild(buildMsgActions(node));
@@ -1581,7 +1619,7 @@ const output = document.getElementById('output');
       copyBtn.innerHTML = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg><span>复制</span>';
       copyBtn.addEventListener('click', () => {
         const inner = messageInner(node);
-        const txt = inner ? inner.textContent : '';
+        const txt = (node && node._rawText != null) ? node._rawText : (inner ? inner.textContent : '');
         copyText(txt).then(ok => toast(ok ? '已复制' : '复制失败', { type: ok ? 'success' : 'error' }));
       });
       bar.appendChild(copyBtn);

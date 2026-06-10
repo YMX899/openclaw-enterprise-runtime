@@ -1596,3 +1596,27 @@
     :root[data-theme="dark"] .status-strip { background: var(--surface-soft); border-color: var(--border); }
     :root[data-theme="dark"] pre,
     :root[data-theme="dark"] #output { background: var(--faint); color: var(--text); }
+
+/* ===== Markdown rendering inside assistant messages ===== */
+.cg-msg-inner h1, .cg-msg-inner h2, .cg-msg-inner h3, .cg-msg-inner h4 { margin: 14px 0 8px; line-height: 1.35; font-weight: 700; }
+.cg-msg-inner h1 { font-size: 20px; }
+.cg-msg-inner h2 { font-size: 18px; }
+.cg-msg-inner h3 { font-size: 16px; }
+.cg-msg-inner h4 { font-size: 15px; }
+.cg-msg-inner p { margin: 8px 0; }
+.cg-msg-inner ul, .cg-msg-inner ol { margin: 8px 0; padding-left: 22px; }
+.cg-msg-inner li { margin: 3px 0; }
+.cg-msg-inner li > p { margin: 2px 0; }
+.cg-msg-inner strong { font-weight: 700; }
+.cg-msg-inner em { font-style: italic; }
+.cg-msg-inner a { color: var(--primary); text-decoration: underline; }
+.cg-msg-inner blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+.cg-msg-inner code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: var(--faint); padding: 1px 5px; border-radius: 6px; }
+.cg-msg-inner pre { position: relative; background: #0d1117; color: #e6edf6; border-radius: var(--r-sm); padding: 14px; overflow-x: auto; margin: 10px 0; }
+.cg-msg-inner pre code { background: transparent; padding: 0; color: inherit; font-size: 13px; line-height: 1.6; }
+.cg-msg-inner table { border-collapse: collapse; margin: 10px 0; width: 100%; font-size: 13.5px; display: block; overflow-x: auto; }
+.cg-msg-inner th, .cg-msg-inner td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.cg-msg-inner th { background: var(--faint); }
+.cg-msg-inner hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+.cg-msg-inner > :first-child { margin-top: 0; }
+.cg-msg-inner > :last-child { margin-bottom: 0; }
