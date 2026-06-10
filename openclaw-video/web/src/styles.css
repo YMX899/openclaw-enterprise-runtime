@@ -1635,3 +1635,14 @@
 .session-pin .ic { width: 13px; height: 13px; }
 .cg-archived-toggle { width: calc(100% - 4px); margin: 8px 2px 4px; padding: 7px 10px; border: 1px dashed var(--border); background: transparent; color: var(--muted); border-radius: var(--r-sm); cursor: pointer; font-size: 12.5px; text-align: center; }
 .cg-archived-toggle:hover { background: var(--faint); color: var(--text); }
+
+/* ===== Stage 5: long-conversation perf + keyboard accessibility ===== */
+/* skip rendering/layout of off-screen messages in long conversations */
+.cg-conversation .message { content-visibility: auto; contain-intrinsic-size: auto 160px; }
+/* clear, consistent keyboard focus rings (do not rely on color alone) */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.session-item:focus-visible,
+.menu-pop button:focus-visible,
+.cg-msg-actions button:focus-visible,
+.row-menu-btn:focus-visible,
+.cg-user-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

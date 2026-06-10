@@ -1531,6 +1531,31 @@ const output = document.getElementById('output');
       if (openPop && !openPop.el.contains(e.target) && (!openPop.btn || !openPop.btn.contains(e.target))) closePop();
     });
     document.addEventListener('keydown', e => {
+      // modal focus trap: keep Tab focus within the open dialog
+      if (modalHost && !modalHost.hidden && e.key === 'Tab') {
+        const f = Array.from(modalHost.querySelectorAll('button, input, [href], [tabindex]:not([tabindex="-1"])'))
+          .filter(el => !el.hidden && el.offsetParent !== null);
+        if (f.length) {
+          const first = f[0], last = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+        return;
+      }
+      // arrow-key navigation within an open menu
+      if (openPop && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+        const items = Array.from(openPop.el.querySelectorAll('button')).filter(b => !b.disabled && b.offsetParent !== null);
+        if (items.length) {
+          e.preventDefault();
+          let idx = items.indexOf(document.activeElement);
+          if (e.key === 'Home') idx = 0;
+          else if (e.key === 'End') idx = items.length - 1;
+          else if (e.key === 'ArrowDown') idx = idx < 0 ? 0 : (idx + 1) % items.length;
+          else idx = idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length;
+          items[idx].focus();
+        }
+        return;
+      }
       if (e.key !== 'Escape') return;
       if (modalHost && !modalHost.hidden) { closeModal(null); return; }
       if (openPop) { const b = openPop.btn; closePop(); if (b && b.focus) b.focus(); return; }
