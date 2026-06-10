@@ -162,8 +162,9 @@ openclaw doctor
 
 ## API key rotation behavior (gateway)
 
-Some providers support retrying a request with alternative keys when an API call
-hits a provider rate limit.
+Some providers support a per-process API key pool. Main agent model runs and
+provider helper calls select healthy keys round-robin; a key that hits a
+provider rate limit is put into cooldown and skipped by later requests.
 
 - Priority order:
   - `OPENCLAW_LIVE_<PROVIDER>_KEY` (single override)
@@ -172,12 +173,16 @@ hits a provider rate limit.
   - `<PROVIDER>_API_KEY_*`
 - Google providers also include `GOOGLE_API_KEY` as an additional fallback.
 - The same key list is deduplicated before use.
-- OpenClaw retries with the next key only for rate-limit errors (for example
+- OpenClaw retries with the next healthy key only for rate-limit errors (for example
   `429`, `rate_limit`, `quota`, `resource exhausted`, `Too many concurrent
 requests`, `ThrottlingException`, `concurrency limit reached`, or
   `workers_ai ... quota limit exceeded`).
 - Non-rate-limit errors are not retried with alternate keys.
-- If all keys fail, the final error from the last attempt is returned.
+- If all keys fail or are cooling down, OpenClaw falls back to normal
+  auth-profile/model fallback behavior, or returns the final error from the last
+  attempt when no fallback is configured.
+- Tune the in-memory cooldown with
+  `OPENCLAW_API_KEY_POOL_RATE_LIMIT_COOLDOWN_MS` (default: `60000`).
 
 ## Removing provider auth while the gateway is running
 

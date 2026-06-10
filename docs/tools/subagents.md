@@ -389,8 +389,8 @@ worker sub-sub-agents.
     defaults: {
       subagents: {
         maxSpawnDepth: 2, // allow sub-agents to spawn children (default: 1)
-        maxChildrenPerAgent: 5, // max active children per agent session (default: 5)
-        maxConcurrent: 8, // global concurrency lane cap (default: 8)
+        maxChildrenPerAgent: 1000, // max active children per agent session (default: 1000)
+        maxConcurrent: 1000, // global concurrency lane cap (default: 1000)
         runTimeoutSeconds: 900, // default timeout for sessions_spawn (0 = no timeout)
         announceTimeoutMs: 120000, // per-call gateway announce timeout
       },
@@ -441,7 +441,7 @@ final answer, the correct follow-up is the exact silent token
 ### Per-agent spawn limit
 
 Each agent session (at any depth) can have at most `maxChildrenPerAgent`
-(default `5`) active children at a time. This prevents runaway fan-out
+(default `1000`) active children at a time. This prevents runaway fan-out
 from a single orchestrator.
 
 ### Cascade stop
@@ -640,7 +640,7 @@ still need normal device approval for scope upgrades.
 - `sessions_spawn` is always non-blocking: it returns `{ status: "accepted", runId, childSessionKey }` immediately.
 - Sub-agent context only injects `AGENTS.md` and `TOOLS.md` (no `SOUL.md`, `IDENTITY.md`, `USER.md`, `MEMORY.md`, `HEARTBEAT.md`, or `BOOTSTRAP.md`). Codex-native subagents follow the same boundary: `TOOLS.md` stays in inherited Codex thread instructions, while parent-only persona, identity, and user files are injected as turn-scoped collaboration instructions so children do not clone them.
 - Maximum nesting depth is 5 (`maxSpawnDepth` range: 1–5). Depth 2 is recommended for most use cases.
-- `maxChildrenPerAgent` caps active children per session (default `5`, range `1–20`).
+- `maxChildrenPerAgent` caps active children per session (default `1000`, range `1–10000`).
 
 ## Related
 

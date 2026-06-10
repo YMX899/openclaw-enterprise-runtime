@@ -27,6 +27,12 @@ vi.mock("../../model-auth.js", async () => {
 });
 
 import { createEmbeddedRunAuthController } from "./auth-controller.js";
+import {
+  markProviderApiKeyRateLimited,
+  resetProviderApiKeyPoolsForTest,
+} from "../../api-key-rotation.js";
+
+const originalCustomOpenAiApiKeys = process.env.CUSTOM_OPENAI_API_KEYS;
 
 function createDeferred<T>() {
   let resolve: ((value: T | PromiseLike<T>) => void) | undefined;
@@ -148,6 +154,12 @@ describe("createEmbeddedRunAuthController", () => {
   beforeEach(() => {
     mocks.prepareProviderRuntimeAuth.mockReset();
     mocks.getApiKeyForModel.mockReset();
+    resetProviderApiKeyPoolsForTest();
+    if (originalCustomOpenAiApiKeys === undefined) {
+      delete process.env.CUSTOM_OPENAI_API_KEYS;
+    } else {
+      process.env.CUSTOM_OPENAI_API_KEYS = originalCustomOpenAiApiKeys;
+    }
   });
 
   it("applies runtime request overrides on the first auth exchange", async () => {
@@ -219,6 +231,69 @@ describe("createEmbeddedRunAuthController", () => {
     expect(harness.apiKeyInfo).toMatchObject({
       mode: "api-key",
       source: "models.providers.custom-openai",
+    });
+  });
+
+  it("selects a healthy api key pool candidate during auth initialization", async () => {
+    process.env.CUSTOM_OPENAI_API_KEYS = "source-api-key,backup-source-api-key";
+    markProviderApiKeyRateLimited({
+      provider: "custom-openai",
+      apiKey: "source-api-key",
+      cooldownMs: 60_000,
+    });
+    const harness = createMutableAuthControllerHarness();
+    const setRuntimeApiKey = vi.fn<(provider: string, apiKey: string) => void>();
+
+    mocks.getApiKeyForModel.mockResolvedValue({
+      apiKey: "source-api-key",
+      mode: "api-key",
+      profileId: "default",
+      source: "env:CUSTOM_OPENAI_API_KEY",
+    });
+    mocks.prepareProviderRuntimeAuth.mockResolvedValue(undefined);
+
+    const controller = createMutableEmbeddedRunAuthController({
+      harness,
+      setRuntimeApiKey,
+    });
+
+    await controller.initializeAuthProfile();
+
+    expect(setRuntimeApiKey).toHaveBeenCalledWith("custom-openai", "backup-source-api-key");
+    expect(harness.apiKeyInfo).toMatchObject({
+      apiKey: "backup-source-api-key",
+      source: "env:CUSTOM_OPENAI_API_KEY; api-key-pool:custom-openai",
+    });
+  });
+
+  it("rotates to the next api key pool candidate after a rate limit", async () => {
+    process.env.CUSTOM_OPENAI_API_KEYS = "source-api-key,backup-source-api-key";
+    const harness = createMutableAuthControllerHarness();
+    const setRuntimeApiKey = vi.fn<(provider: string, apiKey: string) => void>();
+
+    mocks.getApiKeyForModel.mockResolvedValue({
+      apiKey: "source-api-key",
+      mode: "api-key",
+      profileId: "default",
+      source: "env:CUSTOM_OPENAI_API_KEY",
+    });
+    mocks.prepareProviderRuntimeAuth.mockResolvedValue(undefined);
+
+    const controller = createMutableEmbeddedRunAuthController({
+      harness,
+      setRuntimeApiKey,
+    });
+
+    await controller.initializeAuthProfile();
+    await expect(controller.rotateApiKeyForRateLimit()).resolves.toBe(true);
+
+    expect(setRuntimeApiKey).toHaveBeenLastCalledWith(
+      "custom-openai",
+      "backup-source-api-key",
+    );
+    expect(harness.apiKeyInfo).toMatchObject({
+      apiKey: "backup-source-api-key",
+      source: "env:CUSTOM_OPENAI_API_KEY; api-key-pool:custom-openai",
     });
   });
 

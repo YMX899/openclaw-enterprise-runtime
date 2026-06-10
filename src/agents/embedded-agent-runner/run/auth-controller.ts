@@ -3,6 +3,11 @@ import { formatErrorMessage } from "../../../infra/errors.js";
 import type { Model } from "../../../llm/types.js";
 import { prepareProviderRuntimeAuth } from "../../../plugins/provider-runtime.js";
 import {
+  collectProviderApiKeysForExecution,
+  markProviderApiKeyRateLimited,
+  selectProviderApiKeyFromPool,
+} from "../../api-key-rotation.js";
+import {
   type AuthProfileStore,
   isProfileInCooldown,
   resolveProfilesUnavailableReason,
@@ -20,6 +25,7 @@ import {
   MissingProviderAuthError,
   type ResolvedProviderAuth,
 } from "../../model-auth.js";
+import { isNonSecretApiKeyMarker } from "../../model-auth-markers.js";
 import {
   resolveProviderRequestConfig,
   sanitizeRuntimeProviderRequestOverrides,
@@ -381,8 +387,43 @@ export function createEmbeddedRunAuthController(params: {
     });
   };
 
-  const applyApiKeyInfo = async (candidate?: string): Promise<void> => {
-    const apiKeyInfo = await resolveApiKeyForCandidate(candidate);
+  const resolvePooledApiKeyInfo = (
+    apiKeyInfo: ApiKeyInfo,
+    options: { allowCoolingFallback?: boolean } = {},
+  ): ApiKeyInfo => {
+    const primaryApiKey = apiKeyInfo.apiKey?.trim();
+    if (
+      !primaryApiKey ||
+      apiKeyInfo.mode !== "api-key" ||
+      isNonSecretApiKeyMarker(primaryApiKey)
+    ) {
+      return apiKeyInfo;
+    }
+    const runtimeModel = params.getRuntimeModel();
+    const selectedApiKey = selectProviderApiKeyFromPool({
+      provider: runtimeModel.provider,
+      apiKeys: collectProviderApiKeysForExecution({
+        provider: runtimeModel.provider,
+        primaryApiKey,
+      }),
+      allowCoolingFallback: options.allowCoolingFallback,
+    });
+    if (!selectedApiKey || selectedApiKey === apiKeyInfo.apiKey) {
+      return apiKeyInfo;
+    }
+    return {
+      ...apiKeyInfo,
+      apiKey: selectedApiKey,
+      source: `${apiKeyInfo.source}; api-key-pool:${runtimeModel.provider}`,
+    };
+  };
+
+  const applyApiKeyInfo = async (
+    candidate?: string,
+    options: { allowCoolingFallback?: boolean } = {},
+  ): Promise<void> => {
+    const resolvedApiKeyInfo = await resolveApiKeyForCandidate(candidate);
+    const apiKeyInfo = resolvePooledApiKeyInfo(resolvedApiKeyInfo, options);
     params.setApiKeyInfo(apiKeyInfo);
     const resolvedProfileId = apiKeyInfo.profileId ?? candidate;
     if (!apiKeyInfo.apiKey) {
@@ -467,6 +508,27 @@ export function createEmbeddedRunAuthController(params: {
       params.setRuntimeAuthState(null);
     }
     params.setLastProfileId(apiKeyInfo.profileId);
+  };
+
+  const rotateApiKeyForRateLimit = async (): Promise<boolean> => {
+    const current = params.getApiKeyInfo();
+    const currentApiKey = current?.apiKey?.trim();
+    if (!currentApiKey || current.mode !== "api-key" || isNonSecretApiKeyMarker(currentApiKey)) {
+      return false;
+    }
+    const currentCandidate = params.profileCandidates[params.getProfileIndex()];
+    markProviderApiKeyRateLimited({
+      provider: params.getRuntimeModel().provider,
+      apiKey: currentApiKey,
+    });
+    await applyApiKeyInfo(currentCandidate, { allowCoolingFallback: false });
+    const nextApiKey = params.getApiKeyInfo()?.apiKey?.trim();
+    if (!nextApiKey || nextApiKey === currentApiKey) {
+      return false;
+    }
+    params.setThinkLevel(params.initialThinkLevel);
+    params.attemptedThinking.clear();
+    return true;
   };
 
   const advanceAuthProfile = async (): Promise<boolean> => {
@@ -588,6 +650,7 @@ export function createEmbeddedRunAuthController(params: {
     advanceAuthProfile,
     initializeAuthProfile,
     maybeRefreshRuntimeAuthForAuthError,
+    rotateApiKeyForRateLimit,
     stopRuntimeAuthRefreshTimer,
   };
 }

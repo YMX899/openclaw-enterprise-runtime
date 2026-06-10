@@ -16,6 +16,30 @@ const port =
     : readPositiveIntEnv("OPENCLAW_MOCK_OPENAI_PORT");
 const successMarker = process.env.SUCCESS_MARKER ?? "OPENCLAW_E2E_OK";
 const requestLog = process.env.MOCK_REQUEST_LOG;
+const responseDelayMs =
+  process.env.MOCK_RESPONSE_DELAY_MS != null
+    ? readPositiveIntEnv("MOCK_RESPONSE_DELAY_MS")
+    : process.env.OPENCLAW_MOCK_OPENAI_RESPONSE_DELAY_MS != null
+      ? readPositiveIntEnv("OPENCLAW_MOCK_OPENAI_RESPONSE_DELAY_MS")
+      : 0;
+let activeRequests = 0;
+let peakActiveRequests = 0;
+
+function beginModelRequest() {
+  activeRequests += 1;
+  peakActiveRequests = Math.max(peakActiveRequests, activeRequests);
+}
+
+function endModelRequest() {
+  activeRequests = Math.max(0, activeRequests - 1);
+}
+
+async function maybeDelayModelResponse() {
+  if (responseDelayMs <= 0) {
+    return;
+  }
+  await new Promise((resolve) => setTimeout(resolve, responseDelayMs));
+}
 
 function responseEvents(text) {
   const itemId = "msg_e2e_1";
@@ -304,10 +328,14 @@ const server = http.createServer((req, res) => {
       return;
     }
 
+    beginModelRequest();
+    let completedModelRequest = false;
     let bodyText;
     try {
       bodyText = await readBody(req);
     } catch (error) {
+      completedModelRequest = true;
+      endModelRequest();
       if (isRequestBodyTooLargeError(error)) {
         writeJson(res, 413, { error: { message: error.message } });
         return;
@@ -326,10 +354,15 @@ const server = http.createServer((req, res) => {
         `${JSON.stringify({
           method: req.method,
           path: url.pathname,
+          active: activeRequests,
+          peakActive: peakActiveRequests,
           body: boundedRequestLogBody(bodyText, bodyText),
         })}\n`,
       );
     }
+    await maybeDelayModelResponse();
+    completedModelRequest = true;
+    endModelRequest();
 
     if (req.method === "POST" && url.pathname === "/v1/responses") {
       const codeModeEvents = mcpCodeModeApiFileEvents(body, bodyText);
@@ -392,6 +425,9 @@ const server = http.createServer((req, res) => {
     writeJson(res, 404, {
       error: { message: `unhandled mock route: ${req.method} ${url.pathname}` },
     });
+    if (!completedModelRequest) {
+      endModelRequest();
+    }
   })();
 });
 

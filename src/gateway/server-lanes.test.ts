@@ -3,6 +3,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_CRON_MAX_CONCURRENT_RUNS } from "../config/cron-limits.js";
+import { DEFAULT_SUBAGENT_MAX_CONCURRENT } from "../config/agent-limits.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { enqueueCommandInLane, resetCommandQueueStateForTest } from "../process/command-queue.js";
 import { CommandLane } from "../process/lanes.js";
@@ -88,6 +89,44 @@ describe("applyGatewayLaneConcurrency", () => {
       clearTimeout(timeout);
       releaseRuns.resolve();
       await Promise.all([first, second]);
+    }
+  });
+
+  it("allows the default subagent lane to start 1000 runs concurrently", async () => {
+    applyGatewayLaneConcurrency({} as OpenClawConfig);
+
+    let activeRuns = 0;
+    let peakActiveRuns = 0;
+    const allRunsStarted = createDeferred();
+    const releaseRuns = createDeferred();
+
+    const run = async () => {
+      activeRuns += 1;
+      peakActiveRuns = Math.max(peakActiveRuns, activeRuns);
+      if (peakActiveRuns >= DEFAULT_SUBAGENT_MAX_CONCURRENT) {
+        allRunsStarted.resolve();
+      }
+      try {
+        await releaseRuns.promise;
+      } finally {
+        activeRuns -= 1;
+      }
+    };
+
+    const runs = Array.from({ length: DEFAULT_SUBAGENT_MAX_CONCURRENT }, () =>
+      enqueueCommandInLane(CommandLane.Subagent, run, { warnAfterMs: 10_000 }),
+    );
+    const timeout = setTimeout(() => {
+      allRunsStarted.reject(new Error("timed out waiting for default subagent concurrency"));
+    }, 1000);
+
+    try {
+      await allRunsStarted.promise;
+      expect(peakActiveRuns).toBe(DEFAULT_SUBAGENT_MAX_CONCURRENT);
+    } finally {
+      clearTimeout(timeout);
+      releaseRuns.resolve();
+      await Promise.all(runs);
     }
   });
 

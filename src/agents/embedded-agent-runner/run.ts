@@ -1036,6 +1036,7 @@ export async function runEmbeddedAgent(
         advanceAuthProfile,
         initializeAuthProfile,
         maybeRefreshRuntimeAuthForAuthError,
+        rotateApiKeyForRateLimit,
         stopRuntimeAuthRefreshTimer,
       } = createEmbeddedRunAuthController({
         config: params.config,
@@ -1333,6 +1334,35 @@ export async function runEmbeddedAgent(
             throw abortErr;
           }
           throw err;
+        }
+      };
+      const maybeRotateApiKeyForRateLimit = async (stage: "prompt" | "assistant") => {
+        try {
+          if (!(await rotateApiKeyForRateLimit())) {
+            return false;
+          }
+          traceAttempts.push({
+            provider,
+            model: modelId,
+            result: "rotate_api_key",
+            reason: "rate_limit",
+            stage,
+          });
+          lastRetryFailoverReason = mergeRetryFailoverReason({
+            previous: lastRetryFailoverReason,
+            failoverReason: "rate_limit",
+          });
+          log.warn(
+            `rate-limit api key pool rotation: runId=${params.runId} ` +
+              `provider=${sanitizeForLog(provider)}/${sanitizeForLog(modelId)} stage=${stage}; retrying with next key`,
+          );
+          return true;
+        } catch (err) {
+          log.warn(
+            `rate-limit api key pool rotation failed: runId=${params.runId} ` +
+              `provider=${sanitizeForLog(provider)}/${sanitizeForLog(modelId)} stage=${stage}: ${String(err)}`,
+          );
+          return false;
         }
       };
       // Resolve the context engine once and reuse across retries to avoid
@@ -2580,6 +2610,9 @@ export async function runEmbeddedAgent(
               aborted,
             });
             if (promptFailoverReason === "rate_limit") {
+              if (await maybeRotateApiKeyForRateLimit("prompt")) {
+                continue;
+              }
               maybeEscalateRateLimitProfileFallback({
                 failoverProvider: provider,
                 failoverModel: modelId,
@@ -2766,6 +2799,12 @@ export async function runEmbeddedAgent(
             ))
           ) {
             authRetryPending = true;
+            continue;
+          }
+          if (
+            (assistantFailoverReason === "rate_limit" || rateLimitFailure) &&
+            (await maybeRotateApiKeyForRateLimit("assistant"))
+          ) {
             continue;
           }
           if (imageDimensionError && lastProfileId) {

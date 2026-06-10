@@ -1,11 +1,11 @@
 import type { OpenClawConfig } from "./types.js";
 
 /** Default maximum concurrent top-level agent runs. */
-export const DEFAULT_AGENT_MAX_CONCURRENT = 4;
+export const DEFAULT_AGENT_MAX_CONCURRENT = 1000;
 /** Default maximum concurrent child-agent runs across subagent execution. */
-export const DEFAULT_SUBAGENT_MAX_CONCURRENT = 8;
+export const DEFAULT_SUBAGENT_MAX_CONCURRENT = 1000;
 /** Default maximum direct children a single agent run may spawn. */
-export const DEFAULT_SUBAGENT_MAX_CHILDREN_PER_AGENT = 5;
+export const DEFAULT_SUBAGENT_MAX_CHILDREN_PER_AGENT = 1000;
 /** Default age before completed subagent state is archived. */
 export const DEFAULT_SUBAGENT_ARCHIVE_AFTER_MINUTES = 60;
 // Keep depth-1 subagents as leaves unless config explicitly opts into nesting.

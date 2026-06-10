@@ -1,6 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransientProviderRetryParams } from "../provider-runtime/operation-retry.js";
-import { executeWithApiKeyRotation } from "./api-key-rotation.js";
+import {
+  executeWithApiKeyRotation,
+  getProviderApiKeyPoolSnapshot,
+  markProviderApiKeyRateLimited,
+  resetProviderApiKeyPoolsForTest,
+  selectProviderApiKeyFromPool,
+} from "./api-key-rotation.js";
 
 function abortError(message: string): Error {
   return Object.assign(new Error(message), { name: "AbortError" });
@@ -11,6 +17,10 @@ function timeoutError(message: string): Error {
 }
 
 describe("executeWithApiKeyRotation", () => {
+  beforeEach(() => {
+    resetProviderApiKeyPoolsForTest();
+  });
+
   it("keeps transient retry disabled by default for single-key 500", async () => {
     const execute = vi.fn(async () => {
       throw new Error("Audio transcription failed (HTTP 500)");
@@ -259,6 +269,39 @@ describe("executeWithApiKeyRotation", () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
+  it("shares rate-limit cooldown state across calls", async () => {
+    const apiKeys = ["key-1", "key-2"];
+    const firstExecute = vi.fn(async (apiKey: string) => {
+      if (apiKey === "key-1") {
+        throw new Error("HTTP 429 too many requests");
+      }
+      return apiKey;
+    });
+
+    await expect(
+      executeWithApiKeyRotation({
+        provider: "openai",
+        apiKeys,
+        execute: firstExecute,
+      }),
+    ).resolves.toBe("key-2");
+
+    expect(firstExecute).toHaveBeenNthCalledWith(1, "key-1");
+    expect(firstExecute).toHaveBeenNthCalledWith(2, "key-2");
+
+    const secondExecute = vi.fn(async (apiKey: string) => apiKey);
+    await expect(
+      executeWithApiKeyRotation({
+        provider: "openai",
+        apiKeys,
+        execute: secondExecute,
+      }),
+    ).resolves.toBe("key-2");
+
+    expect(secondExecute).toHaveBeenCalledTimes(1);
+    expect(secondExecute).toHaveBeenCalledWith("key-2");
+  });
+
   it("does not rotate keys for transient 500 after same-key retry exhaustion", async () => {
     const sleep = vi.fn(async () => undefined);
     const execute = vi.fn(async () => {
@@ -305,6 +348,43 @@ describe("executeWithApiKeyRotation", () => {
         apiKeyIndex: 0,
         attemptNumber: 1,
       }),
+    );
+  });
+});
+
+describe("provider API key pool", () => {
+  beforeEach(() => {
+    resetProviderApiKeyPoolsForTest();
+  });
+
+  it("round-robins healthy keys", () => {
+    const apiKeys = ["key-1", "key-2", "key-3"];
+
+    expect(selectProviderApiKeyFromPool({ provider: "openai", apiKeys })).toBe("key-1");
+    expect(selectProviderApiKeyFromPool({ provider: "openai", apiKeys })).toBe("key-2");
+    expect(selectProviderApiKeyFromPool({ provider: "openai", apiKeys })).toBe("key-3");
+    expect(selectProviderApiKeyFromPool({ provider: "openai", apiKeys })).toBe("key-1");
+  });
+
+  it("skips a cooled-down key until its window expires", () => {
+    const apiKeys = ["key-1", "key-2"];
+    markProviderApiKeyRateLimited({
+      provider: "openai",
+      apiKey: "key-1",
+      cooldownMs: 60_000,
+      now: 1_000,
+    });
+
+    expect(selectProviderApiKeyFromPool({ provider: "openai", apiKeys, now: 2_000 })).toBe(
+      "key-2",
+    );
+    expect(getProviderApiKeyPoolSnapshot({ provider: "openai", apiKeys, now: 2_000 })).toEqual([
+      { index: 0, cooldownUntil: 61_000, rateLimitCount: 1, available: false },
+      { index: 1, rateLimitCount: 0, available: true },
+    ]);
+
+    expect(selectProviderApiKeyFromPool({ provider: "openai", apiKeys, now: 62_000 })).toBe(
+      "key-1",
     );
   });
 });

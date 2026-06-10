@@ -73,9 +73,11 @@ Provider-owned runner behavior lives on explicit provider hooks such as replay p
 
   </Accordion>
   <Accordion title="When rotation kicks in">
-    - Requests are retried with the next key only on rate-limit responses (for example `429`, `rate_limit`, `quota`, `resource exhausted`, `Too many concurrent requests`, `ThrottlingException`, `concurrency limit reached`, `workers_ai ... quota limit exceeded`, or periodic usage-limit messages).
+    - Main agent model runs and provider helper calls share a per-process key pool. Healthy keys are selected round-robin; keys that hit a rate limit are put into cooldown and skipped by later requests.
+    - Requests are retried with the next healthy key only on rate-limit responses (for example `429`, `rate_limit`, `quota`, `resource exhausted`, `Too many concurrent requests`, `ThrottlingException`, `concurrency limit reached`, `workers_ai ... quota limit exceeded`, or periodic usage-limit messages).
     - Non-rate-limit failures fail immediately; no key rotation is attempted.
-    - When all candidate keys fail, the final error is returned from the last attempt.
+    - When all candidate keys fail or are cooling down, OpenClaw falls back to the normal auth-profile/model fallback path, or returns the final error from the last attempt when no fallback is configured.
+    - Tune the in-memory rate-limit cooldown with `OPENCLAW_API_KEY_POOL_RATE_LIMIT_COOLDOWN_MS` (default: `60000`).
 
   </Accordion>
 </AccordionGroup>
