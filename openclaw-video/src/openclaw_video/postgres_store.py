@@ -118,6 +118,38 @@ class _BasePostgresStore:
                     (principal_id, tenant_hash, account_hash),
                 )
 
+    def get_prefs(self, principal_id: str) -> dict:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT prefs FROM bridge_user_prefs WHERE principal_id = %s",
+                    (principal_id,),
+                )
+                row = cur.fetchone()
+        if not row:
+            return {}
+        prefs = row.get("prefs")
+        return prefs if isinstance(prefs, dict) else {}
+
+    def put_prefs(self, principal_id: str, prefs: dict) -> dict:
+        payload = prefs if isinstance(prefs, dict) else {}
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO bridge_user_prefs (principal_id, prefs, updated_at)
+                    VALUES (%s, %s, now())
+                    ON CONFLICT (principal_id) DO UPDATE
+                    SET prefs = EXCLUDED.prefs, updated_at = now()
+                    RETURNING prefs
+                    """,
+                    (principal_id, Jsonb(payload)),
+                )
+                row = cur.fetchone()
+        if row and isinstance(row.get("prefs"), dict):
+            return row["prefs"]
+        return payload
+
 
 class PostgresSessionStore(_BasePostgresStore):
     def create_session(

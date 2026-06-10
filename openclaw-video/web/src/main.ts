@@ -1342,7 +1342,7 @@ const output = document.getElementById('output');
         b.setAttribute('aria-checked', String(b.dataset.themeChoice === choice));
       });
     }
-    function setTheme(choice) { themeChoice = choice; applyTheme(); }
+    function setTheme(choice) { themeChoice = choice; applyTheme(); savePrefs(); }
     themeMedia.addEventListener('change', applyTheme);
     applyTheme();
 
@@ -1477,8 +1477,27 @@ const output = document.getElementById('output');
     // local session overrides (rename / delete). Session-scoped in-memory only —
     // the page keeps no browser storage by design; swappable to a backend prefs API later.
     let sessionOverrides = {};
-    function persistOverrides() { /* session-scoped; intentionally no browser storage */ }
+    let _prefsLoaded = false;
+    let _prefsSaveTimer = null;
+    function persistOverrides() { savePrefs(); }
     function setSessionOverride(id, patch) { sessionOverrides[id] = Object.assign({}, sessionOverrides[id], patch); persistOverrides(); }
+    async function loadPrefs() {
+      try {
+        const r = await api(apiPrefix + '/prefs');
+        if (r.status === 200 && r.body && r.body.prefs && typeof r.body.prefs === 'object') {
+          const p = r.body.prefs;
+          if (p.theme === 'light' || p.theme === 'dark' || p.theme === 'system') { themeChoice = p.theme; applyTheme(); }
+          if (p.sessions && typeof p.sessions === 'object') { sessionOverrides = p.sessions; renderSessions(knownSessions); }
+        }
+      } catch (e) { /* prefs are best-effort; UI still works without them */ }
+    }
+    function savePrefs() {
+      if (!isAuthenticated()) return;
+      if (_prefsSaveTimer) clearTimeout(_prefsSaveTimer);
+      _prefsSaveTimer = setTimeout(() => {
+        api(apiPrefix + '/prefs', { method: 'PUT', body: JSON.stringify({ prefs: { theme: themeChoice, sessions: sessionOverrides } }) }).catch(() => {});
+      }, 400);
+    }
 
     // per-session row menu
     const sessionRowMenu = document.getElementById('sessionRowMenu');
@@ -1616,6 +1635,9 @@ const output = document.getElementById('output');
       if (un) un.textContent = name;
       if (mn) mn.textContent = name;
       if (av) av.textContent = authed ? '用' : 'OC';
+      // cross-device prefs: load once on becoming authenticated; reset on logout
+      if (authed && !_prefsLoaded) { _prefsLoaded = true; loadPrefs(); }
+      else if (!authed && _prefsLoaded) { _prefsLoaded = false; sessionOverrides = {}; themeChoice = 'system'; applyTheme(); }
     }
     try {
       new MutationObserver(reflectIdentity).observe(

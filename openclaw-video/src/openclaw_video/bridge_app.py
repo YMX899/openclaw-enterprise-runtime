@@ -570,6 +570,37 @@ def create_app(
         principal = await current_principal(request)
         return {"principal_id": principal.principal_id, "authenticated": True, **runtime_metadata()}
 
+    @app.get("/openclaw-api/prefs")
+    @app.get("/ai/openclaw-api/prefs")
+    @app.get("/api/openclaw-api/prefs")
+    @app.get("/console/api/openclaw-api/prefs")
+    async def get_user_prefs(request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        prefs: dict[str, Any] = {}
+        if hasattr(session_store, "get_prefs"):
+            try:
+                prefs = session_store.get_prefs(principal.principal_id) or {}
+            except Exception:
+                prefs = {}
+        return {"prefs": prefs}
+
+    @app.put("/openclaw-api/prefs")
+    @app.put("/ai/openclaw-api/prefs")
+    @app.put("/api/openclaw-api/prefs")
+    @app.put("/console/api/openclaw-api/prefs")
+    async def put_user_prefs(request: Request) -> dict[str, Any]:
+        principal = await current_principal(request)
+        payload = await request.json()
+        prefs = payload.get("prefs") if isinstance(payload, dict) else None
+        if not isinstance(prefs, dict):
+            raise HTTPException(status_code=400, detail="prefs object is required")
+        if len(json.dumps(prefs, ensure_ascii=False)) > 65536:
+            raise HTTPException(status_code=413, detail="prefs payload too large")
+        if not hasattr(session_store, "put_prefs"):
+            raise HTTPException(status_code=501, detail="prefs storage is not configured")
+        saved = session_store.put_prefs(principal.principal_id, prefs)
+        return {"prefs": saved}
+
     @app.get("/openclaw-api/identity/diagnostics")
     @app.get("/ai/openclaw-api/identity/diagnostics")
     @app.get("/api/openclaw-api/identity/diagnostics")

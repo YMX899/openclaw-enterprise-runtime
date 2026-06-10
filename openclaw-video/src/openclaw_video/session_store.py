@@ -54,6 +54,7 @@ class InMemorySessionStore:
     def __init__(self) -> None:
         self._sessions: dict[str, BridgeSession] = {}
         self._messages: dict[str, list[BridgeMessage]] = {}
+        self._prefs: dict[str, dict] = {}
         self._lock = Lock()
 
     def create_session(
@@ -75,6 +76,16 @@ class InMemorySessionStore:
             self._sessions[session.id] = session
             self._messages[session.id] = []
         return session
+
+    def get_prefs(self, principal_id: str) -> dict:
+        with self._lock:
+            return dict(self._prefs.get(principal_id, {}))
+
+    def put_prefs(self, principal_id: str, prefs: dict) -> dict:
+        payload = dict(prefs) if isinstance(prefs, dict) else {}
+        with self._lock:
+            self._prefs[principal_id] = payload
+            return dict(payload)
 
     def list_sessions(self, owner_principal_id: str) -> list[BridgeSession]:
         with self._lock:

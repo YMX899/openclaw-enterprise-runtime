@@ -324,6 +324,24 @@ class BridgeAppTests(unittest.TestCase):
         response = self.client.get("/openclaw-api/me")
         self.assertEqual(response.status_code, 401)
 
+    def test_prefs_roundtrip_and_owner_isolation(self):
+        self.assertEqual(self.client.get("/openclaw-api/prefs").status_code, 401)
+        self.assertEqual(self.client.get("/openclaw-api/prefs", headers=self.auth("account-a")).json()["prefs"], {})
+        put = self.client.put(
+            "/openclaw-api/prefs",
+            json={"prefs": {"theme": "dark", "sessions": {"s1": {"title": "改名"}}}},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(put.status_code, 200, put.text)
+        got = self.client.get("/openclaw-api/prefs", headers=self.auth("account-a")).json()["prefs"]
+        self.assertEqual(got["theme"], "dark")
+        self.assertEqual(got["sessions"]["s1"]["title"], "改名")
+        self.assertEqual(self.client.get("/openclaw-api/prefs", headers=self.auth("account-b")).json()["prefs"], {})
+        self.assertEqual(
+            self.client.put("/openclaw-api/prefs", json={"prefs": "nope"}, headers=self.auth("account-a")).status_code,
+            400,
+        )
+
     def test_dify_cookie_or_header_does_not_bypass_openclaw_login_by_default(self):
         from openclaw_video.bridge_app import create_app
 
