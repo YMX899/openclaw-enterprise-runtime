@@ -1,0 +1,31 @@
+{
+  "schema": "openclaw-m3-knowledge-coaching-root-evidence.v1",
+  "date": "2026-06-10",
+  "timezone": "Asia/Shanghai",
+  "environment": "root (AI-01)",
+  "milestone": "M3 知识固化 + 教练长生成修复",
+  "what": {
+    "knowledge": "Distilled the short-video methodology (5-dimension analysis framework + 6 picture-design principles + hook guide) from 爆款短视频制作与分析知识库.md / 爆火视屏回答模版.txt into compact constants in agent_persona.py, injected per-intent into coaching prompts (build_branch_prompt). Bridge rules + agent generation; no new skill runtime (the stable detection/state/error logic is already Bridge-side rules from M2).",
+    "gateway_fix": "Discovered the OpenClaw Gateway WS chat client capped total wait at 30s, which 502'd long coaching generations (reshoot 分镜方案 / full script). Made the timeout env-tunable (OPENCLAW_GATEWAY_TIMEOUT_SECONDS) with a 120s default. Pre-existing limit, surfaced by detailed coaching."
+  },
+  "secrets_recorded": false,
+  "deploy": {
+    "changed_files": ["openclaw_video/agent_persona.py (knowledge固化)", "openclaw_video/openclaw_gateway.py (timeout env + default 120s)"],
+    "method": "LF upload to release src + py_compile; rebuilt only the OpenClaw bridge (root_rebuild_bridge_fast.sh)",
+    "result": "bridge_fast_rebuild=PASS"
+  },
+  "local_tests": "310 tests; only the pre-existing unrelated identity-diagnostics failure remains.",
+  "public_route_invariants": {"openclaw_page": 200, "unauthenticated_openclaw_api": 401},
+  "dify_core_invariants": {
+    "unchanged_by_this_deploy": true,
+    "docker-api-1_startedAt": "2026-06-09T13:36:22Z (pre-existing, not changed by this work)",
+    "docker-web-1_startedAt": "2026-01-05T11:17:19Z",
+    "docker-nginx-1_startedAt": "2026-01-05T11:17:20Z"
+  },
+  "coaching_e2e": {
+    "why_not_viral": "grounded ~2.5k-char diagnosis structured on the 5-dimension framework, referencing the actual analyzed video",
+    "reshoot_before_fix": "HTTP 502 (Gateway 30s timeout on the long 分镜方案 generation)",
+    "reshoot_after_fix": "HTTP 200, 4522-char grounded复拍方案 (复拍目标 + 分镜 + picture-design concepts), referencing the actual video content"
+  },
+  "key_validation": "Coaching follow-ups are grounded in the real analysis AND now follow the固化 methodology (5 dimensions / picture principles); the long-generation 502 is fixed via the 120s gateway timeout."
+}

@@ -276,6 +276,19 @@ class BranchPromptTests(unittest.TestCase):
         self.assertIn("OpenClaw 短视频分析", prompt)
         self.assertIn("分镜", prompt)
 
+    def test_injects_knowledge_block_per_intent(self):
+        # picture/reshoot intents get the picture principles
+        p = build_branch_prompt("怎么复拍", state="follow_up", intent="ask_reshoot_plan", analysis_summary="x")
+        self.assertIn("画面设计六原则", p)
+        self.assertIn("欲望比产品大一号", p)
+        # rewrite-opening gets the hook guide
+        p = build_branch_prompt("开头怎么改", state="follow_up", intent="ask_rewrite_opening", analysis_summary="x")
+        self.assertIn("前 3 秒钩子要点", p)
+        # why-not-viral and plain feedback get the 5-dimension analysis framework
+        p = build_branch_prompt("为什么不爆", state="follow_up", intent="ask_why_not_viral", analysis_summary="x")
+        self.assertIn("短视频分析方法论", p)
+        self.assertIn("信息密度", p)
+
 
 class PersonaInjectionTests(unittest.TestCase):
     def test_first_turn_gets_persona(self):

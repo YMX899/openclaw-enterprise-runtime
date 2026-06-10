@@ -123,6 +123,28 @@ class GatewayClientTests(unittest.TestCase):
             os.environ.clear()
             os.environ.update(previous)
 
+    def test_environment_factory_honors_timeout_override(self):
+        previous = os.environ.copy()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                token_path = os.path.join(tmp, "gateway.token")
+                key_path = os.path.join(tmp, "bridge.key")
+                with open(token_path, "w", encoding="utf-8") as handle:
+                    handle.write("secret\n")
+                with open(key_path, "w", encoding="utf-8") as handle:
+                    handle.write(TEST_ED25519_PRIVATE_KEY)
+                os.environ.clear()
+                os.environ["OPENCLAW_GATEWAY_URL"] = "ws://openclaw-gateway:18789"
+                os.environ["OPENCLAW_GATEWAY_TOKEN_FILE"] = token_path
+                os.environ["OPENCLAW_GATEWAY_DEVICE_KEY_FILE"] = key_path
+                # default is generous (long coaching generations)
+                self.assertEqual(OpenClawGatewayWsClient.from_environment().timeout_seconds, 120.0)
+                os.environ["OPENCLAW_GATEWAY_TIMEOUT_SECONDS"] = "180"
+                self.assertEqual(OpenClawGatewayWsClient.from_environment().timeout_seconds, 180.0)
+        finally:
+            os.environ.clear()
+            os.environ.update(previous)
+
     def test_invalid_or_missing_ed25519_key_is_not_configured(self):
         with self.assertRaises((GatewayNotConfigured, GatewayError, ValueError)):
             OpenClawDeviceIdentity.from_private_key_pem("")

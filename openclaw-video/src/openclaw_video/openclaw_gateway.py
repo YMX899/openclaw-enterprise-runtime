@@ -193,7 +193,21 @@ class OpenClawGatewayWsClient:
         device_key_path = os.environ.get("OPENCLAW_GATEWAY_DEVICE_KEY_FILE", "").strip()
         if not url or not token or not device_key_path:
             return DisabledGatewayClient()
-        return cls(url=url, token=token, device_identity=OpenClawDeviceIdentity.from_file(device_key_path))
+        # Long coaching generations (reshoot 分镜方案 / full script) can take well
+        # over 30s; the WS client caps the total wait at timeout_seconds, so keep
+        # it generous and env-tunable to avoid 502s on detailed answers.
+        try:
+            timeout_seconds = float(os.environ.get("OPENCLAW_GATEWAY_TIMEOUT_SECONDS", "120"))
+        except ValueError:
+            timeout_seconds = 120.0
+        if timeout_seconds <= 0:
+            timeout_seconds = 120.0
+        return cls(
+            url=url,
+            token=token,
+            device_identity=OpenClawDeviceIdentity.from_file(device_key_path),
+            timeout_seconds=timeout_seconds,
+        )
 
     def connect_params(self, nonce: str | None = None, signed_at_ms: int | None = None) -> dict[str, Any]:
         if not self.token:

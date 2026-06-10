@@ -355,6 +355,51 @@ def error_reply_for(error_code: str | None) -> str:
     return _ERROR_REPLIES.get(str(error_code or ""), _ERROR_FALLBACK)
 
 
+# --- knowledge固化 (M3): compact short-video methodology -------------------
+# Distilled from the short-video knowledge base (爆款短视频制作与分析知识库.md
+# section 4 画面设计方法论 + 爆火视屏回答模版.txt). Kept compact and injected
+# per-intent into coaching prompts so the agent's analysis/rewrites stay
+# consistent with the methodology instead of generic. Not the raw KB.
+
+ANALYSIS_FRAMEWORK = (
+    "短视频分析方法论（按此框架展开，结合本条视频具体说，不要空谈）：\n"
+    "1. 选题：洞察的需求是否够大、播放量上限多高；是否给了明确的解决方案。\n"
+    "2. 易懂度：表达是否通俗、用户看完能否直接落地，避免全程专业词。\n"
+    "3. 信息密度：大致每 10 秒给一个新信息，无废话，持续给观众新刺激。\n"
+    "4. 含金量：是否有新鲜感、是否打破固有认知（认知差）、是否真的有价值。\n"
+    "5. 结构：钩子 / 骨架 / 情绪刺点；开头钩子要打破认知差、给观众停留理由。"
+)
+
+PICTURE_PRINCIPLES = (
+    "画面设计六原则（用来诊断/改画面，逐条对照本条视频）：\n"
+    "1. 欲望比产品大一号：拍产品之后的生活，C 位留给欲望而非产品本身。\n"
+    "2. 空间是一个世界：场景要交代身份与使用情境，不是背景板。\n"
+    "3. 物品是视觉证据：道具要进入动作、佐证卖点，不只是摆设。\n"
+    "4. 用动作代替状态、用细节代替大词：拍情绪的证据，细节特写优先于全景。\n"
+    "5. 信息量决定心理时间：用画面信息量调节节奏与停留感。\n"
+    "6. 风格是感觉记忆：找形式支点，而不是套滤镜或复制表面。"
+)
+
+HOOK_GUIDE = (
+    "前 3 秒钩子要点：第一时间抛出反差/认知差/结果前置，给观众一个明确的停留理由；"
+    "钩子的画面与文案要同时承载核心价值，静音也能看懂重点。"
+)
+
+_INTENT_KNOWLEDGE: dict[str, str] = {
+    "ask_why_not_viral": ANALYSIS_FRAMEWORK,
+    "ask_rewrite_opening": HOOK_GUIDE,
+    "ask_rewrite_script": ANALYSIS_FRAMEWORK,
+    "ask_picture_improvement": PICTURE_PRINCIPLES,
+    "ask_reshoot_plan": PICTURE_PRINCIPLES,
+}
+
+
+def knowledge_for_intent(intent: str) -> str:
+    """Return a compact methodology block relevant to the coaching intent, or
+    the general analysis framework for plain feedback turns."""
+    return _INTENT_KNOWLEDGE.get(intent, ANALYSIS_FRAMEWORK)
+
+
 # --- agent coaching branch prompts (spec ch.10.11-10.13, ch.11) ------------
 # For feedback_given / follow_up we DO call the agent, but with a branch-specific
 # instruction AND the real analysis summary injected — because video analysis
@@ -405,6 +450,7 @@ def build_branch_prompt(
     branch = _BRANCH_INSTRUCTIONS.get(intent)
     if branch:
         parts.append("本轮分支要求：" + branch)
+    parts.append(knowledge_for_intent(intent))
     summary = (analysis_summary or "").strip()
     if summary:
         if len(summary) > 2000:
