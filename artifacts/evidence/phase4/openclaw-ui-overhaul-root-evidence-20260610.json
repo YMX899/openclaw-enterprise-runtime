@@ -1,0 +1,65 @@
+{
+  "schema": "openclaw-ui-overhaul-root-evidence.v1",
+  "date": "2026-06-10",
+  "timezone": "Asia/Shanghai",
+  "environment": "root (AI-01)",
+  "milestone": "前端产品化改造（深色模式 / 会话管理 / 用户菜单 / 移动端 / 状态反馈 / a11y）",
+  "architecture_note": "前端是 bridge_app.py 内嵌的单页 HTML/CSS/JS（LAB_PAGE_HTML，原生 JS，无框架/路由/构建/组件库）。改造在此架构内进行；SPA 专属项（路由/组件拆文件/npm 构建/引入组件库）不适用。",
+  "research_note": "本环境 WebSearch(429)/WebFetch(域名拦截) 不可用，未能实时联网调研；依据对 ChatGPT/Claude/Gemini/通义/Kimi/豆包 等成熟产品的既有通用规律应用。",
+  "secrets_recorded": false,
+  "security_contract_respected": "UI 契约禁止 localStorage 与 Cookie（不在浏览器存任何东西）。因此主题与会话重命名/删除做成会话内内存态（刷新重置），未使用浏览器存储；可后续接后端 prefs 接口持久化。",
+  "deploy": {
+    "changed_files": ["openclaw_video/bridge_app.py (LAB_PAGE_HTML: CSS + 标记 + JS)"],
+    "method": "LF 上传 current release + py_compile + 仅重建 bridge (root_rebuild_bridge_fast.sh)",
+    "result": "bridge_fast_rebuild=PASS",
+    "rollback": "bridge_app.py.bak-20260610-ui"
+  },
+  "validation": {
+    "local_tests": "310 tests pass (only the pre-existing unrelated identity-diagnostics failure); UI contract test passes (no localStorage/Cookie/gateway-secret surfaces).",
+    "js_syntax": "node --check on the page script: OK",
+    "local_render": "headless chromium: chatApp+login present, no horizontal overflow, dark toggle works, 0 code errors (only expected file:// fetch failures)",
+    "root_live_render_logged_in": {
+      "login": "real OpenClaw login succeeded, chatApp shown",
+      "new_elements_present": ["sessionSearch", "userMenuBtn", "cgMenuBtn", "userMenu", "sessionRowMenu", "modalHost", "toastHost", "row-menu-btn"],
+      "dark_mode_applied": true,
+      "horizontal_overflow_desktop": false,
+      "horizontal_overflow_mobile_390": false,
+      "mobile_drawer_opens": true,
+      "code_errors": 0
+    }
+  },
+  "screenshots": [
+    "artifacts/evidence/phase4/openclaw-ui-overhaul-landing-20260610.png",
+    "artifacts/evidence/phase4/openclaw-ui-overhaul-chat-light-20260610.png",
+    "artifacts/evidence/phase4/openclaw-ui-overhaul-chat-dark-20260610.png",
+    "artifacts/evidence/phase4/openclaw-ui-overhaul-mobile-20260610.png"
+  ],
+  "public_route_invariants": {"huahuo_root": 200, "openclaw_page": 200, "unauthenticated_openclaw_api": 401},
+  "dify_core_invariants": {
+    "unchanged_by_this_deploy": true,
+    "docker-api-1_startedAt": "2026-06-09T13:36:22Z (pre-existing, not changed by this work)",
+    "docker-web-1_startedAt": "2026-01-05T11:17:19Z",
+    "docker-nginx-1_startedAt": "2026-01-05T11:17:20Z"
+  },
+  "delivered": [
+    "统一设计令牌 + 完整深色模式（[data-theme] 覆盖 + 聊天主区/气泡/输入区暗色一致、文字可读）",
+    "主题切换（浅色/深色/跟随系统）入口在侧栏用户菜单",
+    "会话搜索（客户端过滤）+ 清除",
+    "历史会话按时间分组（今天/昨天/最近7天/最近30天/更早）+ 当前会话高亮 + 标题省略",
+    "每条会话更多菜单：重命名 / 删除（删除二次确认 + toast + 5s 撤销）",
+    "侧栏底部用户菜单（账号信息 / 主题 / 关于 / 退出登录）",
+    "消息复制操作（assistant 气泡 hover 显示）",
+    "移动端：侧栏抽屉 + 顶栏菜单按钮 + 遮罩，选会话/新建自动关抽屉，无横向溢出",
+    "弹窗（确认/重命名）+ toast 基元，focus 管理 + Esc 关闭 + 外点关闭，aria 标注，统一内联 SVG 图标（不用 emoji/不引图标库）",
+    "输入框自增高（上限 200px）；Enter 发送 / Shift+Enter 换行（既有）",
+    "空状态/列表占位/骨架样式 + 删除确认 + 操作成功/失败提示"
+  ],
+  "frontend_local_only": ["主题选择", "会话重命名", "会话删除（本地隐藏，含撤销）"],
+  "backend_supported": ["会话列表/创建/消息加载/聊天/视频分析（既有接口未改动）"],
+  "deferred": [
+    "会话重命名/删除的服务器端持久化（需新增后端接口；当前为会话内内存态以遵守 no-browser-storage 安全契约）",
+    "消息编辑并重发 / 重新生成 / 点赞点踩（部分需后端能力）",
+    "批量管理 / 置顶 / 归档",
+    "独立多分区设置页（当前为用户菜单内的精简设置）"
+  ]
+}
