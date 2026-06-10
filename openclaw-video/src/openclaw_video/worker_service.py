@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from threading import Event, Thread
 from typing import Callable
 
-from .douyin_wrapper import DouyinAnalysisResult, DouyinWrapperError, run_douyin_chong
+from .douyin_wrapper import DouyinAnalysisResult, DouyinWrapperError, run_douyin_chong, run_upload_video_analysis
 from .job_store import InMemoryJobStore, JobLeaseError, VideoJob
 from .result_schema import RESULT_SCHEMA_VERSION, ResultSchemaError, validate_result_payload
 from .upload_store import UploadNotFound, UploadStoreError, is_upload_uri, resolve_upload_uri
@@ -21,6 +21,10 @@ from .url_guard import (
 )
 
 
+class UploadTooLargeError(RuntimeError):
+    """Uploaded video is too large to inline-base64 for direct model analysis."""
+
+
 Analyzer = Callable[[str, Path], DouyinAnalysisResult]
 
 
@@ -32,6 +36,7 @@ class WorkerConfig:
     max_download_bytes: int = 512 * 1024 * 1024
     max_duration_seconds: int = 60
     max_frames: int = 1200
+    max_inline_upload_bytes: int = 60 * 1024 * 1024
 
 
 class VideoAnalysisWorker:
@@ -62,43 +67,23 @@ class VideoAnalysisWorker:
             max_frames=self.config.max_frames,
         )
 
-    def _analyze_uploaded_video(self, video_uri: str, _output_dir: Path) -> DouyinAnalysisResult:
+    def _analyze_uploaded_video(self, video_uri: str, output_dir: Path) -> DouyinAnalysisResult:
         path = resolve_upload_uri(video_uri)
         size_bytes = path.stat().st_size
         if size_bytes <= 0:
             raise DouyinWrapperError("uploaded video is empty")
-        if size_bytes > self.config.max_download_bytes:
-            raise DouyinWrapperError("uploaded video exceeds size limit")
-        payload = {
-            "schema_version": RESULT_SCHEMA_VERSION,
-            "source": {
-                "video_url_canonical": video_uri,
-                "platform": "upload",
-                "duration_seconds": None,
-            },
-            "summary": (
-                "已收到你上传的视频文件，并完成接收校验（文件有效、大小在限制范围内）。"
-                "上传的视频会进入专门的视频处理流程做后续分析，分析能力完善后，"
-                "这里会直接给出画面、动作、结构和改进建议。"
-                "如果想立即获得完整的逐条分析，建议先用抖音视频链接，让我先读取并解析画面内容。"
-            ),
-            "signals": {
-                "hook": None,
-                "topic": None,
-                "audience": None,
-                "structure": None,
-                "visual_notes": f"uploaded_file={path.name}; size_bytes={size_bytes}",
-                "risk_notes": None,
-            },
-            "raw_tool_result": {
-                "tool": "openclaw-upload-file-analyzer",
-                "mode": "file-level-validation",
-                "filename": path.name,
-                "size_bytes": size_bytes,
-            },
-            "created_at": datetime.now(UTC).isoformat(),
-        }
-        return DouyinAnalysisResult(payload=payload, stdout="", stderr="")
+        if size_bytes > self.config.max_inline_upload_bytes:
+            raise UploadTooLargeError("uploaded video exceeds inline analysis size limit")
+        # Inline-base64 the local bytes and let Doubao analyze the data: URL
+        # directly — no resolver, no public hosting. The result is a real model
+        # analysis, mirroring the link path.
+        return run_upload_video_analysis(
+            file_path=str(path),
+            output_dir=output_dir,
+            source_label=video_uri,
+            timeout_seconds=self.config.timeout_seconds,
+            max_bytes=self.config.max_inline_upload_bytes,
+        )
 
     def _start_heartbeat(self, job: VideoJob) -> Callable[[], None]:
         interval = self.config.heartbeat_interval_seconds
@@ -161,6 +146,8 @@ class VideoAnalysisWorker:
             return self._fail_job(job, "tool_timeout", timed_out=True)
         except UrlRejected:
             return self._fail_job(job, "url_rejected")
+        except UploadTooLargeError:
+            return self._fail_job(job, "upload_too_large")
         except (DouyinWrapperError, ResultSchemaError, ValueError, UploadStoreError, UploadNotFound):
             return self._fail_job(job, "tool_failed")
         except JobLeaseError:

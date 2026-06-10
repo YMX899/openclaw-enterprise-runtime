@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
@@ -249,13 +250,111 @@ def _build_payload(
     return validate_result_payload(payload)
 
 
+_UPLOAD_CONTENT_TYPES = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".webm": "video/webm",
+}
+
+
+def _upload_prompt() -> str:
+    return (
+        "请分析这条短视频，用简体中文回答：主题、开头 3 秒钩子、内容结构与信息密度、"
+        "画面与动作设计、目标人群、风险点，并给出可执行的改进建议（开头改法、脚本改法、复拍要点）。"
+        "不要输出任何链接、密钥、请求头、cookie 或内部路径。"
+    )
+
+
+def _build_upload_payload(
+    *,
+    source_label: str | None,
+    filename: str,
+    size_bytes: int,
+    completion: Any,
+) -> dict[str, Any]:
+    output_text = _safe_text(getattr(completion, "output_text", ""))
+    if not output_text:
+        detail = (
+            getattr(completion, "api_error_message", "")
+            or getattr(completion, "error_message", "")
+            or "empty analysis output"
+        )
+        raise LegacyAdapterError(f"legacy tool returned no analysis output: {detail}")
+    raw_tool_result: dict[str, Any] = {
+        "tool": "openclaw-upload-analyzer",
+        "adapter": "openclaw_video.douyin_legacy_adapter",
+        "mode": "inline-base64",
+        "filename": filename,
+        "size_bytes": size_bytes,
+        "request_id": str(getattr(completion, "request_id", "") or ""),
+        "usage": getattr(completion, "usage", None),
+    }
+    payload = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "source": {
+            "video_url_canonical": source_label or filename,
+            "platform": "upload",
+            "duration_seconds": None,
+        },
+        "summary": output_text,
+        "signals": {
+            "hook": None,
+            "topic": None,
+            "audience": None,
+            "structure": None,
+            "visual_notes": output_text,
+            "risk_notes": None,
+        },
+        "raw_tool_result": raw_tool_result,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    return validate_result_payload(payload)
+
+
+def _analyze_uploaded_file(
+    config: Any,
+    ark_video_client: type,
+    *,
+    file_path: str,
+    source_label: str | None,
+    max_bytes: int,
+) -> dict[str, Any]:
+    """Inline-base64 a local video file and analyze it directly with Doubao.
+
+    No resolver, no streaming download — the bytes are already local. The model
+    fetches the video from the inline ``data:`` URL. Size is bounded by
+    ``max_bytes`` (the worker also guards before calling, for a friendly code).
+    """
+    path = Path(file_path)
+    if not path.is_file():
+        raise LegacyAdapterError("--input-file must point to an existing file")
+    size_bytes = path.stat().st_size
+    if size_bytes <= 0:
+        raise LegacyAdapterError("inline video is empty")
+    if size_bytes > _positive_int(max_bytes, "max_bytes"):
+        raise LegacyAdapterError("inline video exceeds limit")
+    content_type = _UPLOAD_CONTENT_TYPES.get(path.suffix.lower(), "video/mp4")
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    data_url = f"data:{content_type};base64,{encoded}"
+    completion = ark_video_client(config).analyze(video_urls=[data_url], prompt=_upload_prompt())
+    return _build_upload_payload(
+        source_label=source_label,
+        filename=path.name,
+        size_bytes=size_bytes,
+        completion=completion,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="OpenClaw-safe adapter for the legacy douyin_chong package.")
-    parser.add_argument("--input-url", required=True)
+    parser.add_argument("--input-url", default=None, help="Douyin video link (URL mode).")
+    parser.add_argument("--input-file", default=None, help="Local video file path (upload inline-base64 mode).")
+    parser.add_argument("--source-label", default=None, help="Traceable source label (e.g. upload:// URI) for the result payload.")
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--max-bytes", type=int, required=True)
-    parser.add_argument("--max-duration-seconds", type=int, required=True)
-    parser.add_argument("--max-frames", type=int, required=True)
+    parser.add_argument("--max-duration-seconds", type=int, default=int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "60")))
+    parser.add_argument("--max-frames", type=int, default=int(os.environ.get("MAX_VIDEO_FRAMES", "1200")))
     parser.add_argument("--env-file", required=True)
     parser.add_argument("--no-shell", action="store_true", required=True)
     parser.add_argument("--fps", type=float, default=float(os.environ.get("DOUYIN_CHONG_FPS", "4.0")))
@@ -294,24 +393,35 @@ def run_adapter(
         read_timeout=args.read_timeout,
         retries=args.retries,
     )
-    resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
-    video = UniversalVideoResolver().resolve(resolver_input_url)
-    _enforce_limits(video, limits)
-    video_urls = [
-        url
-        for url in (
-            getattr(video, "video_url", ""),
-            getattr(video, "playwm_url", ""),
+    if bool(args.input_file) == bool(args.input_url):
+        raise LegacyAdapterError("exactly one of --input-url or --input-file is required")
+    if args.input_file:
+        payload = _analyze_uploaded_file(
+            config,
+            ArkVideoClient,
+            file_path=args.input_file,
+            source_label=args.source_label,
+            max_bytes=limits.max_download_bytes,
         )
-        if url
-    ]
-    completion = ArkVideoClient(config).analyze(video_urls=video_urls, prompt=_default_prompt())
-    payload = _build_payload(
-        input_url=args.input_url,
-        video=video,
-        completion=completion,
-        limits=limits,
-    )
+    else:
+        resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
+        video = UniversalVideoResolver().resolve(resolver_input_url)
+        _enforce_limits(video, limits)
+        video_urls = [
+            url
+            for url in (
+                getattr(video, "video_url", ""),
+                getattr(video, "playwm_url", ""),
+            )
+            if url
+        ]
+        completion = ArkVideoClient(config).analyze(video_urls=video_urls, prompt=_default_prompt())
+        payload = _build_payload(
+            input_url=args.input_url,
+            video=video,
+            completion=completion,
+            limits=limits,
+        )
     output_json = Path(args.output_json)
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

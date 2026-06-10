@@ -1,0 +1,49 @@
+{
+  "schema": "openclaw-upload-real-analysis-root-evidence.v1",
+  "date": "2026-06-10",
+  "timezone": "Asia/Shanghai",
+  "environment": "root (AI-01)",
+  "milestone": "上传视频真分析（补齐两种输入方式的上传一半）",
+  "design": {
+    "approach": "worker reads the uploaded local bytes and inline-base64s them into a data: URL; Doubao (doubao-seed-2-0-pro) analyzes the data: URL directly. No public hosting, no object storage, no resolver.",
+    "size_guard": "MAX_INLINE_UPLOAD_BYTES (default 60MB); oversize -> error_code upload_too_large -> friendly Bridge reply",
+    "spike_confirmed": "doubao-seed-2-0-pro accepts a ~38MB base64 data: video URL and returns a real analysis (status 200)"
+  },
+  "secrets_recorded": false,
+  "notes_on_redaction": "No account/password/cookie/token/URL/model key recorded. Model analysis stored only as length + sha256 + bounded excerpt.",
+  "deploy": {
+    "changed_files": [
+      "openclaw_video/douyin_legacy_adapter.py (added --input-file inline-base64 mode)",
+      "openclaw_video/douyin_wrapper.py (run_upload_video_analysis)",
+      "openclaw_video/worker_service.py (real _analyze_uploaded_video + UploadTooLargeError + size guard)",
+      "openclaw_video/worker_main.py (MAX_INLINE_UPLOAD_BYTES)",
+      "openclaw_video/agent_persona.py (error_reply_for upload_too_large)"
+    ],
+    "method": "LF-normalized upload to current release src + py_compile; rebuilt bridge (root_rebuild_bridge_fast.sh, for agent_persona) and worker (fast layered image over openclaw-video-video-analysis-worker:latest + up --no-deps --force-recreate, no --build)",
+    "result": "bridge_fast_rebuild=PASS; worker recreated and healthy (no error logs)"
+  },
+  "local_tests": "308 tests; only the pre-existing unrelated identity-diagnostics failure remains.",
+  "public_route_invariants": {"openclaw_page": 200, "unauthenticated_openclaw_api": 401},
+  "dify_core_invariants": {
+    "unchanged_by_this_deploy": true,
+    "docker-api-1_startedAt": "2026-06-09T13:36:22Z (pre-existing, not changed by this work)",
+    "docker-web-1_startedAt": "2026-01-05T11:17:19Z",
+    "docker-nginx-1_startedAt": "2026-01-05T11:17:20Z"
+  },
+  "upload_e2e": {
+    "login": 200,
+    "create_session": 201,
+    "upload": {"http_status": 202, "upload_size_bytes": 29996535, "initial_status": "queued"},
+    "poll_job": {"final_status": "succeeded"},
+    "result": {
+      "http_status": 200,
+      "schema_version": "openclaw-video-result.v1",
+      "platform": "upload",
+      "mode": "inline-base64",
+      "summary_len": 1936,
+      "summary_sha256": "4cb02d7bdfbf87123213d54fcf77a1145799e8da14d8cfce17bd00e5f1aac45a"
+    }
+  },
+  "key_validation": "A 28.6MB uploaded mp4, sent through the real /uploads API, was analyzed by Doubao via inline base64 and returned a full structured Chinese short-video analysis (1936 chars). The upload path is no longer a placeholder. Oversize handling (upload_too_large) is unit-tested.",
+  "rollback": "release src backups *.bak-20260610b; previous worker image id retained (untagged) for image rollback"
+}

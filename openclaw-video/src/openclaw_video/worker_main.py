@@ -23,6 +23,7 @@ def main() -> None:
     max_download_bytes = int(os.environ.get("MAX_DOWNLOAD_BYTES", str(512 * 1024 * 1024)))
     max_duration_seconds = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "60"))
     max_frames = int(os.environ.get("MAX_VIDEO_FRAMES", "1200"))
+    max_inline_upload_bytes = int(os.environ.get("MAX_INLINE_UPLOAD_BYTES", str(60 * 1024 * 1024)))
     store = PostgresJobStore(database_url)
     worker = VideoAnalysisWorker(
         store,
@@ -33,6 +34,7 @@ def main() -> None:
             max_download_bytes=max_download_bytes,
             max_duration_seconds=max_duration_seconds,
             max_frames=max_frames,
+            max_inline_upload_bytes=max_inline_upload_bytes,
         ),
     )
     while True:

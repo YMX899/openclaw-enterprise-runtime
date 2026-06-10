@@ -297,5 +297,83 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                 )
 
 
+    def test_input_file_inline_analysis_builds_upload_payload(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            video_file = Path(tmp) / "clip.mp4"
+            video_file.write_bytes(b"fake-video-bytes")
+            output_json = Path(tmp) / "result.json"
+
+            payload = run_adapter(
+                [
+                    "--input-file", str(video_file),
+                    "--source-label", "upload://abc/clip.mp4",
+                    "--output-json", str(output_json),
+                    "--max-bytes", "2000000",
+                    "--env-file", str(env_file),
+                    "--no-shell",
+                ],
+                component_loader=fake_components,
+            )
+
+        self.assertEqual(payload["schema_version"], "openclaw-video-result.v1")
+        self.assertEqual(payload["source"]["platform"], "upload")
+        self.assertEqual(payload["source"]["video_url_canonical"], "upload://abc/clip.mp4")
+        self.assertEqual(payload["summary"], "分析结果")
+        self.assertEqual(payload["raw_tool_result"]["mode"], "inline-base64")
+        self.assertEqual(payload["raw_tool_result"]["filename"], "clip.mp4")
+        # the model received an inline base64 data: URL, not a resolved link
+        sent_url = FakeArkClient.calls[0]["video_urls"][0]
+        self.assertTrue(sent_url.startswith("data:video/mp4;base64,"))
+
+    def test_input_file_too_large_fails_closed(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            video_file = Path(tmp) / "big.mp4"
+            video_file.write_bytes(b"x" * 2000)
+            with self.assertRaises(LegacyAdapterError):
+                run_adapter(
+                    [
+                        "--input-file", str(video_file),
+                        "--output-json", str(Path(tmp) / "result.json"),
+                        "--max-bytes", "1000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+    def test_requires_exactly_one_input(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            # neither --input-url nor --input-file
+            with self.assertRaises(LegacyAdapterError):
+                run_adapter(
+                    [
+                        "--output-json", str(Path(tmp) / "r.json"),
+                        "--max-bytes", "2000000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+            # both at once
+            with self.assertRaises(LegacyAdapterError):
+                run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--input-file", str(env_file),
+                        "--output-json", str(Path(tmp) / "r2.json"),
+                        "--max-bytes", "2000000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

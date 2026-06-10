@@ -242,6 +242,11 @@ class ErrorReplyTests(unittest.TestCase):
         reply = error_reply_for("something_else")
         self.assertIn("不会假装", reply)
 
+    def test_upload_too_large(self):
+        reply = error_reply_for("upload_too_large")
+        self.assertIn("偏大", reply)
+        self.assertIn("60MB", reply)
+
     def test_none_code_fallback(self):
         self.assertTrue(error_reply_for(None))
 

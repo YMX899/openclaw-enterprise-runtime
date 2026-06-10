@@ -96,10 +96,13 @@ Key points:
 **Immediate task (this round, user-confirmed 2026-06-10):** prove the **link
 method** end-to-end on root — user pastes a real douyin link, the tool resolves
 it, Doubao analyzes from the resolved URL, and the structured result is returned
-into the conversation. Making the **upload method** run a real Doubao analysis
-(exposing the stored file as an Ark-fetchable URL) is deferred to a separate
-work item; the upload path stays as the file-level-validation placeholder for
-now.
+into the conversation. **Update 2026-06-10:** the **upload method** now also runs
+a real Doubao analysis — the worker inline-base64s the uploaded file into a
+`data:` URL and Doubao analyzes it directly (no public hosting; size-guarded by
+`MAX_INLINE_UPLOAD_BYTES`, oversize → `upload_too_large`). Verified end-to-end on
+root (28.6MB mp4 → `succeeded`, 1936-char analysis). Evidence:
+`artifacts/evidence/phase4/openclaw-upload-real-analysis-root-evidence-20260610.json`.
+Both input methods (link + upload) are now complete.
 
 ### Root test finding 2026-06-10 (link path)
 

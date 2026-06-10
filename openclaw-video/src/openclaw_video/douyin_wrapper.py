@@ -89,3 +89,66 @@ def run_douyin_chong(
         raise DouyinWrapperError("douyin_chong result must be a JSON object")
     payload = validate_result_payload(payload)
     return DouyinAnalysisResult(payload=payload, stdout=completed.stdout, stderr=completed.stderr)
+
+
+def run_upload_video_analysis(
+    *,
+    file_path: str,
+    output_dir: Path,
+    source_label: str,
+    binary: str | None = None,
+    env_file: str | None = None,
+    timeout_seconds: int = 900,
+    max_bytes: int = 60 * 1024 * 1024,
+) -> DouyinAnalysisResult:
+    """Analyze a locally-uploaded video via the adapter's inline-base64 mode.
+
+    Uses the same fixed-argument, no-shell wrapper as run_douyin_chong but with
+    --input-file (the adapter reads the bytes, inlines them as a data: URL, and
+    lets Doubao analyze directly — no resolver, no public hosting).
+    """
+    executable = binary or os.environ.get("DOUYIN_CHONG_BIN")
+    if not executable:
+        raise DouyinWrapperError("DOUYIN_CHONG_BIN is not configured")
+    resolved_env_file = env_file or os.environ.get("DOUYIN_CHONG_ENV_FILE")
+    if not resolved_env_file:
+        raise DouyinWrapperError("DOUYIN_CHONG_ENV_FILE is not configured")
+    max_bytes = _positive_int(max_bytes, "max_bytes")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_json = output_dir / "result.json"
+    cmd = [
+        executable,
+        "--input-file",
+        file_path,
+        "--source-label",
+        source_label,
+        "--output-json",
+        str(output_json),
+        "--max-bytes",
+        str(max_bytes),
+        "--env-file",
+        resolved_env_file,
+        "--no-shell",
+    ]
+    try:
+        completed = subprocess.run(
+            cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("upload analysis timed out") from exc
+    except FileNotFoundError as exc:
+        raise DouyinWrapperError("upload analyzer binary was not found") from exc
+    if completed.returncode != 0:
+        raise DouyinWrapperError(f"upload analyzer failed with exit code {completed.returncode}")
+    if output_json.exists():
+        payload = json.loads(output_json.read_text(encoding="utf-8"))
+    else:
+        payload = json.loads(completed.stdout)
+    if not isinstance(payload, dict):
+        raise DouyinWrapperError("upload analyzer result must be a JSON object")
+    payload = validate_result_payload(payload)
+    return DouyinAnalysisResult(payload=payload, stdout=completed.stdout, stderr=completed.stderr)
