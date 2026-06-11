@@ -128,6 +128,12 @@ const output = document.getElementById('output');
     function hasSession() {
       return Boolean(document.getElementById('sessionId').value.trim());
     }
+    function currentSessionId() {
+      return document.getElementById('sessionId').value;
+    }
+    function isActiveSession(sessionId) {
+      return Boolean(sessionId) && currentSessionId() === sessionId;
+    }
     function isAuthenticated() {
       return authStatus.classList.contains('ok');
     }
@@ -645,13 +651,14 @@ const output = document.getElementById('output');
     }
     async function refreshMessages(options = {}) {
       return withBusy('刷新消息', async () => {
-      const sessionId = document.getElementById('sessionId').value;
+      const sessionId = currentSessionId();
       if (!sessionId) {
         show('请先新建或选择一个对话。');
         setRunState('需要会话', 'fail');
         return;
       }
       const result = await api(apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages');
+      if (!isActiveSession(sessionId)) return result;
       if (result.status === 200) {
         renderMessages(result.body.messages || []);
         setRunState('历史已刷新', 'ok');
@@ -1050,7 +1057,7 @@ const output = document.getElementById('output');
     }
     async function sendChat() {
       return withBusy('发送中', async () => {
-      const sessionId = document.getElementById('sessionId').value;
+      const sessionId = currentSessionId();
       const promptText = document.getElementById('prompt').value.trim();
       if (!sessionId || !promptText) {
         show('请先新建或选择对话，并输入问题。');
@@ -1062,6 +1069,7 @@ const output = document.getElementById('output');
         method: 'POST',
         body: JSON.stringify({ session_id: sessionId, content: promptText })
       });
+      if (!isActiveSession(sessionId)) return result;
       if (result.status === 200 && result.body.message) {
         pushMessage('assistant', result.body.message.content || 'OpenClaw 已回复。');
         setRunState('已回复', 'ok');
@@ -1244,10 +1252,14 @@ const output = document.getElementById('output');
         setRunState('无任务', 'fail');
         return;
       }
-      const jobResult = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId));
+      const sessionId = currentSessionId();
+      const jobId = currentJobId;
+      const jobResult = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId));
+      if (!isActiveSession(sessionId) || currentJobId !== jobId) return jobResult;
       const job = jobResult.body.job;
       if (job && job.status === 'succeeded') {
-        const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(currentJobId) + '/result');
+        const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
+        if (!isActiveSession(sessionId) || currentJobId !== jobId) return result;
         pushMessage('assistant', '分析结果已就绪，请查看右侧结构化结果。');
         show({ job: jobResult, result });
         setRunState('结果已就绪', 'ok');
@@ -1272,12 +1284,14 @@ const output = document.getElementById('output');
       if (r.signals && Array.isArray(r.signals.frame_urls)) collect(r.signals.frame_urls);
       return urls.slice(0, 8);
     }
-    async function autoPollCurrentJob(progress, assistantNode) {
+    async function autoPollCurrentJob(progress, assistantNode, sessionId) {
       if (!currentJobId) return;
+      if (sessionId && !isActiveSession(sessionId)) return;
       const jobId = currentJobId;
       if (progress) progress.indeterminate('正在分析视频…');
       for (let attempt = 0; attempt < 60; attempt += 1) {
         await delay(2000);
+        if (sessionId && !isActiveSession(sessionId)) return;
         if (currentJobId !== jobId) return;
         let poll;
         try { poll = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId)); }
@@ -1286,6 +1300,7 @@ const output = document.getElementById('output');
         if (!job) continue;
         if (job.status === 'succeeded') {
           const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
+          if (sessionId && !isActiveSession(sessionId)) return;
           if (progress) progress.done('分析完成');
           const summary = result.body.result && result.body.result.result && result.body.result.result.summary;
           const shots = extractScreenshots(result);
@@ -1304,6 +1319,7 @@ const output = document.getElementById('output');
           return;
         }
         if (terminalStatuses.has(job.status)) {
+          if (sessionId && !isActiveSession(sessionId)) return;
           if (progress) progress.fail('分析未完成');
           const reply = buildJobErrorReply(job.error_code);
           if (assistantNode) { const inner = messageInner(assistantNode); if (inner) inner.childNodes[0] ? (inner.childNodes[0].textContent = reply) : (inner.textContent = reply); }
@@ -1328,7 +1344,7 @@ const output = document.getElementById('output');
       const promptText = document.getElementById('prompt').value.trim();
       // Upload path
       if (composerMode === 'upload' && attachedFile) {
-        const sessionId = document.getElementById('sessionId').value;
+        const sessionId = currentSessionId();
         if (!sessionId) { setNextAction('请先登录并新建对话。'); return; }
         const fileName = attachedFile.name;
         const userNode = pushMessage('user', promptText || '请分析我上传的视频。');
@@ -1338,12 +1354,13 @@ const output = document.getElementById('output');
         document.getElementById('prompt').value = '';
         updateComposerMode();
         const { body } = await uploadVideoWithProgress(attachedFile, sessionId, promptText || '请分析上传的视频。', progress);
+        if (!isActiveSession(sessionId)) return;
         setAttachedFile(null);
         if (body.job && body.job.job_id) {
           setCurrentJob(body.job.job_id);
           progress.indeterminate('上传完成，正在分析视频…');
           activateFlow(3);
-          await autoPollCurrentJob(progress, assistantNode);
+          await autoPollCurrentJob(progress, assistantNode, sessionId);
         } else {
           progress.fail('上传失败，请重试');
         }
@@ -1351,7 +1368,7 @@ const output = document.getElementById('output');
       }
       // Video link path
       if (composerMode === 'link') {
-        const sessionId = document.getElementById('sessionId').value;
+        const sessionId = currentSessionId();
         if (!sessionId) { setNextAction('请先登录并新建对话。'); return; }
         const link = document.getElementById('videoUrl').value;
         const userNode = pushMessage('user', promptText || '请分析这个视频。');
@@ -1360,15 +1377,17 @@ const output = document.getElementById('output');
         const progress = attachProgress(assistantNode, '读取链接中…');
         document.getElementById('prompt').value = '';
         const read = await api(apiPrefix + '/video-link/read-check', { method: 'POST', body: JSON.stringify({ video_url: link }) });
+        if (!isActiveSession(sessionId)) return;
         show({ status: read.status, video_link_read_check: read.body });
         if (read.status === 200 && read.body.status === 'PASS') {
           linkReadable = true;
           progress.indeterminate('链接可读取，正在提交分析…');
           const jobRes = await api(apiPrefix + '/jobs', { method: 'POST', body: JSON.stringify({ session_id: sessionId, video_url: link, content: promptText || '请分析这个视频。' }) });
+          if (!isActiveSession(sessionId)) return;
           if (jobRes.body.job && jobRes.body.job.job_id) {
             setCurrentJob(jobRes.body.job.job_id);
             activateFlow(3);
-            await autoPollCurrentJob(progress, assistantNode);
+            await autoPollCurrentJob(progress, assistantNode, sessionId);
           } else {
             progress.fail('提交分析失败，请重试');
           }

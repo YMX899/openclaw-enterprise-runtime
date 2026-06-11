@@ -1,0 +1,302 @@
+{
+  "schema": "openclaw-web-dialogue-link-upload-root-evidence.v1",
+  "created_at": "2026-06-11T04:59:54.571Z",
+  "environment": "root:https://www.huahuoai.com/ai/openclaw-lab/",
+  "secrets_recorded": false,
+  "raw_video_urls_recorded": false,
+  "account_recorded": false,
+  "status": "PASS",
+  "console_error_count": 0,
+  "console_error_hashes": [],
+  "cases": [
+    {
+      "label": "login",
+      "status": "PASS",
+      "chatVisible": true,
+      "passwordCleared": true
+    },
+    {
+      "label": "douyin_link_composer_analysis",
+      "status": "PASS",
+      "session_hash": "7083f19547b8f1d61f53b711c4f7bbd852eaa0abeb01a69dcd169a8443030510",
+      "users": 1,
+      "assistants": 2,
+      "run_state": "结果已就绪",
+      "output_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "latest_assistant": {
+        "len": 1186,
+        "sha256": "b10869b0f58f381b38f2b82234260d7b5b2438193bed33e8251d5c6740b72531"
+      }
+    },
+    {
+      "label": "douyin_link_followup_dialogue",
+      "status": "PASS",
+      "run_state": "已回复",
+      "latest_assistant": {
+        "len": 1092,
+        "sha256": "935244c721f4b0faae9b6a6e6f696d431f8a7593207976797ee0edb5bd5dd397"
+      }
+    },
+    {
+      "label": "upload_composer_analysis",
+      "status": "PASS",
+      "session_hash": "27a86363f6dfdab5e7504f2b03b88f6ac91094b004934c877856988c2eaf5f5c",
+      "attachment": {
+        "hidden": false,
+        "name_hash": "6deca5b980f245eda3883adce60d47c6dfa87b9a6c50c2e3e0447ca1f7a8e20c",
+        "sendDisabled": false
+      },
+      "users": 1,
+      "assistants": 2,
+      "run_state": "结果已就绪",
+      "output_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "latest_assistant": {
+        "len": 1277,
+        "sha256": "4b2ae057780dc22e684571b1e8f372d482aad8cb8bd2f554c687d4a3e8ddeab6"
+      }
+    },
+    {
+      "label": "upload_followup_dialogue",
+      "status": "PASS",
+      "run_state": "已回复",
+      "latest_assistant": {
+        "len": 3378,
+        "sha256": "b12842a4c87c9649ffcc965ba0dc36c6af36890562bf91e2d4bb8c46fb816915"
+      }
+    }
+  ],
+  "api_responses": [
+    {
+      "url": "/api/openclaw-api/auth/login",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/sessions",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/sessions",
+      "status": 201
+    },
+    {
+      "url": "/api/openclaw-api/sessions/<uuid>/messages",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/sessions/<uuid>/messages",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/video-link/read-check",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs",
+      "status": 202
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>/result",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/chat",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/sessions",
+      "status": 201
+    },
+    {
+      "url": "/api/openclaw-api/sessions/<uuid>/messages",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/uploads",
+      "status": 202
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>/result",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/chat",
+      "status": 200
+    }
+  ]
+}
