@@ -208,65 +208,26 @@
       <input id="videoUrl" type="hidden" value="">
       <input id="prompt-default" type="hidden" value="请分析这个视频。">
 
-      <details id="devDrawer" class="cg-dev-drawer">
-        <summary>
-          <span>诊断与结果明细</span>
-          <span class="summary-note">验证工具 · 链接读取 · 任务状态 · 验收 · 原始 JSON</span>
-        </summary>
-        <div class="cg-dev-body">
-          <div class="result-overview" aria-label="结果概览">
-            <div class="result-card">
-              <span>身份</span>
-              <strong id="authMetric">未登录</strong>
-              <p>OpenClaw 独立会话状态。</p>
-            </div>
-            <div class="result-card">
-              <span>来源</span>
-              <strong id="sourceMetric">等待视频来源</strong>
-              <p>链接读取或上传入口。</p>
-            </div>
-            <div class="result-card">
-              <span>分析</span>
-              <strong id="analysisMetric">就绪</strong>
-              <p>Worker 进度与最终状态。</p>
-            </div>
-            <div class="result-card">
-              <span>结果</span>
-              <strong id="resultMetric">暂无结果</strong>
-              <p>摘要与结构化结果状态。</p>
-            </div>
-          </div>
-          <div class="status-strip" aria-label="当前任务摘要">
-            <div>
-              <span class="metric-label">任务</span>
-              <strong id="jobMetric">无任务</strong>
-            </div>
-            <div>
-              <span class="metric-label">输出</span>
-              <strong id="outputMetric">就绪</strong>
-            </div>
-          </div>
-          <div id="outputSummary" class="output-summary">登录后新建对话，再粘贴视频链接或上传文件。</div>
-          <div class="actions cg-dev-actions">
-            <button id="readVideoLink" class="secondary" type="button">读取链接</button>
-            <button id="submitJob" class="secondary" type="button">分析视频</button>
-            <button id="pollJob" class="secondary" type="button">刷新状态</button>
-            <button id="uploadJob" class="secondary" type="button">分析上传</button>
-            <button id="uploadSmoke" class="secondary" type="button">上传检查</button>
-            <button id="refreshMessages" class="secondary" type="button">刷新历史</button>
-          </div>
-          <div class="actions cg-dev-actions">
-            <button id="identityDiagnostics" class="secondary" type="button">身份诊断</button>
-            <button id="runSelfTest" class="secondary" type="button">自检</button>
-            <button id="runSecurityTest" class="secondary" type="button">安全检查</button>
-            <button id="runPostLoginAcceptance" class="secondary" type="button">登录后验收</button>
-          </div>
-          <details class="raw-response">
-            <summary>开发详情：脱敏响应</summary>
-            <pre id="output">{}</pre>
-          </details>
-        </div>
-      </details>
+      <div id="devDrawer" class="cg-dev-hidden" hidden aria-hidden="true">
+        <strong id="authMetric">未登录</strong>
+        <strong id="sourceMetric">等待视频来源</strong>
+        <strong id="analysisMetric">就绪</strong>
+        <strong id="resultMetric">暂无结果</strong>
+        <strong id="jobMetric">无任务</strong>
+        <strong id="outputMetric">就绪</strong>
+        <div id="outputSummary" class="output-summary">登录后新建对话，再粘贴视频链接或上传文件。</div>
+        <button id="readVideoLink" class="secondary" type="button">读取链接</button>
+        <button id="submitJob" class="secondary" type="button">分析视频</button>
+        <button id="pollJob" class="secondary" type="button">刷新状态</button>
+        <button id="uploadJob" class="secondary" type="button">分析上传</button>
+        <button id="uploadSmoke" class="secondary" type="button">上传检查</button>
+        <button id="refreshMessages" class="secondary" type="button">刷新历史</button>
+        <button id="identityDiagnostics" class="secondary" type="button">身份诊断</button>
+        <button id="runSelfTest" class="secondary" type="button">自检</button>
+        <button id="runSecurityTest" class="secondary" type="button">安全检查</button>
+        <button id="runPostLoginAcceptance" class="secondary" type="button">登录后验收</button>
+        <pre id="output">{}</pre>
+      </div>
     </section>
 
     <div id="cgScrim" class="cg-scrim" hidden></div>

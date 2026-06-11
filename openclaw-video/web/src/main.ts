@@ -17,6 +17,10 @@ function renderMarkdownInto(inner, text) {
   }
 }
 
+function looksLikeUrl(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
 function enhanceCodeBlocks(inner) {
   inner.querySelectorAll('pre').forEach(pre => {
     if (pre.querySelector('.code-copy-btn')) return;
@@ -380,7 +384,21 @@ const output = document.getElementById('output');
       if (!inner) return;
       const chip = document.createElement('div');
       chip.className = 'cg-msg-attachment';
-      chip.textContent = name;
+      if (looksLikeUrl(name)) {
+        chip.classList.add('cg-msg-link');
+        const label = document.createElement('span');
+        label.className = 'cg-msg-link-label';
+        label.textContent = '链接';
+        const link = document.createElement('a');
+        link.href = name;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = name;
+        chip.appendChild(label);
+        chip.appendChild(link);
+      } else {
+        chip.textContent = name;
+      }
       inner.appendChild(chip);
       conversation.scrollTop = conversation.scrollHeight;
     }
@@ -1371,7 +1389,7 @@ const output = document.getElementById('output');
         const sessionId = currentSessionId();
         if (!sessionId) { setNextAction('请先登录并新建对话。'); return; }
         const link = document.getElementById('videoUrl').value;
-        const userNode = pushMessage('user', promptText || '请分析这个视频。');
+        const userNode = pushMessage('user', (promptText || '请分析这个视频。') + '\n' + link);
         addAttachmentChip(userNode, link);
         const assistantNode = pushMessage('assistant', '正在读取视频链接…');
         const progress = attachProgress(assistantNode, '读取链接中…');
@@ -1795,11 +1813,17 @@ const output = document.getElementById('output');
       const ICON_REGEN = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"></path></svg>';
       const ICON_EDIT = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>';
       const ICON_DEL = '<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"></path></svg>';
-      bar.appendChild(mk('复制', ICON_COPY, () => {
+      const copyButton = mk('复制', ICON_COPY, () => {
         const inner = messageInner(node);
         const txt = (node && node._rawText != null) ? node._rawText : (inner ? inner.textContent : '');
-        copyText(txt).then(ok => toast(ok ? '已复制' : '复制失败', { type: ok ? 'success' : 'error' }));
-      }));
+        copyText(txt).then(ok => {
+          copyButton.querySelector('span').textContent = ok ? '已复制' : '复制失败';
+          toast(ok ? '已复制到剪贴板' : '复制失败', { type: ok ? 'success' : 'error' });
+          setTimeout(() => { copyButton.querySelector('span').textContent = '复制'; }, 1400);
+        });
+      });
+      copyButton.classList.add('cg-msg-copy');
+      bar.appendChild(copyButton);
       if (role === 'assistant') {
         bar.appendChild(mk('重新生成', ICON_REGEN, () => {
           const t = prevUserText(node);

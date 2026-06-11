@@ -1,6 +1,6 @@
 {
   "schema": "openclaw-dialogue-branch-root-evidence.v1",
-  "created_at": "2026-06-11T05:08:27.281Z",
+  "created_at": "2026-06-11T05:51:23.682Z",
   "environment": "root (AI-01)",
   "base_url": "https://www.huahuoai.com",
   "lab_path": "/ai/openclaw-lab/",
@@ -38,7 +38,7 @@
       "status": "PASS",
       "response": {
         "length": 201,
-        "sha256": "a44d154c278f3d97e58c8559dc5b5c826f0e1ab8e167fe4b39a36fcc9a16af73"
+        "sha256": "375b94948cc49125833a5eefe435c1f775935d67c1ac08fcd2505182d1157c6c"
       },
       "expectations": [
         {
@@ -51,11 +51,11 @@
       "label": "new_casual_agent",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 7098,
-      "session_id_hash": "1ecb567caf7cd035719c2b6be1bcfb62118903ca2a3e88fd65aaf4f26192f321",
+      "duration_ms": 8890,
+      "session_id_hash": "8d248ec23e5d1550b895adea283643891644aec2716704aed735a7d58ad8f4f6",
       "response": {
-        "length": 668,
-        "sha256": "06312caefbb4305ac056e9bf6afdd0d9a21d0bbff88b0a7cb60212f230882a67"
+        "length": 812,
+        "sha256": "76e40064704e7660d3c0e90757d5ee37d740e76a428a29794ef69afc087a1835"
       },
       "expectations": [
         {
@@ -69,8 +69,8 @@
       "label": "collecting_intent_fixed",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 137,
-      "session_id_hash": "b0df7d4124ecc67da90a7780a85c0270746bbdb48fa2b678756afffd82864a5f",
+      "duration_ms": 128,
+      "session_id_hash": "c782b6bdac69066270e782989ad1444a220a2c0cdb2e077c7ca36d40e21c7f70",
       "response": {
         "length": 154,
         "sha256": "dd7fd746845983b6f18acfada29830f30df0e0dfbe6aab24cce21a5107d45291"
@@ -87,8 +87,8 @@
       "label": "waiting_for_video_fixed",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 133,
-      "session_id_hash": "3b06e49024592ad7e425d7579bcd45c3d33bd829a3944b6631ed33e31ac0bdb0",
+      "duration_ms": 153,
+      "session_id_hash": "8bee1b3a6ea0439f30bc54f8d6684d23b674ab44029b3dd2739bf7c05c1861c6",
       "response": {
         "length": 178,
         "sha256": "451be78a095392172498364162289d0a8db91f7d369b733e87e9db5bf0c2ad88"
@@ -109,11 +109,11 @@
       "label": "waiting_for_video_casual_agent",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 7347,
-      "session_id_hash": "d4da496966a46cb573bd52b6f8a6bfc22663d3f7aca4d13ad4930a58cc15c981",
+      "duration_ms": 6269,
+      "session_id_hash": "86b3a4c2bc75b7f7529c56885c72bcd7d78338775e5edf45d5a7bd0926171f90",
       "response": {
-        "length": 748,
-        "sha256": "cb0fa668f648e989a0c63bc1ea3e5376b8706a2021715385a44e9620388b247f"
+        "length": 665,
+        "sha256": "347a5d6f141241606469c1e94af58c90e1e5c11f3a9c759fd2d621d109433057"
       },
       "expectations": [
         {
@@ -127,8 +127,8 @@
       "label": "guardrail_youtube",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 232,
-      "session_id_hash": "1ae29b9e841d5eb0905c9791a52b338d7d4909bd9923128f87a768818ba2c989",
+      "duration_ms": 140,
+      "session_id_hash": "d859a68c0b08dd3ce23bd20c6ac1fc5aa51f06c313fcaf27d7ba5dafc46957bd",
       "response": {
         "length": 145,
         "sha256": "4fe1b0c1390aecb63babc4bb5351ae6ab3c9ca73b32f4c640dcb85a6221b71cb"
@@ -153,8 +153,8 @@
       "label": "guardrail_bilibili",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 180,
-      "session_id_hash": "1b8c6cbcf5d1ae3ee1596b2c8f00637349c6c3b5a7bb7bd9f1d3a89fbf0bde79",
+      "duration_ms": 134,
+      "session_id_hash": "b26160561f7d1357edd486224eb25aeac9f4e84d6ec1937a374360ae4de0fc83",
       "response": {
         "length": 141,
         "sha256": "188b44d9148f4bddbb790c45ef2a393b40ba10626c1c6de8ce4543bacaddcda1"
@@ -175,8 +175,8 @@
       "label": "guardrail_profile_link",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 128,
-      "session_id_hash": "3c352171c4f97cf9bbf04f9ee1f7739641f8e80ad910c34cc1654b85c12d0faa",
+      "duration_ms": 137,
+      "session_id_hash": "5d522be28b3c734181294f493383a29c76ebe90122cb1c2efa443a102f4d0b93",
       "response": {
         "length": 96,
         "sha256": "b7bfe3b6a1a7b043d1661bd93836a5b1b240cde638bf2e1471101979b729bf9b"
@@ -197,8 +197,8 @@
       "label": "guardrail_off_topic",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 180,
-      "session_id_hash": "192b863deef6f4d7dcdb649b60c482d13b255f0eaf4a23ec460bf84fdf16a4b5",
+      "duration_ms": 129,
+      "session_id_hash": "c0cb3fe3a40d35bb1aa90ad57e72ff411c551988a21aa20e1c4e7b561cbe5532",
       "response": {
         "length": 45,
         "sha256": "856cfae6d4d24050391d9f1be454ebcadc17607931847a254c2a7379d8da1dbe"
@@ -215,8 +215,8 @@
       "label": "guardrail_prompt_injection",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 133,
-      "session_id_hash": "de7b1abdc3066f5dcf58555b1822e89c4a77394365f31204be6673bae94a023b",
+      "duration_ms": 135,
+      "session_id_hash": "ef48e160a1250bd0ec6e6017a1912d98672282abc04867fe66c672942f9ac5a7",
       "response": {
         "length": 73,
         "sha256": "9e4a911f5ebcede683a03d2fd4330c7423eee82ade9b0813e714ba2fee024dbf"
@@ -237,7 +237,7 @@
       "label": "video_link_read_check",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 1047,
+      "duration_ms": 1106,
       "status_value": "PASS",
       "eligible_for_model_analysis": true,
       "direct_video_candidate_count": 2,
@@ -247,7 +247,7 @@
       "label": "video_job_submit",
       "status": "PASS",
       "http_status": 202,
-      "job_id_hash": "596fd1cb3853521cd8bf93360852cf9c2e3315c862a20b81896bf400c9dd3a91",
+      "job_id_hash": "3488484eb993b923180805e20760bf8af305109ae4a42261ef278309117ad16e",
       "initial_status": "queued"
     },
     {
@@ -255,15 +255,15 @@
       "status": "PASS",
       "http_status": 200,
       "response": {
-        "length": 312,
-        "sha256": "92fc3aeb2e7309c15482c723dfd071b1765c89822d5dbf0fa241407d05545849"
+        "length": 355,
+        "sha256": "26022bf22373738f8d8ca0372863b964676892e4f777fc5a2c72cab187677af7"
       }
     },
     {
       "label": "video_job_poll_terminal",
       "status": "PASS",
       "terminal_status": "succeeded",
-      "duration_ms": 39257,
+      "duration_ms": 35334,
       "result_schema_version": "openclaw-video-result.v1"
     },
     {
@@ -271,8 +271,8 @@
       "status": "PASS",
       "http_status": 200,
       "summary": {
-        "length": 1098,
-        "sha256": "ead9350a14af05e65b99cc0c1c335acfbc477e24e6bd3338b0c371db5683c8f4"
+        "length": 1160,
+        "sha256": "74a2581a465689d4476814ae050931bcc08ff8693c89a0339979cf3250f1f2b5"
       },
       "schema_version": "openclaw-video-result.v1"
     },
@@ -280,74 +280,74 @@
       "label": "feedback_given_general",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 16504,
+      "duration_ms": 15678,
       "response": {
-        "length": 1513,
-        "sha256": "c8c6749042024e2a72b102bb2c970e937081a33e5d466e1bd7c2fef16f553e6c"
+        "length": 1516,
+        "sha256": "a00b60c58381d296ad654dc10f7456739cb42ba2e4f97dd51cd19bb601225426"
       }
     },
     {
       "label": "follow_up_rewrite_opening",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 10352,
+      "duration_ms": 10979,
       "response": {
-        "length": 1006,
-        "sha256": "5b9749dfff7b7487fdb9aadc4649cb701e00f8ed0ebe038a019224509b1cc573"
+        "length": 1012,
+        "sha256": "6308f8f770633c5c8ac022b0827408ce386808f831512f38baeff153dcde07e4"
       }
     },
     {
       "label": "follow_up_rewrite_script",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 24474,
+      "duration_ms": 17961,
       "response": {
-        "length": 2777,
-        "sha256": "ff7ad9922bc7acd9eeca2c02c4f9e9daebb94edd5f5b3eb578f55dcaf7686312"
+        "length": 1994,
+        "sha256": "5fe35e971c10bb1c847abe330fefcc275e14c0f0f55699338590aa08d31ca36d"
       }
     },
     {
       "label": "follow_up_reshoot_plan",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 27923,
+      "duration_ms": 24870,
       "response": {
-        "length": 3564,
-        "sha256": "08ddda2fca2c2ab7b76f9b39df319bad407a384a332fa566041a29df5cf33fb5"
+        "length": 3226,
+        "sha256": "f4f6fd6fc1a75754faddef2ba6f71be8eb5c8ba896c2cc91222e47caeb27b682"
       }
     },
     {
       "label": "follow_up_picture_improvement",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 22225,
+      "duration_ms": 23815,
       "response": {
-        "length": 2782,
-        "sha256": "2f9b05083752f1a6ce9a0bf509a86e6f8d4afa51c5cc78a566dc401c5742c61f"
+        "length": 3046,
+        "sha256": "86df1ae59b8c9f157a396ead6b08bb0bd80ecff4671e2ccf2f1d98d8d376b0b5"
       }
     },
     {
       "label": "follow_up_why_not_viral",
       "status": "PASS",
       "http_status": 200,
-      "duration_ms": 19881,
+      "duration_ms": 17208,
       "response": {
-        "length": 2695,
-        "sha256": "5e90380521ffe14565dc6ec63ad31fe0d559c4b9a1ae942f9a6c02b3519e6aa7"
+        "length": 2114,
+        "sha256": "ffa1d264039d7f19fc1be9dbcbbc5da91310af3b030df66693838f63b547b85a"
       }
     },
     {
       "label": "error_job_submit",
       "status": "PASS",
       "http_status": 202,
-      "job_id_hash": "624862b273bc17d396718d0ca668d48cfcac07c6ebc0f76dec99b9481be36ffd"
+      "job_id_hash": "a26ac08bb6e71406930d848ef00bc402dc00b872a99bf2cd60e8d3c2729ba0a1"
     },
     {
       "label": "error_job_poll_terminal",
       "status": "PASS",
       "terminal_status": "failed",
       "error_code": "tool_failed",
-      "duration_ms": 6247
+      "duration_ms": 8307
     },
     {
       "label": "error_recovering_branch",

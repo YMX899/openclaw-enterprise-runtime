@@ -81,10 +81,21 @@ class DouyinVideoResolver:
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError("Could not extract Douyin video data from router payload.") from exc
 
+        video_id = str(item.get("aweme_id") or item.get("id") or "")
+        if not video_id:
+            for candidate in (resolved_page_url, share_url, normalized_url, source_url):
+                try:
+                    video_id = self._extract_video_id(candidate)
+                    break
+                except ValueError:
+                    continue
+        if not video_id:
+            raise RuntimeError("Could not determine Douyin video id from router payload or URLs.")
+
         playable = self._resolve_playable_video_url(playwm_url)
         return VideoSource(
             source_url=source_url,
-            video_id=self._extract_video_id(source_url),
+            video_id=video_id,
             share_url=resolved_page_url,
             playwm_url=playwm_url,
             video_url=playable["video_url"],
@@ -142,6 +153,8 @@ class DouyinVideoResolver:
             r"/note/(\d+)",
             r"/share/video/(\d+)",
             r"[?&]modal_id=(\d+)",
+            r"[?&]item_id=(\d+)",
+            r"[?&]video_id=(\d+)",
             r"[?&]vid=(\d+)",
         )
         for pattern in patterns:
@@ -160,13 +173,19 @@ class DouyinVideoResolver:
     def _follow_short_link(self, url: str) -> str:
         response = self._http_get(
             url,
-            allow_redirects=False,
+            allow_redirects=True,
             timeout=20,
             headers=self._build_page_headers(DESKTOP_UA),
         )
-        if response.is_redirect and response.headers.get("Location"):
-            return response.headers["Location"]
-        return url
+        redirect_urls = [
+            redirect.headers.get("Location", "")
+            for redirect in response.history
+        ]
+        redirect_urls.append(response.url)
+        for candidate in redirect_urls:
+            if "iesdouyin.com/share/video/" in candidate:
+                return candidate
+        return response.url or url
 
     def _extract_router_data(self, html: str) -> dict[str, Any]:
         match = self.router_assignment_re.search(html)
@@ -247,15 +266,15 @@ class DouyinVideoResolver:
         normalized_url: str,
         share_url: str,
     ) -> list[str]:
-        last_error: Exception | None = None
-        for candidate_url in (source_url, normalized_url, share_url):
+        video_id = ""
+        for candidate_url in (share_url, normalized_url, source_url):
             try:
                 video_id = self._extract_video_id(candidate_url)
                 break
-            except ValueError as exc:
-                last_error = exc
-        else:
-            raise ValueError(f"Could not extract video id from URL: {source_url}") from last_error
+            except ValueError:
+                continue
+        if not video_id:
+            raise ValueError(f"Could not extract video id from URL: {source_url}")
         candidates = [
             share_url,
             normalized_url,

@@ -1,6 +1,6 @@
 {
-  "schema": "openclaw-web-dialogue-link-upload-root-evidence.v1",
-  "created_at": "2026-06-11T04:59:54.571Z",
+  "schema": "openclaw-web-dialogue-link-upload-root-evidence.v2",
+  "created_at": "2026-06-11T05:48:01.093Z",
   "environment": "root:https://www.huahuoai.com/ai/openclaw-lab/",
   "secrets_recorded": false,
   "raw_video_urls_recorded": false,
@@ -18,14 +18,22 @@
     {
       "label": "douyin_link_composer_analysis",
       "status": "PASS",
-      "session_hash": "7083f19547b8f1d61f53b711c4f7bbd852eaa0abeb01a69dcd169a8443030510",
+      "session_hash": "cf13755b3aee86867677ec4e90266dd4489b43789cccdf2827325c480b91b5d1",
       "users": 1,
       "assistants": 2,
       "run_state": "结果已就绪",
-      "output_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ui": {
+        "userTextHasHttp": true,
+        "linkHrefSha256": "a335059914ce9499757905c223246896e56f2fc14a20ab84ff43d7ac0e159f49",
+        "copyVisible": true,
+        "timeVisible": true,
+        "devHidden": true,
+        "assistantParagraphMargin": "0px"
+      },
+      "output_hash": "ee02079fb0903d381ed516ab76ae7851aaedbd0901a726e42555486ac33c8401",
       "latest_assistant": {
-        "len": 1186,
-        "sha256": "b10869b0f58f381b38f2b82234260d7b5b2438193bed33e8251d5c6740b72531"
+        "len": 1208,
+        "sha256": "70d6619cb6ab7ffd4d29e8cd4f3465c4b2c1a6a5fe6336bad3f35d5edab0109f"
       }
     },
     {
@@ -33,14 +41,14 @@
       "status": "PASS",
       "run_state": "已回复",
       "latest_assistant": {
-        "len": 1092,
-        "sha256": "935244c721f4b0faae9b6a6e6f696d431f8a7593207976797ee0edb5bd5dd397"
+        "len": 1134,
+        "sha256": "49a9f6a86a4af62998498cdbcbffce681d5f8df0a288169c455209bb7e9f1114"
       }
     },
     {
       "label": "upload_composer_analysis",
       "status": "PASS",
-      "session_hash": "27a86363f6dfdab5e7504f2b03b88f6ac91094b004934c877856988c2eaf5f5c",
+      "session_hash": "c0d4a18e79de92c7395b49fc997a44926373aee0805231e3be1736f04644efc5",
       "attachment": {
         "hidden": false,
         "name_hash": "6deca5b980f245eda3883adce60d47c6dfa87b9a6c50c2e3e0447ca1f7a8e20c",
@@ -49,10 +57,10 @@
       "users": 1,
       "assistants": 2,
       "run_state": "结果已就绪",
-      "output_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output_hash": "874aeec24b7fb192e13850ef4e1343d35ee81964c95581fd47aa22e9f5f6bb4e",
       "latest_assistant": {
-        "len": 1277,
-        "sha256": "4b2ae057780dc22e684571b1e8f372d482aad8cb8bd2f554c687d4a3e8ddeab6"
+        "len": 1226,
+        "sha256": "d374cd862c7c527912766a48df906001a7150f67ebf27df4d74bb167a8d53cf8"
       }
     },
     {
@@ -60,8 +68,8 @@
       "status": "PASS",
       "run_state": "已回复",
       "latest_assistant": {
-        "len": 3378,
-        "sha256": "b12842a4c87c9649ffcc965ba0dc36c6af36890562bf91e2d4bb8c46fb816915"
+        "len": 3562,
+        "sha256": "179e823d0ad54ace2b00196d9b283564f233dee2f2ae5c87047c053b6bb54384"
       }
     }
   ],
@@ -179,6 +187,26 @@
       "status": 200
     },
     {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
+    },
+    {
       "url": "/api/openclaw-api/jobs/<uuid>/result",
       "status": 200
     },
@@ -197,6 +225,10 @@
     {
       "url": "/api/openclaw-api/uploads",
       "status": 202
+    },
+    {
+      "url": "/api/openclaw-api/jobs/<uuid>",
+      "status": 200
     },
     {
       "url": "/api/openclaw-api/jobs/<uuid>",

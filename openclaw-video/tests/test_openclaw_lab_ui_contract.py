@@ -46,15 +46,18 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             with self.subTest(element_id=element_id):
                 self.assertIn(f'id="{element_id}"', self.index_html)
 
-    def test_ui_has_chinese_landing_chat_history_and_validation_layers(self):
+    def test_ui_has_chinese_landing_chat_history_and_hidden_diagnostics(self):
         # markup-level strings live in the built shell; handler/API strings live in source.
         in_shell = [
             "OpenClaw 短视频智能分析", "登录后进入分析对话", "无需再登录 Dify 网页",
-            "历史对话", "新建对话", "视频分析", "nextAction", "开发详情：脱敏响应", "验证工具",
+            "历史对话", "新建对话", "视频分析", "nextAction",
         ]
         for required in in_shell:
             with self.subTest(shell=required):
                 self.assertIn(required, self.index_html)
+        self.assertIn('id="devDrawer" class="cg-dev-hidden" hidden', self.index_html)
+        self.assertNotIn("开发详情：脱敏响应", self.index_html)
+        self.assertNotIn("验证工具", self.index_html)
         in_source = [
             "setPrimaryAction", "setPanelState", "showLanding", "showChatApp",
             "loadSessions", "renderSessions", "selectSession", "sendChat", "refreshMessages",

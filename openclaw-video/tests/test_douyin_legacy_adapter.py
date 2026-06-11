@@ -115,6 +115,42 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             "7648317087237562266",
         )
 
+    def test_vendored_douyin_resolver_extracts_query_video_ids(self):
+        from douyin_chong.clients.douyin import DouyinVideoResolver
+
+        resolver = DouyinVideoResolver()
+
+        self.assertEqual(
+            resolver._extract_video_id("https://www.douyin.com/?modal_id=7648317087237562266"),
+            "7648317087237562266",
+        )
+        self.assertEqual(
+            resolver._extract_video_id("https://www.douyin.com/share?item_id=7648317087237562267"),
+            "7648317087237562267",
+        )
+        self.assertEqual(
+            resolver._extract_video_id("https://www.douyin.com/share?video_id=7648317087237562268"),
+            "7648317087237562268",
+        )
+
+    def test_vendored_douyin_shortlink_follow_uses_redirect_history(self):
+        from douyin_chong.clients.douyin import DouyinVideoResolver
+
+        class Redirect:
+            headers = {"Location": "https://www.douyin.com/video/7648317087237562266"}
+
+        class Response:
+            history = [Redirect()]
+            url = "https://www.iesdouyin.com/share/video/7648317087237562266/?from_ssr=1"
+
+        resolver = DouyinVideoResolver()
+        with patch.object(resolver, "_http_get", return_value=Response()) as http_get:
+            self.assertEqual(
+                resolver._follow_short_link("https://v.douyin.com/lx-ONOPrxjU/"),
+                "https://www.iesdouyin.com/share/video/7648317087237562266/?from_ssr=1",
+            )
+        self.assertEqual(http_get.call_args.kwargs["allow_redirects"], True)
+
     def test_shortlink_is_canonicalized_before_legacy_resolver(self):
         with patch(
             "openclaw_video.douyin_legacy_adapter.validate_video_url_with_redirects"
