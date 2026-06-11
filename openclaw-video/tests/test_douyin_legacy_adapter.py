@@ -85,6 +85,14 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         FakeResolver.video = FakeVideo()
         FakeArkClient.completion = FakeCompletion()
 
+    def test_model_prompts_require_markdown_format(self):
+        default_prompt = adapter_module._default_prompt()
+        upload_prompt = adapter_module._upload_prompt()
+        for prompt in (default_prompt, upload_prompt):
+            self.assertIn("Markdown", prompt)
+            self.assertIn("##", prompt)
+            self.assertTrue("代码块" in prompt or "code block" in prompt)
+
     def test_vendored_candidate_components_are_importable(self):
         vendor_root = Path(__file__).resolve().parents[1] / "vendor"
         with patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"DOUYIN_CHONG_PYTHONPATH": str(vendor_root)}):
@@ -203,6 +211,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(payload["source"]["platform"], "douyin")
         self.assertEqual(payload["summary"], "分析结果")
         self.assertEqual(written_payload, payload)
+        self.assertIn("Markdown", FakeArkClient.calls[0]["prompt"])
+        self.assertIn("##", FakeArkClient.calls[0]["prompt"])
         self.assertEqual(FakeConfig.env_snapshots[0]["ARK_API_KEY"], None)
         self.assertEqual(FakeConfig.env_snapshots[0]["MODEL"], None)
         config_call = FakeConfig.calls[0]
@@ -359,6 +369,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(payload["summary"], "分析结果")
         self.assertEqual(payload["raw_tool_result"]["mode"], "inline-base64")
         self.assertEqual(payload["raw_tool_result"]["filename"], "clip.mp4")
+        self.assertIn("Markdown", FakeArkClient.calls[0]["prompt"])
+        self.assertIn("##", FakeArkClient.calls[0]["prompt"])
         # the model received an inline base64 data: URL, not a resolved link
         sent_url = FakeArkClient.calls[0]["video_urls"][0]
         self.assertTrue(sent_url.startswith("data:video/mp4;base64,"))

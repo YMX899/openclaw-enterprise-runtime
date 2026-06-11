@@ -3,6 +3,7 @@ import unittest
 from types import SimpleNamespace
 
 from openclaw_video.agent_persona import (
+    MARKDOWN_OUTPUT_RULES,
     NEW_SESSION_GREETING,
     SYSTEM_PERSONA,
     build_agent_message,
@@ -276,6 +277,13 @@ class BranchPromptTests(unittest.TestCase):
         self.assertIn("OpenClaw 短视频分析", prompt)
         self.assertIn("分镜", prompt)
 
+    def test_branch_prompt_requires_markdown_output(self):
+        prompt = build_branch_prompt("开头怎么改", state="follow_up", intent="ask_rewrite_opening", analysis_summary="x")
+        self.assertIn("Markdown", prompt)
+        self.assertIn("##", prompt)
+        self.assertIn("**加粗关键词**", prompt)
+        self.assertIn(MARKDOWN_OUTPUT_RULES, prompt)
+
     def test_injects_knowledge_block_per_intent(self):
         # picture/reshoot intents get the picture principles
         p = build_branch_prompt("怎么复拍", state="follow_up", intent="ask_reshoot_plan", analysis_summary="x")
@@ -295,15 +303,19 @@ class PersonaInjectionTests(unittest.TestCase):
         msg = build_agent_message("帮我分析视频", is_first_turn=True)
         self.assertIn("OpenClaw 短视频分析", msg)
         self.assertIn("帮我分析视频", msg)
+        self.assertIn("Markdown", msg)
+        self.assertIn("##", msg)
 
     def test_subsequent_turn_without_state_is_plain(self):
         msg = build_agent_message("开头怎么改", is_first_turn=False)
-        self.assertEqual(msg, "开头怎么改")
+        self.assertIn("Markdown", msg)
+        self.assertIn("用户消息：开头怎么改", msg)
 
     def test_subsequent_turn_with_state_gets_state_hint(self):
         msg = build_agent_message("开头怎么改", is_first_turn=False, state="follow_up")
         self.assertIn("追问", msg)
         self.assertIn("开头怎么改", msg)
+        self.assertIn("Markdown", msg)
 
     def test_first_turn_with_state_includes_both(self):
         msg = build_agent_message("我想做短视频", is_first_turn=True, state="collecting_intent")

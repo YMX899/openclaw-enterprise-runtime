@@ -149,6 +149,8 @@ def _default_prompt() -> str:
     return (
         "Analyze this Douyin short video and write the final answer in Simplified Chinese. "
         "Cover topic, opening hook, structure, visuals, actions, audience, risks, and improvement suggestions. "
+        "Use Markdown format: `##` section headings, short bullet lists, and bold key phrases. "
+        "Keep paragraphs compact and do not wrap the whole answer in a code block. "
         "Do not include links, secrets, request headers, cookies, or internal paths."
     )
 
@@ -262,6 +264,8 @@ def _upload_prompt() -> str:
     return (
         "请分析这条短视频，用简体中文回答：主题、开头 3 秒钩子、内容结构与信息密度、"
         "画面与动作设计、目标人群、风险点，并给出可执行的改进建议（开头改法、脚本改法、复拍要点）。"
+        "必须使用 Markdown 格式：用 `##` 小标题、短列表、**加粗关键词**，段落保持紧凑，"
+        "不要把整段回复包在代码块里。"
         "不要输出任何链接、密钥、请求头、cookie 或内部路径。"
     )
 

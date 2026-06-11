@@ -37,6 +37,14 @@ SYSTEM_PERSONA = (
     "给可执行方案：开头改法（多版本）、脚本改法、复拍分镜。"
 )
 
+MARKDOWN_OUTPUT_RULES = (
+    "输出格式要求（必须遵守）：\n"
+    "- 使用 Markdown 输出，不要输出纯文本长段落。\n"
+    "- 优先使用 `##` 小标题、短列表、**加粗关键词**，回答保持紧凑。\n"
+    "- 每段尽量短；能用列表就不要写成大段说明。\n"
+    "- 不要用代码块包住整段回复，除非用户明确要求代码。"
+)
+
 # --- greetings -------------------------------------------------------------
 
 NEW_SESSION_GREETING = (
@@ -266,10 +274,10 @@ def build_agent_message(content: str, *, is_first_turn: bool, state: str | None 
         body = SYSTEM_PERSONA
         if hint:
             body += "\n" + hint
-        return body + "\n\n用户消息：" + content
+        return body + "\n\n" + MARKDOWN_OUTPUT_RULES + "\n\n用户消息：" + content
     if hint:
-        return hint + "\n用户消息：" + content
-    return content
+        return hint + "\n\n" + MARKDOWN_OUTPUT_RULES + "\n\n用户消息：" + content
+    return MARKDOWN_OUTPUT_RULES + "\n\n用户消息：" + content
 
 
 # --- fixed branch replies (Bridge "rule floor", spec ch.10/13) --------------
@@ -443,7 +451,7 @@ def build_branch_prompt(
     analysis summary (truncated) so the agent grounds its answer in what was
     actually analyzed rather than guessing.
     """
-    parts = [SYSTEM_PERSONA]
+    parts = [SYSTEM_PERSONA, MARKDOWN_OUTPUT_RULES]
     hint = _STATE_HINTS.get(state or "", "")
     if hint:
         parts.append(hint)
