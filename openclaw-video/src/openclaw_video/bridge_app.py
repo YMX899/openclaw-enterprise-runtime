@@ -646,7 +646,11 @@ def create_app(
                 else:
                     workspaces = {"data": [{"id": tenant_id, "current": True}]}
                 result["current_workspace_count"] = current_workspace_count(workspaces)
-                principal = derive_principal(identity_secret, profile, workspaces)
+                try:
+                    principal = derive_principal(identity_secret, profile, workspaces)
+                except Exception:
+                    result["failure_stage"] = "workspace"
+                    return result
                 result["workspace_ok"] = True
                 tenant_hash, account_hash = _principal_hashes(identity_secret, principal)
                 if not principal_allowed(tenant_hash, account_hash):

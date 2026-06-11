@@ -15,6 +15,9 @@ agent.md
 tmp/
 .phase1-sandbox/
 .phase1.5-venv/
+.venv/
+*.bundle
+*.bundle.lock
 *.tmp
 *.bak
 *.log
