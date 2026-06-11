@@ -15,6 +15,7 @@ from openclaw_video.agent_persona import (
     fixed_state_reply,
     guardrail_for_message,
     has_douyin_link,
+    has_supported_video_link,
 )
 
 
@@ -70,11 +71,11 @@ class GuardrailTests(unittest.TestCase):
         self.assertIn("YouTube", g.content)
         self.assertIn("抖音", g.content)
 
-    def test_guardrail_bilibili(self):
-        g = guardrail_for_message("https://www.bilibili.com/video/BV1xx")
-        self.assertIsNotNone(g)
-        self.assertEqual(g.reason, "unsupported_platform")
-        self.assertIn("B 站", g.content)
+    def test_no_guardrail_for_bilibili_link(self):
+        self.assertIsNone(guardrail_for_message("https://www.bilibili.com/video/BV1xx"))
+
+    def test_no_guardrail_for_tiktok_link(self):
+        self.assertIsNone(guardrail_for_message("https://www.tiktok.com/@demo/video/123"))
 
     def test_guardrail_xiaohongshu(self):
         g = guardrail_for_message("https://www.xiaohongshu.com/explore/abc")
@@ -346,6 +347,11 @@ class DouyinLinkDetectorTests(unittest.TestCase):
 
     def test_no_link(self):
         self.assertFalse(has_douyin_link("纯文本，没有链接"))
+
+    def test_supported_video_link_accepts_bilibili_and_tiktok(self):
+        self.assertTrue(has_supported_video_link("https://www.bilibili.com/video/BV1xx"))
+        self.assertTrue(has_supported_video_link("https://b23.tv/abc"))
+        self.assertTrue(has_supported_video_link("https://www.tiktok.com/@demo/video/123"))
 
 
 if __name__ == "__main__":

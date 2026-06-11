@@ -355,6 +355,7 @@ class ComposeContractTests(unittest.TestCase):
             "__init__.py",
             "clients/__init__.py",
             "clients/ark_video.py",
+            "clients/bilibili.py",
             "clients/douyin.py",
             "clients/resolver.py",
             "clients/tiktok.py",

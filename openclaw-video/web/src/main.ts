@@ -76,7 +76,7 @@ const output = document.getElementById('output');
     const composerAttachmentName = document.getElementById('composerAttachmentName');
     const composerLinkHint = document.getElementById('composerLinkHint');
     const videoFileInput = document.getElementById('videoFile');
-    const VIDEO_LINK_RE = /(https?:\/\/(?:[\w.-]*\.)?douyin\.com\/(?!user\/)[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+)/i;
+    const VIDEO_LINK_RE = /(https?:\/\/(?:[\w.-]*\.)?douyin\.com\/(?!user\/)[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+|https?:\/\/(?:[\w.-]*\.)?tiktok\.com\/[^\s]+|https?:\/\/(?:www\.|m\.)?bilibili\.com\/video\/[^\s]+|https?:\/\/b23\.tv\/[^\s]+)/i;
     let currentJobId = '';
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
@@ -219,7 +219,7 @@ const output = document.getElementById('output');
         setNextAction('检测到视频链接，点击发送将先读取链接再提交分析。');
       } else {
         setPrimaryAction('sendChat');
-        setNextAction('粘贴抖音视频链接、上传视频，或直接输入问题后发送。');
+        setNextAction('粘贴抖音/TikTok/B站视频链接、上传视频，或直接输入问题后发送。');
       }
     }
     function setPreLoginView() {
@@ -383,10 +383,15 @@ const output = document.getElementById('output');
       conversation.scrollTop = conversation.scrollHeight;
       return node;
     }
-    function messageInner(node) {
-      return node ? node.querySelector('.cg-msg-inner') : null;
-    }
-    function addAttachmentChip(node, name) {
+function messageInner(node) {
+  return node ? node.querySelector('.cg-msg-inner') : null;
+}
+function updateAssistantMessage(node, text) {
+  const inner = messageInner(node);
+  if (!inner) return;
+  renderMarkdownInto(inner, text);
+}
+function addAttachmentChip(node, name) {
       const inner = messageInner(node);
       if (!inner) return;
       const chip = document.createElement('div');
@@ -1338,8 +1343,7 @@ const output = document.getElementById('output');
           const summary = result.body.result && result.body.result.result && result.body.result.result.summary;
           const shots = extractScreenshots(result);
           if (assistantNode) {
-            const inner = messageInner(assistantNode);
-            if (inner) inner.firstChild ? (inner.childNodes[0].textContent = summary || '分析完成，结果已就绪。') : (inner.textContent = summary || '分析完成，结果已就绪。');
+            updateAssistantMessage(assistantNode, summary || '分析完成，结果已就绪。');
             if (shots.length) addScreenshots(assistantNode, shots);
           } else {
             const node = pushMessage('assistant', summary || '分析完成，结果已就绪。');
@@ -1355,7 +1359,7 @@ const output = document.getElementById('output');
           if (sessionId && !isActiveSession(sessionId)) return;
           if (progress) progress.fail('分析未完成');
           const reply = buildJobErrorReply(job.error_code);
-          if (assistantNode) { const inner = messageInner(assistantNode); if (inner) inner.childNodes[0] ? (inner.childNodes[0].textContent = reply) : (inner.textContent = reply); }
+          if (assistantNode) updateAssistantMessage(assistantNode, reply);
           else pushMessage('assistant', reply);
           show({ job: poll });
           setRunState('任务结束', 'fail');
@@ -1367,7 +1371,7 @@ const output = document.getElementById('output');
     }
     function buildJobErrorReply(errorCode) {
       const map = {
-        url_rejected: '这个链接没有通过安全校验或无法解析。请发抖音单条视频页链接（形如 https://www.douyin.com/video/xxxx），不要发主页或非抖音链接。',
+        url_rejected: '这个链接没有通过安全校验或无法解析。请发抖音/TikTok/B站单条视频页链接，不要发主页或其他暂未支持的平台链接。',
         tool_timeout: '这条视频解析超时了。可以稍后重试，或换一条更短的单条视频链接。',
         tool_failed: '这条视频暂时没能成功解析，所以我不能假装看过它。可以确认视频未被删除/设为私密，或换完整视频页链接重试。'
       };
@@ -1424,11 +1428,10 @@ const output = document.getElementById('output');
           } else {
             progress.fail('提交分析失败，请重试');
           }
-        } else {
-          progress.fail('链接无法读取');
-          const inner = messageInner(assistantNode);
-          if (inner) inner.childNodes[0].textContent = buildJobErrorReply('url_rejected');
-        }
+      } else {
+        progress.fail('链接无法读取');
+          updateAssistantMessage(assistantNode, buildJobErrorReply('url_rejected'));
+      }
         updateComposerMode();
         return;
       }
@@ -1649,7 +1652,7 @@ const output = document.getElementById('output');
     });
     document.getElementById('aboutBtn').addEventListener('click', () => {
       closePop();
-      openModal({ title: '关于 OpenClaw', desc: 'OpenClaw 短视频分析助手：支持抖音视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。本页为 OpenClaw 自有会话，独立于 Dify 登录。', confirmText: '知道了' });
+      openModal({ title: '关于 OpenClaw', desc: 'OpenClaw 短视频分析助手：支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。本页为 OpenClaw 自有会话，独立于 Dify 登录。', confirmText: '知道了' });
     });
 
     // local session overrides (rename / delete). Session-scoped in-memory only —

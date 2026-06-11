@@ -84,16 +84,37 @@ def _size_bytes(video: Any) -> int | None:
 
 
 def _canonicalize_input_for_resolver(input_url: str) -> str:
-    host = (urlparse(input_url).hostname or "").lower()
-    if host != "v.douyin.com":
-        return input_url
     try:
         return validate_video_url_with_redirects(input_url).canonical
     except UrlRejected as exc:
         raise LegacyAdapterError("video URL failed redirect validation") from exc
 
 
-def _probe_stream_size_bytes(url: str, *, max_bytes: int, timeout_seconds: float = 30.0) -> int:
+def _platform_from_url(url: str) -> str:
+    host = (urlparse(url).hostname or "").lower()
+    if host == "b23.tv" or host.endswith(".b23.tv") or host == "bilibili.com" or host.endswith(".bilibili.com"):
+        return "bilibili"
+    if host == "tiktok.com" or host.endswith(".tiktok.com"):
+        return "tiktok"
+    return "douyin"
+
+
+def _referer_for_url(url: str) -> str:
+    platform = _platform_from_url(url)
+    if platform == "bilibili":
+        return "https://www.bilibili.com/"
+    if platform == "tiktok":
+        return "https://www.tiktok.com/"
+    return "https://www.douyin.com/"
+
+
+def _probe_stream_size_bytes(
+    url: str,
+    *,
+    max_bytes: int,
+    timeout_seconds: float = 30.0,
+    referer: str = "https://www.douyin.com/",
+) -> int:
     if not url:
         raise LegacyAdapterError("video size is unavailable")
     request = Request(
@@ -103,7 +124,7 @@ def _probe_stream_size_bytes(url: str, *, max_bytes: int, timeout_seconds: float
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
             ),
-            "Referer": "https://www.douyin.com/",
+            "Referer": referer,
         },
     )
     total = 0
@@ -136,7 +157,13 @@ def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
         raise LegacyAdapterError("video frame budget exceeds limit")
     size = _size_bytes(video)
     if size is None:
-        size = _probe_stream_size_bytes(str(getattr(video, "video_url", "") or ""), max_bytes=limits.max_download_bytes)
+        source_url = str(getattr(video, "source_url", "") or "")
+        share_url = str(getattr(video, "share_url", "") or "")
+        size = _probe_stream_size_bytes(
+            str(getattr(video, "video_url", "") or ""),
+            max_bytes=limits.max_download_bytes,
+            referer=share_url or _referer_for_url(source_url),
+        )
         try:
             object.__setattr__(video, "size_mb", size / 1024 / 1024)
         except Exception:
@@ -147,7 +174,7 @@ def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
 
 def _default_prompt() -> str:
     return (
-        "Analyze this Douyin short video and write the final answer in Simplified Chinese. "
+        "Analyze this short video from the supported platform and write the final answer in Simplified Chinese. "
         "Cover topic, opening hook, structure, visuals, actions, audience, risks, and improvement suggestions. "
         "Use Markdown format: `##` section headings, short bullet lists, and bold key phrases. "
         "Keep paragraphs compact and do not wrap the whole answer in a code block. "
@@ -212,9 +239,11 @@ def _build_payload(
 
     duration = _duration_seconds(video)
     size = _size_bytes(video)
+    platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
     raw_tool_result: dict[str, Any] = {
         "tool": "douyin_chong",
         "adapter": "openclaw_video.douyin_legacy_adapter",
+        "platform": platform,
         "video_id": str(getattr(video, "video_id", "") or ""),
         "author": str(getattr(video, "author", "") or ""),
         "desc": _safe_text(getattr(video, "desc", ""), limit=500),
@@ -234,7 +263,7 @@ def _build_payload(
         "schema_version": RESULT_SCHEMA_VERSION,
         "source": {
             "video_url_canonical": input_url,
-            "platform": "douyin",
+            "platform": platform,
             "duration_seconds": duration,
         },
         "summary": output_text,

@@ -105,6 +105,54 @@ class VideoLinkProbeTests(unittest.TestCase):
         self.assertTrue(payload["limits"]["size_ok"])
         self.assertFalse(payload["model_invoked"])
 
+    def test_probe_accepts_bilibili_link(self):
+        fake_video = SimpleNamespace(
+            video_url="https://upos-sz-mirror.example/video.m4s",
+            playwm_url="",
+            source_url="https://www.bilibili.com/video/BV1xx",
+            share_url="https://www.bilibili.com/video/BV1xx",
+            video_id="BV1xx",
+            content_type="video/mp4",
+            duration_ms=30_000,
+            size_mb=2,
+            video_url_source="direct",
+        )
+
+        payload = probe_video_link(
+            "https://www.bilibili.com/video/BV1xx",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+        )
+
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["canonical_host"], "www.bilibili.com")
+        self.assertEqual(payload["video_id_present"], True)
+
+    def test_probe_accepts_tiktok_link(self):
+        fake_video = SimpleNamespace(
+            video_url="https://v16-webapp-prime.example/video.mp4",
+            playwm_url="",
+            source_url="https://www.tiktok.com/@demo/video/123",
+            share_url="https://www.tiktok.com/@demo/video/123",
+            video_id="123",
+            content_type="video/mp4",
+            duration_ms=30_000,
+            size_mb=2,
+            video_url_source="direct",
+        )
+
+        payload = probe_video_link(
+            "https://www.tiktok.com/@demo/video/123",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+        )
+
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["canonical_host"], "www.tiktok.com")
+        self.assertEqual(payload["video_id_present"], True)
+
     def test_probe_reuses_url_guard_rejections(self):
         with self.assertRaises(UrlRejected):
             probe_video_link(

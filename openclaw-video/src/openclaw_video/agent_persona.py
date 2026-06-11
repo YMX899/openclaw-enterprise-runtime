@@ -181,15 +181,18 @@ _DOUYIN_RE = re.compile(
     r"https?://(?:[\w.-]*\.)?(?:douyin\.com|iesdouyin\.com)/\S+", re.IGNORECASE
 )
 _DOUYIN_SHORT_RE = re.compile(r"https?://v\.douyin\.com/\S+", re.IGNORECASE)
+_SUPPORTED_VIDEO_RE = re.compile(
+    r"https?://(?:[\w.-]*\.)?(?:douyin\.com|iesdouyin\.com|tiktok\.com|bilibili\.com)/\S+"
+    r"|https?://(?:v\.douyin\.com|b23\.tv)/\S+",
+    re.IGNORECASE,
+)
 _ANY_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 
 _OTHER_PLATFORMS = {
     "youtube.com": "YouTube", "youtu.be": "YouTube",
-    "bilibili.com": "B 站", "b23.tv": "B 站",
     "xiaohongshu.com": "小红书", "xhslink.com": "小红书",
     "weibo.com": "微博",
     "kuaishou.com": "快手",
-    "tiktok.com": "TikTok",
 }
 
 
@@ -201,6 +204,10 @@ class GuardrailReply:
 
 def has_douyin_link(text: str) -> bool:
     return bool(_DOUYIN_RE.search(text or "") or _DOUYIN_SHORT_RE.search(text or ""))
+
+
+def has_supported_video_link(text: str) -> bool:
+    return bool(_SUPPORTED_VIDEO_RE.search(text or ""))
 
 
 def _find_other_platform(text: str) -> str | None:
@@ -244,7 +251,7 @@ def guardrail_for_message(text: str) -> GuardrailReply | None:
             ),
             reason="profile_link",
         )
-    if has_douyin_link(text):
+    if has_supported_video_link(text):
         return None
     platform = _find_other_platform(text)
     if platform:

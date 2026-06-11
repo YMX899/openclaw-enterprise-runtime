@@ -17,8 +17,11 @@ Resolver = Callable[[str, int | None], list[str]]
 RedirectFetcher = Callable[[str], str | None]
 
 ALLOWED_HOST_SUFFIXES = (
+    "b23.tv",
+    "bilibili.com",
     "douyin.com",
     "iesdouyin.com",
+    "tiktok.com",
 )
 
 BLOCKED_IPS = {
@@ -109,7 +112,7 @@ def _canonicalize(url: str) -> tuple[str, str, int | None]:
         raise UrlRejected("URL host is required")
     host = parsed.hostname.rstrip(".").lower()
     if not _is_allowed_host(host):
-        raise UrlRejected("host is not in the Douyin allowlist")
+        raise UrlRejected("host is not in the supported video platform allowlist")
     if parsed.port not in (None, 80, 443):
         raise UrlRejected("only standard http/https ports are allowed")
     query = urlencode(sorted(parse_qsl(parsed.query, keep_blank_values=True)), doseq=True)

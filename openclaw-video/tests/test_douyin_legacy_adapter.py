@@ -10,6 +10,7 @@ from openclaw_video.douyin_legacy_adapter import (
     LegacyAdapterError,
     _canonicalize_input_for_resolver,
     _load_legacy_components,
+    _platform_from_url,
     run_adapter,
 )
 
@@ -178,6 +179,13 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             "https://www.douyin.com/video/7648317087237562266",
         )
 
+    def test_platform_from_url_supports_vendor_resolver_platforms(self):
+        self.assertEqual(_platform_from_url("https://www.douyin.com/video/1"), "douyin")
+        self.assertEqual(_platform_from_url("https://www.tiktok.com/@demo/video/123"), "tiktok")
+        self.assertEqual(_platform_from_url("https://vm.tiktok.com/abc"), "tiktok")
+        self.assertEqual(_platform_from_url("https://www.bilibili.com/video/BV1xx"), "bilibili")
+        self.assertEqual(_platform_from_url("https://b23.tv/abc"), "bilibili")
+
     def test_writes_committed_result_schema_without_default_env(self):
         with TemporaryDirectory() as tmp:
             env_file = Path(tmp) / "douyin.env"
@@ -295,7 +303,11 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     component_loader=fake_components,
                 )
 
-        probe.assert_called_once_with("https://video.example/video.mp4", max_bytes=2000000)
+        probe.assert_called_once_with(
+            "https://video.example/video.mp4",
+            max_bytes=2000000,
+            referer="https://www.iesdouyin.com/share/video/1/",
+        )
         self.assertEqual(payload["raw_tool_result"]["size_bytes"], 1536)
         self.assertEqual(payload["schema_version"], "openclaw-video-result.v1")
 

@@ -24,6 +24,22 @@ class UrlGuardTests(unittest.TestCase):
         self.assertEqual(result.host, "v.douyin.com")
         self.assertIn("a=1&b=2", result.canonical)
 
+    def test_accepts_public_tiktok_https(self):
+        result = validate_video_url("https://www.tiktok.com/@demo/video/123", resolver("8.8.8.8"))
+        self.assertEqual(result.host, "www.tiktok.com")
+
+    def test_accepts_public_bilibili_https(self):
+        result = validate_video_url("https://www.bilibili.com/video/BV1xx?p=2", resolver("8.8.8.8"))
+        self.assertEqual(result.host, "www.bilibili.com")
+
+    def test_accepts_bilibili_short_redirect_target(self):
+        result = validate_video_url_with_redirects(
+            "https://b23.tv/abc",
+            resolver=resolver_by_host({"b23.tv": ["8.8.8.8"], "www.bilibili.com": ["8.8.8.8"]}),
+            redirect_fetcher=redirect_map({"https://b23.tv/abc": "https://www.bilibili.com/video/BV1xx"}),
+        )
+        self.assertEqual(result.canonical, "https://www.bilibili.com/video/BV1xx")
+
     def test_rejects_non_douyin_domain(self):
         with self.assertRaises(UrlRejected):
             validate_video_url("https://example.com/video", resolver("93.184.216.34"))

@@ -22,6 +22,7 @@ tmp/
 # Large/generated artifacts that should not be required for rollback
 *-whole-workflow.svg
 browser-client-copy.mjs
+openclaw-video/output/
 
 # Draft request captures and downloaded page asset inventories
 draft-api-*.json
