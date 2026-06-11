@@ -173,3 +173,54 @@ docker logs --tail=200 openclaw-video-openclaw-gateway-1
 4. 如果要改线上服务，先确认 `/project/Dify` 与 `/app/bin/openclaw-video/current/openclaw-video` 的差异，再决定同步策略。
 
 涉及远程服务器操作时，当前 Codex 环境必须使用 `ssh-skill`，不要直接调用原生 `ssh` 或 `scp`。
+
+## 10. 本次服务器初始化记录
+
+本次已在服务器完成以下工作：
+
+- 已创建服务器目录：`/project`。
+- 已将版本化工程克隆到：`/project/Dify`。
+- 服务器 Git 工作树最新提交：`be20134 Classify test identity workspace failures`。
+- 已安装/确认基础环境：
+  - Ubuntu 24.04.2 LTS。
+  - Python 3.12.3。
+  - `python3.12-venv`、`python3-venv`、`python3-pip`、`build-essential`、`pkg-config`。
+  - Node.js v22.22.3，npm 10.9.8。
+  - Git 2.43.0。
+  - Docker 28.1.1。
+  - Docker Compose v2.35.1。
+- 已在 `/project/Dify/openclaw-video/.venv` 创建 Python 虚拟环境，并执行 `python -m pip install -e ".[dev]"`。
+- 已在 `/project/Dify/openclaw-video/web` 执行 `npm ci`，并生成前端生产构建到 `src/openclaw_video/webdist/`。
+
+本次服务器验证结果：
+
+```bash
+cd /project/Dify/openclaw-video
+. .venv/bin/activate
+python -m compileall -q src/openclaw_video
+python -m pytest \
+  tests/test_bridge_app.py::BridgeAppTests::test_identity_diagnostics_fails_closed_for_multiple_current_workspaces \
+  tests/test_compose_contract.py::ComposeContractTests::test_vendor_source_hash_manifest_matches_current_files \
+  tests/test_video_link_probe.py \
+  tests/test_url_guard.py
+```
+
+结果：`23 passed, 1 warning`。
+
+```bash
+cd /project/Dify/openclaw-video/web
+npm ci
+npm run build
+```
+
+结果：Vite production build 通过。npm audit 仍提示 2 个中等风险项，未执行 `npm audit fix --force`，因为该命令可能带来破坏性依赖升级。
+
+```bash
+cd /project/Dify/openclaw-video
+BRIDGE_POSTGRES_PASSWORD=dummy BRIDGE_IDENTITY_SECRET=dummy \
+  docker compose -f docker-compose.openclaw-video.yaml config
+```
+
+结果：Compose 配置解析通过。
+
+完整 `pytest tests` 中有历史审计用例依赖 `.gitignore` 排除的浏览器 smoke 证据文件，例如 `tmp/playwright-public-browser/.../summary.json`。该类文件不是源码交接内容，服务器新克隆工作树不会自动包含；需要重新执行对应浏览器 smoke 后再跑历史审计门禁。
