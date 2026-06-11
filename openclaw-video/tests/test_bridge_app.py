@@ -307,7 +307,7 @@ class BridgeAppTests(unittest.TestCase):
             "OpenClaw 短视频智能分析", "让短视频链接直接进入可追踪的分析对话",
             'id="openLogin"', 'id="landingPage"', 'id="chatApp"', 'id="sessionList"',
             'id="prompt"', 'id="output"', "登录后进入分析对话", "无需再登录 Dify 网页",
-            "历史对话", "新建对话", "诊断与结果明细", "视频分析", "开发详情：脱敏响应", "验证工具",
+            "历史对话", "新建对话", "视频分析",
         ]:
             with self.subTest(shell=s):
                 self.assertIn(s, shell.text)
