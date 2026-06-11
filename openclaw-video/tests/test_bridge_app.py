@@ -249,6 +249,46 @@ class BridgeAppTests(unittest.TestCase):
         self.assertNotIn("token", response.text.lower())
         self.assertNotIn("cookie", response.text.lower())
 
+    def test_create_session_message_persists_video_url_without_job(self):
+        session = self.create_session()
+        response = self.client.post(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            json={
+                "role": "user",
+                "content": "请分析这个视频。\nhttps://b23.tv/ieNCg9V",
+                "video_url": "https://b23.tv/ieNCg9V",
+            },
+            headers=self.auth(),
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        message = response.json()["message"]
+        self.assertEqual(message["role"], "user")
+        self.assertEqual(message["video_url"], "https://b23.tv/ieNCg9V")
+        self.assertIsNone(message["job_id"])
+        self.assertTrue(message["created_at"])
+        messages = self.client.get(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            headers=self.auth(),
+        )
+        self.assertEqual(messages.status_code, 200, messages.text)
+        self.assertEqual(messages.json()["messages"][0]["video_url"], "https://b23.tv/ieNCg9V")
+        self.assertEqual(self.jobs.count_active_jobs(self.sessions.get_session(session["id"]).owner_principal_id), 0)
+
+    def test_create_session_message_requires_owner_and_user_role(self):
+        session = self.create_session(account="account-a")
+        cross_user = self.client.post(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            json={"role": "user", "content": "hello"},
+            headers=self.auth("account-b"),
+        )
+        self.assertEqual(cross_user.status_code, 404)
+        assistant = self.client.post(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            json={"role": "assistant", "content": "not allowed"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(assistant.status_code, 400)
+
     def _lab_shell_and_bundle(self, base):
         shell = self.client.get(base + "/openclaw-lab/")
         self.assertEqual(shell.status_code, 200, shell.text)

@@ -706,6 +706,21 @@ function addAttachmentChip(node, name) {
       if (!options.quiet) show({ status: result.status, messages: result.body });
       });
     }
+    async function persistUserMessage(sessionId, content, videoUrl) {
+      if (!sessionId || !content) return null;
+      try {
+        return await api(apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages', {
+          method: 'POST',
+          body: JSON.stringify({
+            role: 'user',
+            content,
+            video_url: videoUrl || undefined
+          })
+        });
+      } catch (error) {
+        return { status: 0, body: { error: String(error && error.message || error) } };
+      }
+    }
     async function login() {
       return withBusy('正在登录', async () => {
       document.getElementById('loginFeedback').textContent = '';
@@ -1447,7 +1462,8 @@ function addAttachmentChip(node, name) {
         const sessionId = currentSessionId();
         if (!sessionId) { setNextAction('请先登录并新建对话。'); return; }
         const link = document.getElementById('videoUrl').value;
-        const userNode = pushMessage('user', (promptText || '请分析这个视频。') + '\n' + link);
+        const userContent = (promptText || '请分析这个视频。') + '\n' + link;
+        const userNode = pushMessage('user', userContent);
         addAttachmentChip(userNode, link);
         const assistantNode = pushMessage('assistant', '正在读取视频链接…');
         const progress = attachProgress(assistantNode, '读取链接中…');
@@ -1469,6 +1485,7 @@ function addAttachmentChip(node, name) {
           }
         } else {
           const isWarn = read.status === 200 && read.body && read.body.status === 'WARN';
+          await persistUserMessage(sessionId, userContent, link);
           progress.fail(isWarn ? '超出分析限制' : '链接无法读取');
           updateAssistantMessage(assistantNode, buildReadCheckFailureReply(read.body));
         }

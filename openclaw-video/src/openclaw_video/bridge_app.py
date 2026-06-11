@@ -744,6 +744,36 @@ def create_app(
             raise HTTPException(status_code=404, detail="session not found") from exc
         return {"messages": [_serialize_message(item) for item in messages]}
 
+    @app.post("/openclaw-api/sessions/{session_id}/messages")
+    @app.post("/ai/openclaw-api/sessions/{session_id}/messages")
+    @app.post("/api/openclaw-api/sessions/{session_id}/messages")
+    @app.post("/console/api/openclaw-api/sessions/{session_id}/messages")
+    async def create_message(session_id: str, request: Request) -> JSONResponse:
+        principal = await current_principal(request)
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be an object")
+        role = str(payload.get("role") or "user").strip() or "user"
+        if role != "user":
+            raise HTTPException(status_code=400, detail="only user messages can be created")
+        content = str(payload.get("content") or "").strip()
+        video_url = str(payload.get("video_url") or "").strip() or None
+        if not content and video_url:
+            content = video_url
+        try:
+            message = session_store.add_message(
+                session_id,
+                principal.principal_id,
+                role,
+                content,
+                video_url=video_url,
+            )
+        except (SessionNotFound, SessionOwnershipError) as exc:
+            raise HTTPException(status_code=404, detail="session not found") from exc
+        except MessageValidationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse(status_code=201, content={"message": _serialize_message(message)})
+
     @app.post("/openclaw-api/jobs")
     @app.post("/ai/openclaw-api/jobs")
     @app.post("/api/openclaw-api/jobs")
