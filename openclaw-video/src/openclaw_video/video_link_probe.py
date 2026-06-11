@@ -18,6 +18,7 @@ from .url_guard import (
     default_resolver,
     validate_video_url_with_redirects,
 )
+from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS
 
 
 class VideoLinkProbeError(RuntimeError):
@@ -26,8 +27,8 @@ class VideoLinkProbeError(RuntimeError):
 
 @dataclass(frozen=True)
 class VideoLinkProbeConfig:
-    max_duration_seconds: int = 60
-    max_download_bytes: int = 512 * 1024 * 1024
+    max_duration_seconds: int = DEFAULT_MAX_VIDEO_DURATION_SECONDS
+    max_download_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES
 
 
 def _sha256_text(value: str) -> str:

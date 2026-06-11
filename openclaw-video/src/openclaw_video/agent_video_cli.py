@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from .douyin_legacy_adapter import LegacyAdapterError, run_adapter
+from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
 
 
 def _sha256_text(value: str) -> str:
@@ -75,9 +76,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--input-url", required=True)
     parser.add_argument("--env-file", default=os.environ.get("DOUYIN_CHONG_ENV_FILE", "/run/secrets/douyin_chong_env"))
-    parser.add_argument("--max-bytes", type=int, default=int(os.environ.get("MAX_DOWNLOAD_BYTES", str(512 * 1024 * 1024))))
-    parser.add_argument("--max-duration-seconds", type=int, default=int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "60")))
-    parser.add_argument("--max-frames", type=int, default=int(os.environ.get("MAX_VIDEO_FRAMES", "1200")))
+    parser.add_argument("--max-bytes", type=int, default=int(os.environ.get("MAX_DOWNLOAD_BYTES", str(DEFAULT_MAX_DOWNLOAD_BYTES))))
+    parser.add_argument("--max-duration-seconds", type=int, default=int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", str(DEFAULT_MAX_VIDEO_DURATION_SECONDS))))
+    parser.add_argument("--max-frames", type=int, default=int(os.environ.get("MAX_VIDEO_FRAMES", str(DEFAULT_MAX_VIDEO_FRAMES))))
     parser.add_argument("--output-json", default="")
     parser.add_argument("--pretty", action="store_true")
     return parser

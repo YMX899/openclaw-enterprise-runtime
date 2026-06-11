@@ -184,7 +184,7 @@ def video_link_read_check_fixture():
         "size_bytes": 2_621_440,
         "video_url_source": "direct",
         "limits": {
-            "max_duration_seconds": 60,
+            "max_duration_seconds": 300,
             "max_download_bytes": 512 * 1024 * 1024,
             "duration_known": True,
             "size_known": True,

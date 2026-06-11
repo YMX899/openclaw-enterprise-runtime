@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .result_schema import validate_result_payload
+from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
 
 
 class DouyinWrapperError(RuntimeError):
@@ -32,9 +33,9 @@ def run_douyin_chong(
     output_dir: Path,
     binary: str | None = None,
     timeout_seconds: int = 900,
-    max_download_bytes: int = 512 * 1024 * 1024,
-    max_duration_seconds: int = 60,
-    max_frames: int = 1200,
+    max_download_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
+    max_duration_seconds: int = DEFAULT_MAX_VIDEO_DURATION_SECONDS,
+    max_frames: int = DEFAULT_MAX_VIDEO_FRAMES,
 ) -> DouyinAnalysisResult:
     """Run douyin_chong through a fixed-argument, no-shell wrapper.
 

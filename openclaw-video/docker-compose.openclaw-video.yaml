@@ -44,7 +44,7 @@ services:
       BRIDGE_UPLOAD_DIR: /data/uploads
       MAX_UPLOAD_BYTES: "536870912"
       MAX_DOWNLOAD_BYTES: "536870912"
-      MAX_VIDEO_DURATION_SECONDS: "60"
+      MAX_VIDEO_DURATION_SECONDS: "300"
     ports:
       - "127.0.0.1:18181:3000"
     volumes:
@@ -101,8 +101,8 @@ services:
       DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
       DOUYIN_CHONG_PYTHONPATH: /app/vendor
       MAX_DOWNLOAD_BYTES: "536870912"
-      MAX_VIDEO_DURATION_SECONDS: "60"
-      MAX_VIDEO_FRAMES: "1200"
+      MAX_VIDEO_DURATION_SECONDS: "300"
+      MAX_VIDEO_FRAMES: "6000"
     volumes:
       - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
       - ./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro
@@ -133,8 +133,8 @@ services:
       WORKER_CONCURRENCY: "1"
       JOB_TIMEOUT_SECONDS: "900"
       MAX_DOWNLOAD_BYTES: "536870912"
-      MAX_VIDEO_DURATION_SECONDS: "60"
-      MAX_VIDEO_FRAMES: "1200"
+      MAX_VIDEO_DURATION_SECONDS: "300"
+      MAX_VIDEO_FRAMES: "6000"
       BRIDGE_UPLOAD_DIR: /data/uploads
     volumes:
       - ./vendor/douyin_chong:/app/vendor/douyin_chong:ro

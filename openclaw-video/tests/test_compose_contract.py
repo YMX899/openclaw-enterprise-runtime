@@ -90,8 +90,8 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn('chown -R "$APP_UID:$APP_GID" "$HOME"', entrypoint)
         self.assertIn('DOUYIN_CHONG_PYTHONPATH="${DOUYIN_CHONG_PYTHONPATH:-/app/vendor}"', entrypoint)
         self.assertIn('MAX_DOWNLOAD_BYTES="${MAX_DOWNLOAD_BYTES:-536870912}"', entrypoint)
-        self.assertIn('MAX_VIDEO_DURATION_SECONDS="${MAX_VIDEO_DURATION_SECONDS:-60}"', entrypoint)
-        self.assertIn('MAX_VIDEO_FRAMES="${MAX_VIDEO_FRAMES:-1200}"', entrypoint)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS="${MAX_VIDEO_DURATION_SECONDS:-300}"', entrypoint)
+        self.assertIn('MAX_VIDEO_FRAMES="${MAX_VIDEO_FRAMES:-6000}"', entrypoint)
         self.assertIn("HOME=/var/lib/openclaw", dockerfile)
         self.assertIn("XDG_CONFIG_HOME=/var/lib/openclaw/.config", dockerfile)
         self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
@@ -192,8 +192,8 @@ class ComposeContractTests(unittest.TestCase):
             "WORKER_CONCURRENCY: \"1\"",
             "JOB_TIMEOUT_SECONDS: \"900\"",
             "MAX_DOWNLOAD_BYTES: \"536870912\"",
-            "MAX_VIDEO_DURATION_SECONDS: \"60\"",
-            "MAX_VIDEO_FRAMES: \"1200\"",
+            "MAX_VIDEO_DURATION_SECONDS: \"300\"",
+            "MAX_VIDEO_FRAMES: \"6000\"",
             "DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter",
             "DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env",
             "BRIDGE_UPLOAD_DIR: /data/uploads",
@@ -252,7 +252,7 @@ class ComposeContractTests(unittest.TestCase):
 
         self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
         self.assertIn('MAX_DOWNLOAD_BYTES: "536870912"', compose)
-        self.assertIn('MAX_VIDEO_DURATION_SECONDS: "60"', compose)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS: "300"', compose)
 
     def test_base_images_default_to_official_and_can_be_overridden_for_isolated_hosts(self):
         compose = COMPOSE.read_text(encoding="utf-8")

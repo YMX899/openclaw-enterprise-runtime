@@ -41,8 +41,8 @@ def fake_payload(input_url: str) -> dict:
             "usage": {"total_tokens": 10},
             "limits": {
                 "max_download_bytes": 10000,
-                "max_duration_seconds": 60,
-                "max_frames": 1200,
+                "max_duration_seconds": 300,
+                "max_frames": 6000,
                 "fps": 4.0,
             },
         },

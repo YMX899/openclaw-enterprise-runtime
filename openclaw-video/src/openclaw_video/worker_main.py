@@ -4,6 +4,7 @@ import os
 import time
 
 from .postgres_store import PostgresJobStore
+from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
 from .worker_service import VideoAnalysisWorker, WorkerConfig
 
 
@@ -20,9 +21,9 @@ def main() -> None:
     timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", "900"))
     worker_id = os.environ.get("WORKER_ID", "video-analysis-worker-1")
     heartbeat_interval_seconds = int(os.environ.get("JOB_HEARTBEAT_SECONDS", "30"))
-    max_download_bytes = int(os.environ.get("MAX_DOWNLOAD_BYTES", str(512 * 1024 * 1024)))
-    max_duration_seconds = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "60"))
-    max_frames = int(os.environ.get("MAX_VIDEO_FRAMES", "1200"))
+    max_download_bytes = int(os.environ.get("MAX_DOWNLOAD_BYTES", str(DEFAULT_MAX_DOWNLOAD_BYTES)))
+    max_duration_seconds = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", str(DEFAULT_MAX_VIDEO_DURATION_SECONDS)))
+    max_frames = int(os.environ.get("MAX_VIDEO_FRAMES", str(DEFAULT_MAX_VIDEO_FRAMES)))
     max_inline_upload_bytes = int(os.environ.get("MAX_INLINE_UPLOAD_BYTES", str(60 * 1024 * 1024)))
     store = PostgresJobStore(database_url)
     worker = VideoAnalysisWorker(

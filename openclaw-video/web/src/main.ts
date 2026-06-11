@@ -1532,7 +1532,7 @@ function addAttachmentChip(node, name) {
           '链接可以读取，但暂时不能进入模型分析。',
           '',
           ...reasons.map(reason => '- ' + reason),
-          '- 可以换一条 60 秒以内的单条视频，或先裁剪后上传文件。'
+          '- 可以换一条 5 分钟以内的单条视频，或先裁剪后上传文件。'
         ].join('\n');
       }
       return buildJobErrorReply('url_rejected');

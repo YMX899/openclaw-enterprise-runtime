@@ -19,6 +19,7 @@ from .url_guard import (
     default_resolver,
     validate_video_url_with_redirects,
 )
+from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
 
 
 class UploadTooLargeError(RuntimeError):
@@ -33,9 +34,9 @@ class WorkerConfig:
     timeout_seconds: int = 900
     worker_id: str = "video-analysis-worker-1"
     heartbeat_interval_seconds: int = 30
-    max_download_bytes: int = 512 * 1024 * 1024
-    max_duration_seconds: int = 60
-    max_frames: int = 1200
+    max_download_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES
+    max_duration_seconds: int = DEFAULT_MAX_VIDEO_DURATION_SECONDS
+    max_frames: int = DEFAULT_MAX_VIDEO_FRAMES
     max_inline_upload_bytes: int = 60 * 1024 * 1024
 
 

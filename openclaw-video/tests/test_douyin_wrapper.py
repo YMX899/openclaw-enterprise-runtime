@@ -27,8 +27,8 @@ class DouyinWrapperTests(unittest.TestCase):
                 binary="/opt/douyin_chong/douyin_chong",
                 timeout_seconds=123,
                 max_download_bytes=1000,
-                max_duration_seconds=60,
-                max_frames=1200,
+                max_duration_seconds=300,
+                max_frames=6000,
             )
         command = run.call_args.args[0]
         kwargs = run.call_args.kwargs
@@ -38,9 +38,9 @@ class DouyinWrapperTests(unittest.TestCase):
         self.assertIn("--max-bytes", command)
         self.assertIn("1000", command)
         self.assertIn("--max-duration-seconds", command)
-        self.assertIn("60", command)
+        self.assertIn("300", command)
         self.assertIn("--max-frames", command)
-        self.assertIn("1200", command)
+        self.assertIn("6000", command)
         self.assertIn("--no-shell", command)
         self.assertNotIn("shell", kwargs)
         self.assertEqual(kwargs["timeout"], 123)

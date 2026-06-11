@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 
 from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
 from .url_guard import UrlRejected, validate_video_url_with_redirects
+from .video_limits import DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
 
 
 class LegacyAdapterError(RuntimeError):
@@ -386,8 +387,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-label", default=None, help="Traceable source label (e.g. upload:// URI) for the result payload.")
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--max-bytes", type=int, required=True)
-    parser.add_argument("--max-duration-seconds", type=int, default=int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "60")))
-    parser.add_argument("--max-frames", type=int, default=int(os.environ.get("MAX_VIDEO_FRAMES", "1200")))
+    parser.add_argument("--max-duration-seconds", type=int, default=int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", str(DEFAULT_MAX_VIDEO_DURATION_SECONDS))))
+    parser.add_argument("--max-frames", type=int, default=int(os.environ.get("MAX_VIDEO_FRAMES", str(DEFAULT_MAX_VIDEO_FRAMES))))
     parser.add_argument("--env-file", required=True)
     parser.add_argument("--no-shell", action="store_true", required=True)
     parser.add_argument("--fps", type=float, default=float(os.environ.get("DOUYIN_CHONG_FPS", "4.0")))

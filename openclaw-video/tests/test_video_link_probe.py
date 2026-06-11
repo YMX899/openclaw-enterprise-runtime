@@ -105,6 +105,56 @@ class VideoLinkProbeTests(unittest.TestCase):
         self.assertTrue(payload["limits"]["size_ok"])
         self.assertFalse(payload["model_invoked"])
 
+    def test_probe_accepts_videos_up_to_five_minutes_by_default(self):
+        fake_video = SimpleNamespace(
+            video_url="https://cdn.douyin.com/video.mp4",
+            playwm_url="",
+            source_url="",
+            share_url="",
+            video_id="",
+            content_type="video/mp4",
+            duration_ms=299_000,
+            size_mb=10,
+            video_url_source="direct",
+        )
+
+        payload = probe_video_link(
+            "https://www.douyin.com/video/123",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+        )
+
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["limits"]["max_duration_seconds"], 300)
+        self.assertTrue(payload["limits"]["eligible_for_model_analysis"])
+        self.assertTrue(payload["limits"]["duration_ok"])
+
+    def test_probe_warns_when_video_exceeds_five_minutes_by_default(self):
+        fake_video = SimpleNamespace(
+            video_url="https://cdn.douyin.com/video.mp4",
+            playwm_url="",
+            source_url="",
+            share_url="",
+            video_id="",
+            content_type="video/mp4",
+            duration_ms=301_000,
+            size_mb=10,
+            video_url_source="direct",
+        )
+
+        payload = probe_video_link(
+            "https://www.douyin.com/video/123",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+        )
+
+        self.assertEqual(payload["status"], "WARN")
+        self.assertEqual(payload["limits"]["max_duration_seconds"], 300)
+        self.assertFalse(payload["limits"]["eligible_for_model_analysis"])
+        self.assertFalse(payload["limits"]["duration_ok"])
+
     def test_probe_accepts_bilibili_link(self):
         fake_video = SimpleNamespace(
             video_url="https://upos-sz-mirror.example/video.m4s",

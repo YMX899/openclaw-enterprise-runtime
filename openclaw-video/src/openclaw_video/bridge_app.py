@@ -58,6 +58,7 @@ from .session_store import (
 from .upload_store import UploadStoreError, delete_upload_uri, store_upload_fileobj
 from .url_guard import UrlRejected
 from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_video_link
+from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS
 from .agent_persona import (
     NEW_SESSION_GREETING,
     build_agent_message,
@@ -836,8 +837,8 @@ def create_app(
             return probe_video_link(
                 video_url,
                 config=VideoLinkProbeConfig(
-                    max_duration_seconds=positive_int_from_env("MAX_VIDEO_DURATION_SECONDS", 60),
-                    max_download_bytes=positive_int_from_env("MAX_DOWNLOAD_BYTES", 512 * 1024 * 1024),
+                    max_duration_seconds=positive_int_from_env("MAX_VIDEO_DURATION_SECONDS", DEFAULT_MAX_VIDEO_DURATION_SECONDS),
+                    max_download_bytes=positive_int_from_env("MAX_DOWNLOAD_BYTES", DEFAULT_MAX_DOWNLOAD_BYTES),
                 ),
             )
         except UrlRejected as exc:
