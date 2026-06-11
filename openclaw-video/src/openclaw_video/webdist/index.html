@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OpenClaw 短视频智能分析</title>
   
-  <script type="module" crossorigin src="./assets/index-BK_1VhYE.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-x-YQ06NI.css">
+  <script type="module" crossorigin src="./assets/index-DhqkHG-n.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DQHJU942.css">
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
@@ -89,7 +89,7 @@
         <div class="brand cg-brand">
           <div class="brand-mark" aria-hidden="true">OC</div>
           <div class="brand-copy">
-            <p class="eyebrow">OpenClaw</p>
+            <p class="eyebrow">视频分析助手</p>
             <h2 id="sessionHeading">短视频分析</h2>
           </div>
         </div>
@@ -129,7 +129,7 @@
         <div id="userMenu" class="menu-pop" role="menu" aria-labelledby="userMenuBtn" hidden>
           <div class="menu-account">
             <strong id="menuUserName">未登录</strong>
-            <span id="menuUserSub">OpenClaw 独立短视频分析会话</span>
+            <span id="menuUserSub">独立短视频分析会话</span>
           </div>
           <div class="menu-sep"></div>
           <button type="button" role="menuitemradio" data-theme-choice="light" aria-checked="false">
@@ -151,7 +151,7 @@
           </button>
           <button id="aboutBtn" type="button" role="menuitem">
             <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
-            关于 OpenClaw
+            关于产品
           </button>
           <button id="logoutButton" class="danger" type="button" role="menuitem">
             <svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
@@ -161,15 +161,15 @@
       </div>
     </aside>
 
-    <section class="cg-main" aria-label="OpenClaw 中文聊天分析界面">
+    <section class="cg-main" aria-label="中文短视频分析聊天界面">
       <header class="cg-topbar">
         <button id="cgMenuBtn" class="cg-menu-btn" type="button" aria-label="打开会话菜单" aria-controls="sessionPanel" aria-expanded="false">
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
         </button>
         <div class="cg-topbar-title">
-          <h1 id="cgConvTitle">OpenClaw</h1>
+          <h1 id="cgConvTitle">短视频分析助手</h1>
         </div>
-        <div class="cg-topbar-status" aria-label="OpenClaw 运行状态">
+        <div class="cg-topbar-status" aria-label="服务运行状态">
           <div id="runState" class="run-state todo">等待登录</div>
           <button id="refreshMe" class="secondary" type="button">刷新</button>
         </div>
@@ -185,7 +185,7 @@
       </nav>
 
       <div id="conversation" class="cg-conversation conversation" aria-live="polite">
-        <div class="message assistant" data-role-label="OpenClaw"><div class="cg-msg-inner">你好，我是 OpenClaw 短视频分析助手。把抖音/TikTok/B站视频链接粘贴进下方输入框，或点击 ＋ 上传视频文件，我就开始分析；也可以直接提问。</div></div>
+        <div class="message assistant" data-role-label="分析助手"><div class="cg-msg-inner">你好，我是短视频分析助手。把抖音/TikTok/B站视频链接粘贴进下方输入框，或点击 ＋ 上传视频文件，我就开始分析；也可以直接提问。</div></div>
       </div>
 
       <div id="nextAction" class="next-action cg-next-action" hidden><span>下一步</span>请先登录进入分析工作台。</div>
@@ -199,11 +199,11 @@
           <div id="composerLinkHint" class="cg-link-hint" hidden>检测到视频链接，将作为视频来源分析。</div>
           <div class="cg-composer-row">
             <button id="composerAttach" class="cg-attach-btn" type="button" aria-label="上传视频文件" title="上传视频文件">＋</button>
-            <textarea id="prompt" class="cg-input" rows="1" placeholder="给 OpenClaw 发送消息，或粘贴抖音/TikTok/B站视频链接…"></textarea>
+            <textarea id="prompt" class="cg-input" rows="1" placeholder="发送消息，或粘贴抖音/TikTok/B站视频链接…"></textarea>
             <button id="sendChat" class="cg-send" type="button" aria-label="发送" title="发送">↑</button>
           </div>
         </div>
-        <p class="cg-composer-help">OpenClaw 可能会出错，请核对重要信息。视频分析结果以页面展示为准。</p>
+        <p class="cg-composer-help">AI 可能会出错，请核对重要信息。视频分析结果以页面展示为准。</p>
       </div>
 
       <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm" class="sr-only" tabindex="-1" aria-hidden="true">

@@ -5,6 +5,9 @@ import DOMPurify from 'dompurify';
 
 marked.setOptions({ gfm: true, breaks: true });
 
+const DEFAULT_CONVERSATION_TITLE = '短视频分析助手';
+const ASSISTANT_LABEL = '分析助手';
+
 function renderMarkdownInto(inner, text) {
   // Render assistant text as sanitized Markdown; fall back to plain text on error.
   try {
@@ -323,9 +326,9 @@ const output = document.getElementById('output');
       if (value.chat) {
         const status = typeof value.chat.status === 'number' ? value.chat.status : null;
         if (status === 200) {
-          return { tone: 'ok', text: 'OpenClaw 已回复，对话已更新。' };
+          return { tone: 'ok', text: '分析助手已回复，对话已更新。' };
         }
-        return { tone: status >= 500 ? 'fail' : 'warn', text: 'OpenClaw 聊天响应：HTTP ' + (status || '未知') + '。' };
+        return { tone: status >= 500 ? 'fail' : 'warn', text: '聊天响应：HTTP ' + (status || '未知') + '。' };
       }
       if (value.messages) {
         const count = Array.isArray(value.messages.messages) ? value.messages.messages.length : 0;
@@ -364,7 +367,7 @@ const output = document.getElementById('output');
     function pushMessage(role, text, ts) {
       const node = document.createElement('div');
       node.className = 'message ' + role;
-      node.setAttribute('data-role-label', role === 'user' ? '你' : 'OpenClaw');
+      node.setAttribute('data-role-label', role === 'user' ? '你' : ASSISTANT_LABEL);
       node._rawText = text;
       const inner = document.createElement('div');
       inner.className = 'cg-msg-inner';
@@ -481,9 +484,36 @@ function addAttachmentChip(node, name) {
       if (Number.isNaN(date.getTime())) return '';
       return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
+    function isTechnicalSessionTitle(title) {
+      const value = String(title || '').trim();
+      return !value
+        || value === '短视频分析'
+        || /^branch[-_]/i.test(value)
+        || /^openclaw\s+(self test|security test|post-login acceptance|upload smoke)/i.test(value)
+        || /^self[-_\s]?test/i.test(value)
+        || /^security[-_\s]?test/i.test(value)
+        || /^post[-_\s]?login/i.test(value)
+        || /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
+    }
     function sessionDisplayTitle(session) {
       const o = sessionOverrides[session.id];
-      return (o && o.title) || session.title || '未命名对话';
+      if (o && o.title) return o.title;
+      const raw = String(session.title || '').trim();
+      return isTechnicalSessionTitle(raw) ? '本次对话简介' : raw;
+    }
+    function sessionHeaderTitle(session) {
+      const o = sessionOverrides[session.id];
+      if (o && o.title) return o.title;
+      const raw = String(session.title || '').trim();
+      return isTechnicalSessionTitle(raw) ? DEFAULT_CONVERSATION_TITLE : raw;
+    }
+    function sessionDisplaySubtitle(session) {
+      const time = formatSessionTime(session.updated_at || session.created_at);
+      return time ? '最近更新 ' + time : '短视频分析对话';
+    }
+    function setConversationTitle(value) {
+      const title = document.getElementById('cgConvTitle');
+      if (title) title.textContent = value || DEFAULT_CONVERSATION_TITLE;
     }
     function sessionGroup(value) {
       const d = value ? new Date(value) : null;
@@ -501,7 +531,11 @@ function addAttachmentChip(node, name) {
       const q = (currentSearchQuery || '').trim().toLowerCase();
       return (list || [])
         .filter(s => !(sessionOverrides[s.id] && sessionOverrides[s.id].deleted))
-        .filter(s => !q || sessionDisplayTitle(s).toLowerCase().includes(q));
+        .filter(s => {
+          if (!q) return true;
+          const haystack = [sessionDisplayTitle(s), s.title || '', sessionDisplaySubtitle(s)].join(' ').toLowerCase();
+          return haystack.includes(q);
+        });
     }
     function renderSessions(sessions) {
       sessionList.innerHTML = '';
@@ -555,6 +589,10 @@ function addAttachmentChip(node, name) {
         title.className = 'session-title';
         title.textContent = sessionDisplayTitle(session);
         item.appendChild(title);
+        const sub = document.createElement('span');
+        sub.className = 'session-sub';
+        sub.textContent = sessionDisplaySubtitle(session);
+        item.appendChild(sub);
         item.addEventListener('click', () => {
           if (batchMode) {
             const cb = row.querySelector('.cg-row-check');
@@ -637,6 +675,7 @@ function addAttachmentChip(node, name) {
       knownSessions = [session, ...knownSessions.filter(item => item.id !== session.id)];
       document.getElementById('sessionId').value = session.id;
       document.getElementById('sessionTitle').value = session.title || '短视频分析';
+      setConversationTitle(sessionHeaderTitle(session));
       renderSessions(knownSessions);
     }
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -680,6 +719,7 @@ function addAttachmentChip(node, name) {
       if (!session || !session.id) return;
       document.getElementById('sessionId').value = session.id;
       document.getElementById('sessionTitle').value = session.title || '短视频分析';
+      setConversationTitle(sessionHeaderTitle(session));
       linkReadable = false;
       setCurrentJob('');
       setAuthenticatedView();
@@ -1124,7 +1164,7 @@ function addAttachmentChip(node, name) {
       });
       if (!isActiveSession(sessionId)) return result;
       if (result.status === 200 && result.body.message) {
-        pushMessage('assistant', result.body.message.content || 'OpenClaw 已回复。');
+        pushMessage('assistant', result.body.message.content || '分析助手已回复。');
         setRunState('已回复', 'ok');
         resultMetric.textContent = '对话';
         activateFlow(4);
@@ -1709,7 +1749,7 @@ function addAttachmentChip(node, name) {
     });
     document.getElementById('aboutBtn').addEventListener('click', () => {
       closePop();
-      openModal({ title: '关于 OpenClaw', desc: 'OpenClaw 短视频分析助手：支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。本页为 OpenClaw 自有会话，独立于 Dify 登录。', confirmText: '知道了' });
+      openModal({ title: '关于产品', desc: '短视频分析助手支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。', confirmText: '知道了' });
     });
 
     // local session overrides (rename / delete). Session-scoped in-memory only —
@@ -1761,7 +1801,7 @@ function addAttachmentChip(node, name) {
       if (!t) return;
       setSessionOverride(s.id, { title: t });
       renderSessions(knownSessions);
-      if (document.getElementById('sessionId').value === s.id) document.getElementById('cgConvTitle').textContent = t;
+      if (document.getElementById('sessionId').value === s.id) setConversationTitle(t);
       toast('已重命名', { type: 'success' });
     });
     sessionRowMenu.querySelector('[data-row-action="pin"]').addEventListener('click', () => {
@@ -1787,7 +1827,7 @@ function addAttachmentChip(node, name) {
       if (document.getElementById('sessionId').value === s.id) {
         document.getElementById('sessionId').value = '';
         conversation.innerHTML = '';
-        document.getElementById('cgConvTitle').textContent = 'OpenClaw';
+        setConversationTitle(DEFAULT_CONVERSATION_TITLE);
       }
       renderSessions(knownSessions);
       toast('已删除', {
@@ -1824,7 +1864,7 @@ function addAttachmentChip(node, name) {
       if (batchSelected.has(cur)) {
         document.getElementById('sessionId').value = '';
         conversation.innerHTML = '';
-        document.getElementById('cgConvTitle').textContent = 'OpenClaw';
+        setConversationTitle(DEFAULT_CONVERSATION_TITLE);
       }
       batchSelected.clear(); batchMode = false;
       const sa = document.getElementById('batchSelectAll'); if (sa) sa.checked = false;
