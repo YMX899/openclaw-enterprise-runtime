@@ -1158,6 +1158,10 @@ function addAttachmentChip(node, name) {
         return;
       }
       pushMessage('user', promptText);
+      const promptEl = document.getElementById('prompt');
+      promptEl.value = '';
+      updateComposerMode();
+      autosizePrompt();
       const result = await api(apiPrefix + '/chat', {
         method: 'POST',
         body: JSON.stringify({ session_id: sessionId, content: promptText })
@@ -1921,6 +1925,7 @@ function addAttachmentChip(node, name) {
         const b = document.createElement('button');
         b.type = 'button'; b.title = label; b.setAttribute('aria-label', label);
         b.innerHTML = svg + '<span>' + label + '</span>';
+        b.dataset.label = label;
         b.addEventListener('click', onClick);
         return b;
       };
