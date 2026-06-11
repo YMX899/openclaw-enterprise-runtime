@@ -21,6 +21,13 @@ function looksLikeUrl(value) {
   return /^https?:\/\//i.test(String(value || '').trim());
 }
 
+function messageTextWithVideoUrl(text, videoUrl) {
+  const value = String(text || '');
+  const url = String(videoUrl || '').trim();
+  if (!looksLikeUrl(url) || value.includes(url)) return value;
+  return (value ? value + '\n' : '') + url;
+}
+
 function enhanceCodeBlocks(inner) {
   inner.querySelectorAll('pre').forEach(pre => {
     if (pre.querySelector('.code-copy-btn')) return;
@@ -599,7 +606,15 @@ const output = document.getElementById('output');
         pushMessage('assistant', '当前对话还没有消息。可以发送问题，或提交视频链接开始分析。');
         return;
       }
-      messages.forEach(message => pushMessage(message.role === 'user' ? 'user' : 'assistant', message.content || '', message.created_at));
+      messages.forEach(message => {
+        const role = message.role === 'user' ? 'user' : 'assistant';
+        const videoUrl = message.video_url || '';
+        const text = role === 'user'
+          ? messageTextWithVideoUrl(message.content || '', videoUrl)
+          : (message.content || '');
+        const node = pushMessage(role, text, message.created_at);
+        if (role === 'user' && looksLikeUrl(videoUrl)) addAttachmentChip(node, videoUrl);
+      });
     }
     async function withBusy(label, task) {
       setRunState(label, 'busy');

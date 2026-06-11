@@ -1,0 +1,59 @@
+{
+  "schema": "openclaw-history-video-url-render-root.v1",
+  "created_at": "2026-06-11T07:38:29.278Z",
+  "target_url": "https://www.huahuoai.com/ai/openclaw-lab/",
+  "raw_video_urls_recorded": false,
+  "secrets_recorded": false,
+  "login_mocked": true,
+  "video_url_sha256": "a335059914ce9499757905c223246896e56f2fc14a20ab84ff43d7ac0e159f49",
+  "input_host": "www.douyin.com",
+  "status": "PASS",
+  "ui": {
+    "title": "OpenClaw 短视频智能分析",
+    "chatVisible": true,
+    "preLoginHidden": true,
+    "userTextHasHttp": true,
+    "userTextLength": 129,
+    "linkHrefPresent": true,
+    "linkHost": "www.douyin.com",
+    "copyVisible": true,
+    "timeVisible": true,
+    "assistantMarkdownCompact": true,
+    "loadedNewJs": true,
+    "scriptSrcHashes": [
+      "e6b6210d0fcf978a496355de7955e1bd3b14a89222e30ab0f8894c7dcc0eaa8b"
+    ]
+  },
+  "responses": [
+    {
+      "url": "/ai/openclaw-lab/?codexHistoryUrlTest=20260611",
+      "status": 200
+    },
+    {
+      "url": "/ai/openclaw-lab/assets/index-B_1w7gBS.js",
+      "status": 200
+    },
+    {
+      "url": "/ai/openclaw-lab/assets/index-x-YQ06NI.css",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/me",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/sessions",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/prefs",
+      "status": 200
+    },
+    {
+      "url": "/api/openclaw-api/sessions/<session>/messages",
+      "status": 200
+    }
+  ],
+  "console_error_count": 0,
+  "console_error_hashes": []
+}

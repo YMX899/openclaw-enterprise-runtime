@@ -162,6 +162,53 @@ async function pollJob(page, jobId, timeoutMs = 120000) {
   return { job: last, duration_ms: Date.now() - started };
 }
 
+async function refreshUiMessages(page, sessionId) {
+  await page.evaluate((id) => {
+    const input = document.querySelector('#sessionId');
+    const refresh = document.querySelector('#refreshMessages');
+    if (input) {
+      input.value = id;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (refresh) refresh.click();
+  }, sessionId);
+  await waitFor(
+    async () => page.evaluate(() => Boolean(document.querySelector('.message.user, .message.assistant'))),
+    { timeoutMs: 30000, label: 'UI message refresh' },
+  );
+}
+
+async function historyVideoUrlRenderCase(page, sessionId) {
+  await refreshUiMessages(page, sessionId);
+  const ui = await page.evaluate(() => {
+    const user = [...document.querySelectorAll('.message.user')]
+      .find((node) => /https?:\/\//.test(node.innerText || ''));
+    const link = user?.querySelector('.cg-msg-link a');
+    const copy = user?.querySelector('.cg-msg-copy');
+    const time = user?.querySelector('.cg-msg-time');
+    return {
+      userMessageFound: Boolean(user),
+      userTextHasHttp: /https?:\/\//.test(user?.innerText || ''),
+      userTextLength: (user?.innerText || '').length,
+      linkHrefPresent: Boolean(link?.href),
+      copyVisible: Boolean(copy) && getComputedStyle(copy).display !== 'none',
+      timeVisible: Boolean((time?.textContent || '').trim()),
+    };
+  });
+  return {
+    label: 'ui_history_video_url_render',
+    status: ui.userTextHasHttp && ui.linkHrefPresent && ui.copyVisible && ui.timeVisible ? 'PASS' : 'FAIL',
+    session_id_hash: sha256(sessionId),
+    ui,
+    expectations: [
+      expectation('history user message contains visible URL text', ui.userTextHasHttp),
+      expectation('history user message contains clickable URL chip', ui.linkHrefPresent),
+      expectation('history user message has copy action', ui.copyVisible),
+      expectation('history user message has send time', ui.timeVisible),
+    ],
+  };
+}
+
 async function main() {
   const chromium = await loadChromium();
   const launchOptions = { headless: HEADLESS, slowMo: SLOW_MO };
@@ -393,6 +440,9 @@ async function main() {
         job_id_hash: jobId ? sha256(jobId) : null,
         initial_status: submit.body?.job?.status || null,
       });
+      if (submit.status === 202) {
+        evidence.checks.push(await historyVideoUrlRenderCase(page, videoSession.id));
+      }
 
       if (jobId) {
         const analyzingChat = await chat(page, videoSession.id, '开头怎么改');
