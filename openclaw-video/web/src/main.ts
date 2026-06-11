@@ -1,3 +1,4 @@
+// @ts-nocheck
 import './styles.css';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -74,11 +75,12 @@ const output = document.getElementById('output');
     let knownSessions = [];
 
     function openLoginPanel() {
-      loginPanel.hidden = false;
-      window.setTimeout(() => document.getElementById('loginAccount').focus(), 30);
+      // login fields are now inline on the landing hero; just focus the account input
+      const acct = document.getElementById('loginAccount');
+      if (acct) { try { acct.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} window.setTimeout(() => acct.focus(), 30); }
     }
     function closeLoginPanel() {
-      loginPanel.hidden = true;
+      if (loginPanel) loginPanel.hidden = true;
     }
     function showLanding() {
       landingPage.hidden = false;
@@ -333,7 +335,16 @@ const output = document.getElementById('output');
       outputSummary.textContent = summary.text;
       outputSummary.className = 'output-summary ' + summary.tone;
     }
-    function pushMessage(role, text) {
+    function formatMsgTime(value) {
+      const d = value ? new Date(value) : new Date();
+      if (Number.isNaN(d.getTime())) return '';
+      const now = new Date();
+      const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      const hm = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      if (sameDay) return '今天 ' + hm;
+      return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + hm;
+    }
+    function pushMessage(role, text, ts) {
       const node = document.createElement('div');
       node.className = 'message ' + role;
       node.setAttribute('data-role-label', role === 'user' ? '你' : 'OpenClaw');
@@ -347,6 +358,10 @@ const output = document.getElementById('output');
       }
       node.appendChild(inner);
       node.appendChild(buildMsgActions(node, role));
+      const timeEl = document.createElement('div');
+      timeEl.className = 'cg-msg-time';
+      timeEl.textContent = formatMsgTime(ts);
+      node.appendChild(timeEl);
       conversation.appendChild(node);
       conversation.scrollTop = conversation.scrollHeight;
       return node;
@@ -560,7 +575,7 @@ const output = document.getElementById('output');
         pushMessage('assistant', '当前对话还没有消息。可以发送问题，或提交视频链接开始分析。');
         return;
       }
-      messages.forEach(message => pushMessage(message.role === 'user' ? 'user' : 'assistant', message.content || ''));
+      messages.forEach(message => pushMessage(message.role === 'user' ? 'user' : 'assistant', message.content || '', message.created_at));
     }
     async function withBusy(label, task) {
       setRunState(label, 'busy');

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OpenClaw 短视频智能分析</title>
   
-  <script type="module" crossorigin src="./assets/index-DiavOqxy.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DoUJrEKK.css">
+  <script type="module" crossorigin src="./assets/index-Dyuvp47f.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DFecwLpL.css">
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
@@ -43,15 +43,17 @@
             </div>
           </div>
         </div>
-        <div class="hero-preview" aria-hidden="true">
-          <div class="preview-topline"></div>
-          <div class="preview-message user">这个视频的核心卖点是什么？</div>
-          <div class="preview-message assistant">已识别视频来源，正在提取画面、动作与话术线索。</div>
-          <div class="preview-metrics">
-            <span>链接读取</span>
-            <strong>PASS</strong>
-            <span>会话历史</span>
-            <strong>已同步</strong>
+        <div class="hero-login">
+          <div class="login-card-inline">
+            <p class="eyebrow">OpenClaw 账号</p>
+            <h2 id="loginHeading">登录后进入分析对话</h2>
+            <p class="section-note">直接在此填写 OpenClaw 账号登录；无需再登录 Dify 网页。</p>
+            <label for="loginAccount">账号</label>
+            <input id="loginAccount" autocomplete="username" inputmode="text" placeholder="请输入账号">
+            <label for="loginPassword">密码</label>
+            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码">
+            <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
+            <button id="loginButton" class="primary-flow" type="button">登录</button>
           </div>
         </div>
       </section>
@@ -75,30 +77,9 @@
     </main>
   </section>
 
-  <section id="loginPanel" class="login-modal" aria-labelledby="loginHeading" hidden>
+  <section id="loginPanel" class="login-modal" aria-hidden="true" hidden>
     <div class="login-card" role="dialog" aria-modal="true">
       <button id="closeLogin" class="icon-button" type="button" aria-label="关闭登录">×</button>
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">OpenClaw 账号</p>
-          <h2 id="loginHeading">登录后进入分析对话</h2>
-          <p class="section-note">这里使用 OpenClaw 自己的登录界面；无需再登录 Dify 网页。</p>
-        </div>
-      </div>
-      <div class="grid">
-        <div>
-          <label for="loginAccount">账号</label>
-          <input id="loginAccount" autocomplete="username" inputmode="text" placeholder="请输入账号">
-        </div>
-        <div>
-          <label for="loginPassword">密码</label>
-          <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码">
-        </div>
-      </div>
-      <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
-      <div class="actions login-actions">
-        <button id="loginButton" class="primary-flow">登录</button>
-      </div>
     </div>
   </section>
 

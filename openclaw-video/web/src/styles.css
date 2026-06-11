@@ -1646,3 +1646,18 @@
 .cg-msg-actions button:focus-visible,
 .row-menu-btn:focus-visible,
 .cg-user-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* ===== inline login card on the landing hero + message timestamps ===== */
+.hero-login { display: flex; align-items: flex-start; justify-content: center; }
+.login-card-inline { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-md); padding: 24px; }
+.login-card-inline .eyebrow { margin: 0; color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+.login-card-inline h2 { margin: 4px 0; font-size: 19px; }
+.login-card-inline .section-note { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.login-card-inline label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
+.login-card-inline input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-soft); color: var(--text); font-size: 14px; outline: none; transition: border-color .18s var(--ease), box-shadow .18s var(--ease); }
+.login-card-inline input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-ring); }
+.login-card-inline .login-feedback { min-height: 18px; margin: 10px 0 0; font-size: 12.5px; color: var(--danger); }
+.login-card-inline #loginButton { width: 100%; height: 44px; margin-top: 16px; border: none; border-radius: var(--r-sm); background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+.login-card-inline #loginButton:hover { background: var(--primary-strong); }
+@media (max-width: 860px) { .login-card-inline { max-width: none; } }
+.cg-msg-time { max-width: 768px; margin: 4px auto 0; padding: 0 20px; font-size: 11px; color: var(--muted); }
