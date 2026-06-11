@@ -87,6 +87,9 @@ const output = document.getElementById('output');
     const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
     let linkReadable = false;
     let knownSessions = [];
+    const sessionPreviewCache = new Map();
+    const sessionPreviewLoading = new Set();
+    const SESSION_PREVIEW_LIMIT = 28;
 
     function openLoginPanel() {
       // login fields are now inline on the landing hero; just focus the account input
@@ -495,11 +498,59 @@ function addAttachmentChip(node, name) {
         || /^post[-_\s]?login/i.test(value)
         || /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
     }
+    function compactSessionPreview(text) {
+      const value = String(text || '')
+        .replace(/https?:\/\/\S+/gi, '视频链接')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!value) return '';
+      return value.length > 20 ? value.slice(0, 20) + '...' : value;
+    }
+    function firstUserPreviewFromMessages(messages) {
+      const first = (Array.isArray(messages) ? messages : [])
+        .find(message => message && message.role === 'user' && String(message.content || '').trim());
+      if (!first) return '';
+      return compactSessionPreview(messageTextWithVideoUrl(first.content || '', first.video_url || ''));
+    }
+    function cacheSessionPreview(sessionId, preview) {
+      const value = compactSessionPreview(preview);
+      if (!sessionId || !value) return false;
+      if (sessionPreviewCache.get(sessionId) === value) return false;
+      sessionPreviewCache.set(sessionId, value);
+      return true;
+    }
+    function sessionCachedPreview(session) {
+      return session && session.id ? (sessionPreviewCache.get(session.id) || '') : '';
+    }
+    async function hydrateSessionPreviews(sessions) {
+      if (!isAuthenticated()) return;
+      const targets = (Array.isArray(sessions) ? sessions : [])
+        .filter(session => session && session.id && isTechnicalSessionTitle(session.title))
+        .filter(session => !sessionPreviewCache.has(session.id) && !sessionPreviewLoading.has(session.id))
+        .slice(0, SESSION_PREVIEW_LIMIT);
+      if (!targets.length) return;
+      let changed = false;
+      await Promise.all(targets.map(async session => {
+        sessionPreviewLoading.add(session.id);
+        try {
+          const result = await api(apiPrefix + '/sessions/' + encodeURIComponent(session.id) + '/messages');
+          if (result.status === 200) {
+            const preview = firstUserPreviewFromMessages(result.body.messages || []) || '短视频分析对话';
+            changed = cacheSessionPreview(session.id, preview) || changed;
+          }
+        } catch (e) {
+          // The list can still render with its temporary title if a single preview fetch fails.
+        } finally {
+          sessionPreviewLoading.delete(session.id);
+        }
+      }));
+      if (changed) renderSessions(knownSessions);
+    }
     function sessionDisplayTitle(session) {
       const o = sessionOverrides[session.id];
       if (o && o.title) return o.title;
       const raw = String(session.title || '').trim();
-      return isTechnicalSessionTitle(raw) ? '本次对话简介' : raw;
+      return isTechnicalSessionTitle(raw) ? (sessionCachedPreview(session) || '短视频分析对话') : raw;
     }
     function sessionHeaderTitle(session) {
       const o = sessionOverrides[session.id];
@@ -533,7 +584,7 @@ function addAttachmentChip(node, name) {
         .filter(s => !(sessionOverrides[s.id] && sessionOverrides[s.id].deleted))
         .filter(s => {
           if (!q) return true;
-          const haystack = [sessionDisplayTitle(s), s.title || '', sessionDisplaySubtitle(s)].join(' ').toLowerCase();
+          const haystack = [sessionDisplayTitle(s), sessionCachedPreview(s), s.title || '', sessionDisplaySubtitle(s)].join(' ').toLowerCase();
           return haystack.includes(q);
         });
     }
@@ -636,6 +687,7 @@ function addAttachmentChip(node, name) {
         if (showArchived) renderGroup('已归档', archived);
       }
       updateBatchUi();
+      hydrateSessionPreviews(visible);
     }
     function updateBatchUi() {
       const bar = document.getElementById('batchBar');
@@ -738,7 +790,13 @@ function addAttachmentChip(node, name) {
       const result = await api(apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages');
       if (!isActiveSession(sessionId)) return result;
       if (result.status === 200) {
-        renderMessages(result.body.messages || []);
+        const messages = result.body.messages || [];
+        if (cacheSessionPreview(sessionId, firstUserPreviewFromMessages(messages))) {
+          renderSessions(knownSessions);
+          const active = knownSessions.find(session => session.id === sessionId);
+          if (active) setConversationTitle(sessionHeaderTitle(active));
+        }
+        renderMessages(messages);
         setRunState('历史已刷新', 'ok');
       } else {
         setRunState('需要处理', 'fail');
@@ -1158,6 +1216,8 @@ function addAttachmentChip(node, name) {
         return;
       }
       pushMessage('user', promptText);
+      cacheSessionPreview(sessionId, promptText);
+      renderSessions(knownSessions);
       const promptEl = document.getElementById('prompt');
       promptEl.value = '';
       updateComposerMode();
@@ -1199,6 +1259,8 @@ function addAttachmentChip(node, name) {
         resultMetric.textContent = '等待中';
         activateFlow(3);
         pushMessage('user', '已提交视频链接进行分析。');
+        cacheSessionPreview(document.getElementById('sessionId').value, promptText + '\n' + videoUrl);
+        renderSessions(knownSessions);
         pushMessage('assistant', '任务已提交。稍后刷新状态查看分析进度。');
       } else {
         setRunState('需要处理', 'fail');
@@ -1484,6 +1546,8 @@ function addAttachmentChip(node, name) {
         const fileName = attachedFile.name;
         const userNode = pushMessage('user', promptText || '请分析我上传的视频。');
         addAttachmentChip(userNode, fileName);
+        cacheSessionPreview(sessionId, promptText || '请分析我上传的视频。');
+        renderSessions(knownSessions);
         const assistantNode = pushMessage('assistant', '已收到视频文件，正在上传…');
         const progress = attachProgress(assistantNode, '准备上传…');
         document.getElementById('prompt').value = '';
@@ -1509,6 +1573,8 @@ function addAttachmentChip(node, name) {
         const userContent = (promptText || '请分析这个视频。') + '\n' + link;
         const userNode = pushMessage('user', userContent);
         addAttachmentChip(userNode, link);
+        cacheSessionPreview(sessionId, userContent);
+        renderSessions(knownSessions);
         const assistantNode = pushMessage('assistant', '正在读取视频链接…');
         const progress = attachProgress(assistantNode, '读取链接中…');
         document.getElementById('prompt').value = '';

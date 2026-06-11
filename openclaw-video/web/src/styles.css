@@ -1631,19 +1631,19 @@
     :root[data-theme="dark"] #output { background: var(--faint); color: var(--text); }
 
 /* ===== Markdown rendering inside assistant messages ===== */
-.cg-msg-inner h1, .cg-msg-inner h2, .cg-msg-inner h3, .cg-msg-inner h4 { margin: 0px 0.3px; line-height: 1.18; font-weight: 700; }
+.cg-msg-inner h1, .cg-msg-inner h2, .cg-msg-inner h3, .cg-msg-inner h4 { margin: 0px 0px 0px 0px; line-height: 1.18; font-weight: 700; }
 .cg-msg-inner h1 { font-size: 18px; }
 .cg-msg-inner h2 { font-size: 16px; }
 .cg-msg-inner h3 { font-size: 15px; }
 .cg-msg-inner h4 { font-size: 14px; }
-.cg-msg-inner p { margin: 0.3px 0.5px; }
+.cg-msg-inner p { margin: 0px 0.2px 0.2px 0.2px; }
 .cg-msg-inner ul, .cg-msg-inner ol { margin: 1px 0; padding-left: 18px; }
 .cg-msg-inner li { margin: 0; }
 .cg-msg-inner li > p { margin: 0; }
 .cg-msg-inner strong { font-weight: 700; }
 .cg-msg-inner em { font-style: italic; }
 .cg-msg-inner a { color: var(--primary); text-decoration: underline; }
-.cg-msg-inner blockquote { margin: 0.5px 0.5px; padding: 1px 8px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+.cg-msg-inner blockquote { margin: 0px 0px 0px 0px; padding: 1px 8px; border-left: 3px solid var(--border-strong); color: var(--muted); }
 .cg-msg-inner code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: var(--faint); padding: 1px 5px; border-radius: 6px; }
 .cg-msg-inner pre { position: relative; background: #0d1117; color: #e6edf6; border-radius: var(--r-sm); padding: 9px; overflow-x: auto; margin: 3px 0; }
 .cg-msg-inner pre code { background: transparent; padding: 0; color: inherit; font-size: 12.5px; line-height: 1.45; }
