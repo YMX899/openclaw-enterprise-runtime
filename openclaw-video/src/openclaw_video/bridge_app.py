@@ -641,7 +641,10 @@ def create_app(
                 profile = {"id": request.headers["x-test-account"]}
                 result["profile_ok"] = True
                 tenant_id = request.headers.get("x-test-tenant", "test-tenant")
-                workspaces = {"data": [{"id": tenant_id, "current": True}]}
+                if request.headers.get("x-test-multiple-current") == "1":
+                    workspaces = {"data": [{"id": tenant_id, "current": True}, {"id": "test-tenant-b", "current": True}]}
+                else:
+                    workspaces = {"data": [{"id": tenant_id, "current": True}]}
                 result["current_workspace_count"] = current_workspace_count(workspaces)
                 principal = derive_principal(identity_secret, profile, workspaces)
                 result["workspace_ok"] = True
