@@ -1377,6 +1377,45 @@ function addAttachmentChip(node, name) {
       };
       return map[errorCode] || '分析任务未能完成。可以稍后重试，或换一条视频链接。';
     }
+    function secondsLabel(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return null;
+      return (Math.round(number * 10) / 10) + ' 秒';
+    }
+    function bytesLabel(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return null;
+      if (number >= 1024 * 1024) return (Math.round(number / 1024 / 102.4) / 10) + ' MB';
+      if (number >= 1024) return (Math.round(number / 102.4) / 10) + ' KB';
+      return Math.round(number) + ' B';
+    }
+    function buildReadCheckFailureReply(body) {
+      const payload = body && typeof body === 'object' ? body : {};
+      const limits = payload.limits && typeof payload.limits === 'object' ? payload.limits : {};
+      if (payload.status === 'WARN' && limits.eligible_for_model_analysis === false) {
+        const reasons = [];
+        const duration = secondsLabel(payload.duration_seconds);
+        const maxDuration = secondsLabel(limits.max_duration_seconds);
+        const size = bytesLabel(payload.size_bytes);
+        const maxSize = bytesLabel(limits.max_download_bytes);
+        if (limits.duration_known && limits.duration_ok === false) {
+          reasons.push(`视频时长 ${duration || '已识别'}，超过当前 ${maxDuration || '配置'} 上限。`);
+        }
+        if (limits.size_known && limits.size_ok === false) {
+          reasons.push(`视频大小 ${size || '已识别'}，超过当前 ${maxSize || '配置'} 上限。`);
+        }
+        if (limits.duration_known === false) reasons.push('暂时无法确认视频时长。');
+        if (limits.size_known === false) reasons.push('暂时无法确认视频大小。');
+        if (!reasons.length) reasons.push('链接已解析出媒体候选，但没有通过当前模型分析限制。');
+        return [
+          '链接可以读取，但暂时不能进入模型分析。',
+          '',
+          ...reasons.map(reason => '- ' + reason),
+          '- 可以换一条 60 秒以内的单条视频，或先裁剪后上传文件。'
+        ].join('\n');
+      }
+      return buildJobErrorReply('url_rejected');
+    }
     async function handleComposerSend() {
       const promptText = document.getElementById('prompt').value.trim();
       // Upload path
@@ -1428,10 +1467,11 @@ function addAttachmentChip(node, name) {
           } else {
             progress.fail('提交分析失败，请重试');
           }
-      } else {
-        progress.fail('链接无法读取');
-          updateAssistantMessage(assistantNode, buildJobErrorReply('url_rejected'));
-      }
+        } else {
+          const isWarn = read.status === 200 && read.body && read.body.status === 'WARN';
+          progress.fail(isWarn ? '超出分析限制' : '链接无法读取');
+          updateAssistantMessage(assistantNode, buildReadCheckFailureReply(read.body));
+        }
         updateComposerMode();
         return;
       }
