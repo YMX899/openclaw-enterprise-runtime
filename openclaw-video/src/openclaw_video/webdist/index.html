@@ -5,29 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>花火AI视频分析</title>
   
-  <script type="module" crossorigin src="./assets/index-Oua6LKCH.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BoGfMG3Q.css">
+  <script type="module" crossorigin src="./assets/index-D6gbTJPE.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bv6SDsf6.css">
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
   <section id="landingPage" class="landing-page" aria-label="登录">
     <main class="login-page-main">
-      <div class="login-brand">
-        <div class="brand-mark" aria-hidden="true">OC</div>
-        <div>
-          <p class="eyebrow">花火AI</p>
-          <h1>花火AI视频分析</h1>
+      <section class="login-intro" aria-labelledby="loginIntroTitle">
+        <div class="login-brand">
+          <div class="brand-mark" aria-hidden="true">AI</div>
+          <div>
+            <p class="eyebrow">花火AI</p>
+            <h1 id="loginIntroTitle">花火AI视频分析</h1>
+          </div>
         </div>
-      </div>
-      <div class="login-card-inline">
-        <h2 id="loginHeading">登录</h2>
+        <div class="login-copy">
+          <h2>把视频链接变成可执行的创作方案</h2>
+          <p>支持抖音、TikTok、B 站单条视频链接和本地视频上传，围绕选题、前 3 秒钩子、结构、画面和复拍方案输出分析。</p>
+        </div>
+        <div class="login-feature-grid" aria-label="产品能力">
+          <div><strong>链接解析</strong><span>读取视频时长、大小和平台信息</span></div>
+          <div><strong>多模态分析</strong><span>识别画面、字幕、节奏与动作设计</span></div>
+          <div><strong>创作改法</strong><span>给开头改写、脚本提纲和复拍分镜</span></div>
+          <div><strong>历史会话</strong><span>保存每次分析结果，方便回看追问</span></div>
+        </div>
+        <a class="friend-link" href="https://www.huahuoai.com/home/" target="_blank" rel="noopener noreferrer">访问花火AI首页</a>
+      </section>
+      <form id="loginForm" class="login-card-inline" autocomplete="on">
+        <h2 id="loginHeading">登录工作台</h2>
         <label for="loginAccount">账号</label>
-        <input id="loginAccount" autocomplete="username" inputmode="text" placeholder="请输入账号">
+        <input id="loginAccount" name="username" autocomplete="username" inputmode="text" placeholder="请输入账号" required>
         <label for="loginPassword">密码</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码">
+        <input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required>
         <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
-        <button id="loginButton" class="primary-flow" type="button">登录</button>
-      </div>
+        <button id="loginButton" class="primary-flow" type="submit">登录</button>
+      </form>
       <button id="openLogin" class="login-entry sr-only" type="button" aria-label="聚焦登录表单">登录</button>
     </main>
   </section>

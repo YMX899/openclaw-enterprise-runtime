@@ -874,6 +874,15 @@ function addAttachmentChip(node, name) {
         return { status: 0, body: { error: String(error && error.message || error) } };
       }
     }
+    async function offerCredentialSave() {
+      const form = document.getElementById('loginForm');
+      if (!form || !window.PasswordCredential || !navigator.credentials || !navigator.credentials.store) return;
+      try {
+        await navigator.credentials.store(new PasswordCredential(form));
+      } catch (error) {
+        // Browsers may reject silently when password saving is disabled or unsupported.
+      }
+    }
     async function login() {
       return withBusy('正在登录', async () => {
       document.getElementById('loginFeedback').textContent = '';
@@ -885,8 +894,7 @@ function addAttachmentChip(node, name) {
         })
       });
       if (result.status === 200) {
-        document.getElementById('loginPassword').value = '';
-        document.getElementById('loginAccount').value = '';
+        await offerCredentialSave();
         setAuthenticatedView();
         await loadSessions({ quiet: true });
       } else {
@@ -1709,12 +1717,10 @@ function addAttachmentChip(node, name) {
     loginPanel.addEventListener('click', event => {
       if (event.target === loginPanel) closeLoginPanel();
     });
-    ['loginAccount', 'loginPassword'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', event => {
-        if (event.key === 'Enter') login();
-      });
+    document.getElementById('loginForm').addEventListener('submit', event => {
+      event.preventDefault();
+      login();
     });
-    document.getElementById('loginButton').addEventListener('click', login);
     document.getElementById('logoutButton').addEventListener('click', logout);
     document.getElementById('refreshMe').addEventListener('click', refreshMe);
     document.getElementById('identityDiagnostics').addEventListener('click', identityDiagnostics);

@@ -313,9 +313,10 @@ class BridgeAppTests(unittest.TestCase):
         # productized shell markup + automation selectors (served HTML)
         for s in [
             "花火AI视频分析",
-            'id="openLogin"', 'id="landingPage"', 'id="chatApp"', 'id="sessionList"',
+            'id="openLogin"', 'id="landingPage"', 'id="chatApp"', 'id="loginForm"', 'id="sessionList"',
             'id="prompt"', 'id="output"', "登录",
-            "历史对话", "新建对话", "视频分析",
+            "历史对话", "新建对话", "视频分析", "访问花火AI首页",
+            'autocomplete="current-password"',
         ]:
             with self.subTest(shell=s):
                 self.assertIn(s, shell.text)

@@ -36,7 +36,7 @@ class OpenClawLabUiContractTests(unittest.TestCase):
 
     def test_productized_ui_preserves_required_automation_selectors(self):
         required_ids = [
-            "openLogin", "landingPage", "chatApp", "loginAccount", "loginPassword",
+            "openLogin", "landingPage", "chatApp", "loginForm", "loginAccount", "loginPassword",
             "loginButton", "authStatus", "identityDiagnostics", "runPostLoginAcceptance",
             "runSelfTest", "runSecurityTest", "createSession", "sessionList", "sessionId",
             "videoUrl", "prompt", "readVideoLink", "submitJob", "pollJob", "videoFile",
@@ -51,6 +51,8 @@ class OpenClawLabUiContractTests(unittest.TestCase):
         in_shell = [
             "花火AI视频分析", "登录",
             "历史对话", "新建对话", "视频分析", "发送消息或粘贴视频链接", "nextAction",
+            'name="username"', 'autocomplete="username"', 'name="password"',
+            'autocomplete="current-password"', "访问花火AI首页", "https://www.huahuoai.com/home/",
         ]
         for required in in_shell:
             with self.subTest(shell=required):
