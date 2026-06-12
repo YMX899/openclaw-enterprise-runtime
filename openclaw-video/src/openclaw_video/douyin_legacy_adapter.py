@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 from typing import Any, Callable
 from urllib.parse import urlparse
@@ -58,6 +60,14 @@ class LegacyVideoLimits:
             min_fps=self.min_fps,
             max_fps=self.max_fps,
         )
+
+
+@dataclass(frozen=True)
+class PreparedModelVideo:
+    path: Path
+    size_bytes: int
+    fps: float
+    compressed: bool
 
 
 def _positive_int(value: int, name: str) -> int:
@@ -139,6 +149,16 @@ def _referer_for_url(url: str) -> str:
     return "https://www.douyin.com/"
 
 
+def _request_headers(*, referer: str = "https://www.douyin.com/") -> dict[str, str]:
+    return {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+        ),
+        "Referer": referer,
+    }
+
+
 def _probe_stream_size_bytes(
     url: str,
     *,
@@ -150,13 +170,7 @@ def _probe_stream_size_bytes(
         raise LegacyAdapterError("video size is unavailable")
     request = Request(
         url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
-            ),
-            "Referer": referer,
-        },
+        headers=_request_headers(referer=referer),
     )
     total = 0
     try:
@@ -175,6 +189,142 @@ def _probe_stream_size_bytes(
     if total <= 0:
         raise LegacyAdapterError("video size is unavailable")
     return total
+
+
+def _download_video_to_file(
+    url: str,
+    *,
+    output_path: Path,
+    max_bytes: int,
+    referer: str,
+    timeout_seconds: float = 120.0,
+) -> int:
+    if not url:
+        raise LegacyAdapterError("video URL is unavailable")
+    request = Request(url, headers=_request_headers(referer=referer))
+    total = 0
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response, output_path.open("wb") as handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise LegacyAdapterError("video size exceeds download limit")
+                handle.write(chunk)
+    except LegacyAdapterError:
+        try:
+            output_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+    except Exception as exc:
+        try:
+            output_path.unlink()
+        except FileNotFoundError:
+            pass
+        raise LegacyAdapterError("video download failed") from exc
+    if total <= 0:
+        raise LegacyAdapterError("video download was empty")
+    return total
+
+
+def _probe_file_duration_seconds(path: Path) -> float | None:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return None
+    completed = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if completed.returncode != 0:
+        return None
+    try:
+        duration = float((completed.stdout or "").strip())
+    except ValueError:
+        return None
+    return duration if duration > 0 else None
+
+
+def _compress_video_for_model(
+    input_path: Path,
+    *,
+    output_path: Path,
+    limits: LegacyVideoLimits,
+    duration_seconds: float | None,
+    fps: float,
+) -> int:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise LegacyAdapterError("ffmpeg is required to compress oversized video")
+    duration = duration_seconds or _probe_file_duration_seconds(input_path)
+    if duration is None or duration <= 0:
+        raise LegacyAdapterError("video duration is unavailable")
+    target_bytes = int(limits.max_model_video_bytes * 0.90)
+    audio_bitrate = 64_000
+    total_bitrate = max(180_000, int((target_bytes * 8) / duration * 0.92))
+    video_bitrate = max(120_000, total_bitrate - audio_bitrate)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    filter_value = f"fps={fps}"
+    cmd = [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(input_path),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-vf",
+        filter_value,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-b:v",
+        str(video_bitrate),
+        "-maxrate",
+        str(video_bitrate),
+        "-bufsize",
+        str(video_bitrate * 2),
+        "-c:a",
+        "aac",
+        "-b:a",
+        str(audio_bitrate),
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
+    try:
+        completed = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=600)
+    except subprocess.TimeoutExpired as exc:
+        raise LegacyAdapterError("video compression timed out") from exc
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        raise LegacyAdapterError(f"video compression failed: {detail[:500]}")
+    size_bytes = output_path.stat().st_size if output_path.exists() else 0
+    if size_bytes <= 0:
+        raise LegacyAdapterError("compressed video is empty")
+    if size_bytes > limits.max_model_video_bytes:
+        raise LegacyAdapterError("compressed video still exceeds model size limit")
+    return size_bytes
 
 
 def _effective_fps_for_size(size_bytes: int, limits: LegacyVideoLimits) -> float:
@@ -213,6 +363,32 @@ def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> float:
     if estimated_frames > limits.max_frames:
         raise LegacyAdapterError("video frame budget exceeds limit")
     return round(effective_fps, 4)
+
+
+def _prepare_local_video_for_model(
+    input_path: Path,
+    *,
+    output_dir: Path,
+    limits: LegacyVideoLimits,
+    duration_seconds: float | None,
+) -> PreparedModelVideo:
+    size_bytes = input_path.stat().st_size
+    if size_bytes <= 0:
+        raise LegacyAdapterError("video is empty")
+    if size_bytes > limits.max_download_bytes:
+        raise LegacyAdapterError("video size exceeds download limit")
+    effective_fps = _effective_fps_for_size(size_bytes, limits)
+    if size_bytes <= limits.max_model_video_bytes:
+        return PreparedModelVideo(path=input_path, size_bytes=size_bytes, fps=round(effective_fps, 4), compressed=False)
+    compressed_path = output_dir / "model-input-compressed.mp4"
+    compressed_size = _compress_video_for_model(
+        input_path,
+        output_path=compressed_path,
+        limits=limits,
+        duration_seconds=duration_seconds,
+        fps=round(effective_fps, 4),
+    )
+    return PreparedModelVideo(path=compressed_path, size_bytes=compressed_size, fps=round(effective_fps, 4), compressed=True)
 
 
 def _default_prompt() -> str:
@@ -270,6 +446,7 @@ def _build_payload(
     video: Any,
     completion: Any,
     limits: LegacyVideoLimits,
+    model_input: PreparedModelVideo | None = None,
 ) -> dict[str, Any]:
     output_text = _safe_text(getattr(completion, "output_text", ""))
     if not output_text:
@@ -305,6 +482,12 @@ def _build_payload(
             "max_fps": limits.max_fps,
         },
     }
+    if model_input is not None:
+        raw_tool_result["model_input"] = {
+            "compressed": model_input.compressed,
+            "size_bytes": model_input.size_bytes,
+            "fps": model_input.fps,
+        }
     payload = {
         "schema_version": RESULT_SCHEMA_VERSION,
         "source": {
@@ -351,6 +534,7 @@ def _build_upload_payload(
     filename: str,
     size_bytes: int,
     completion: Any,
+    model_input: PreparedModelVideo | None = None,
 ) -> dict[str, Any]:
     output_text = _safe_text(getattr(completion, "output_text", ""))
     if not output_text:
@@ -369,6 +553,12 @@ def _build_upload_payload(
         "request_id": str(getattr(completion, "request_id", "") or ""),
         "usage": getattr(completion, "usage", None),
     }
+    if model_input is not None:
+        raw_tool_result["model_input"] = {
+            "compressed": model_input.compressed,
+            "size_bytes": model_input.size_bytes,
+            "fps": model_input.fps,
+        }
     payload = {
         "schema_version": RESULT_SCHEMA_VERSION,
         "source": {
@@ -398,6 +588,9 @@ def _analyze_uploaded_file(
     file_path: str,
     source_label: str | None,
     max_bytes: int,
+    limits: LegacyVideoLimits,
+    output_dir: Path,
+    prepared_model_input: PreparedModelVideo | None = None,
 ) -> dict[str, Any]:
     """Inline-base64 a local video file and analyze it directly with Doubao.
 
@@ -413,8 +606,14 @@ def _analyze_uploaded_file(
         raise LegacyAdapterError("inline video is empty")
     if size_bytes > _positive_int(max_bytes, "max_bytes"):
         raise LegacyAdapterError("inline video exceeds limit")
-    content_type = _UPLOAD_CONTENT_TYPES.get(path.suffix.lower(), "video/mp4")
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    model_input = prepared_model_input or _prepare_local_video_for_model(
+        path,
+        output_dir=output_dir,
+        limits=limits,
+        duration_seconds=None,
+    )
+    content_type = _UPLOAD_CONTENT_TYPES.get(model_input.path.suffix.lower(), "video/mp4")
+    encoded = base64.b64encode(model_input.path.read_bytes()).decode("ascii")
     data_url = f"data:{content_type};base64,{encoded}"
     completion = ark_video_client(config).analyze(video_urls=[data_url], prompt=_upload_prompt())
     return _build_upload_payload(
@@ -422,6 +621,7 @@ def _analyze_uploaded_file(
         filename=path.name,
         size_bytes=size_bytes,
         completion=completion,
+        model_input=model_input,
     )
 
 
@@ -473,11 +673,20 @@ def run_adapter(
     AppConfig, UniversalVideoResolver, ArkVideoClient = component_loader()
     if bool(args.input_file) == bool(args.input_url):
         raise LegacyAdapterError("exactly one of --input-url or --input-file is required")
+    output_json = Path(args.output_json)
+    output_json.parent.mkdir(parents=True, exist_ok=True)
     if args.input_file:
+        model_input = _prepare_local_video_for_model(
+            Path(args.input_file),
+            output_dir=output_json.parent,
+            limits=limits,
+            duration_seconds=None,
+        )
+        output_limits = limits.with_fps(model_input.fps)
         config = _load_config_from_explicit_env_file(
             AppConfig,
             env_file=env_file.resolve(),
-            limits=limits,
+            limits=output_limits,
             max_tokens=args.max_tokens,
             connect_timeout=args.connect_timeout,
             read_timeout=args.read_timeout,
@@ -489,6 +698,9 @@ def run_adapter(
             file_path=args.input_file,
             source_label=args.source_label,
             max_bytes=limits.max_download_bytes,
+            limits=limits,
+            output_dir=output_json.parent,
+            prepared_model_input=model_input,
         )
     else:
         resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
@@ -503,23 +715,36 @@ def run_adapter(
             read_timeout=args.read_timeout,
             retries=args.retries,
         )
-        video_urls = [
-            url
-            for url in (
-                getattr(video, "video_url", ""),
-                getattr(video, "playwm_url", ""),
+        model_input = None
+        video_urls = [url for url in (getattr(video, "video_url", ""), getattr(video, "playwm_url", "")) if url]
+        original_size = _size_bytes(video)
+        if original_size is not None and original_size > limits.max_model_video_bytes:
+            direct_url = str(getattr(video, "video_url", "") or "")
+            source_url = str(getattr(video, "source_url", "") or "")
+            share_url = str(getattr(video, "share_url", "") or "")
+            downloaded_path = output_json.parent / "model-input-original.mp4"
+            _download_video_to_file(
+                direct_url,
+                output_path=downloaded_path,
+                max_bytes=limits.max_download_bytes,
+                referer=share_url or _referer_for_url(source_url),
             )
-            if url
-        ]
+            model_input = _prepare_local_video_for_model(
+                downloaded_path,
+                output_dir=output_json.parent,
+                limits=limits,
+                duration_seconds=_duration_seconds(video),
+            )
+            encoded = base64.b64encode(model_input.path.read_bytes()).decode("ascii")
+            video_urls = [f"data:video/mp4;base64,{encoded}"]
         completion = ArkVideoClient(config).analyze(video_urls=video_urls, prompt=_default_prompt())
         payload = _build_payload(
             input_url=args.input_url,
             video=video,
             completion=completion,
             limits=effective_limits,
+            model_input=model_input,
         )
-    output_json = Path(args.output_json)
-    output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return payload
 

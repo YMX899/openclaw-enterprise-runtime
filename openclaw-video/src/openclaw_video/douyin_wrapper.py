@@ -52,6 +52,10 @@ def _raise_for_adapter_failure(prefix: str, completed: subprocess.CompletedProce
     lowered = detail.lower()
     if "input video" in lowered and "exceeds the limit" in lowered:
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because it exceeds the model input size limit")
+    if "compressed video still exceeds model size limit" in lowered:
+        raise VideoTooLargeForModelError(f"{prefix} rejected the video because compression did not fit the model limit")
+    if "video model size exceeds limit at minimum fps" in lowered:
+        raise VideoTooLargeForModelError(f"{prefix} rejected the video because minimum fps still exceeds the model limit")
     raise DouyinWrapperError(f"{prefix} failed with exit code {completed.returncode}")
 
 
@@ -144,7 +148,7 @@ def run_upload_video_analysis(
     binary: str | None = None,
     env_file: str | None = None,
     timeout_seconds: int = 900,
-    max_bytes: int = 60 * 1024 * 1024,
+    max_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
 ) -> DouyinAnalysisResult:
     """Analyze a locally-uploaded video via the adapter's inline-base64 mode.
 

@@ -36,7 +36,7 @@ def main() -> None:
     video_understanding_fps = float(os.environ.get("DOUYIN_CHONG_FPS", str(DEFAULT_VIDEO_UNDERSTANDING_FPS)))
     min_video_understanding_fps = float(os.environ.get("MIN_VIDEO_UNDERSTANDING_FPS", str(MIN_VIDEO_UNDERSTANDING_FPS)))
     max_video_understanding_fps = float(os.environ.get("MAX_VIDEO_UNDERSTANDING_FPS", str(MAX_VIDEO_UNDERSTANDING_FPS)))
-    max_inline_upload_bytes = int(os.environ.get("MAX_INLINE_UPLOAD_BYTES", str(60 * 1024 * 1024)))
+    max_inline_upload_bytes = int(os.environ.get("MAX_INLINE_UPLOAD_BYTES", str(max_download_bytes)))
     store = PostgresJobStore(database_url)
     worker = VideoAnalysisWorker(
         store,

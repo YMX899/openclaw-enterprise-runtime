@@ -37,7 +37,7 @@ from .video_limits import (
 
 
 class UploadTooLargeError(RuntimeError):
-    """Uploaded video is too large to inline-base64 for direct model analysis."""
+    """Uploaded video is too large for local preprocessing."""
 
 
 Analyzer = Callable[[str, Path], DouyinAnalysisResult]
@@ -55,7 +55,7 @@ class WorkerConfig:
     video_understanding_fps: float = DEFAULT_VIDEO_UNDERSTANDING_FPS
     min_video_understanding_fps: float = MIN_VIDEO_UNDERSTANDING_FPS
     max_video_understanding_fps: float = MAX_VIDEO_UNDERSTANDING_FPS
-    max_inline_upload_bytes: int = 60 * 1024 * 1024
+    max_inline_upload_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES
 
 
 class VideoAnalysisWorker:
@@ -96,10 +96,9 @@ class VideoAnalysisWorker:
         if size_bytes <= 0:
             raise DouyinWrapperError("uploaded video is empty")
         if size_bytes > self.config.max_inline_upload_bytes:
-            raise UploadTooLargeError("uploaded video exceeds inline analysis size limit")
-        # Inline-base64 the local bytes and let Doubao analyze the data: URL
-        # directly — no resolver, no public hosting. The result is a real model
-        # analysis, mirroring the link path.
+            raise UploadTooLargeError("uploaded video exceeds preprocessing size limit")
+        # Let the adapter compress oversized local videos before it inline-base64s
+        # the model input. This keeps uploads on the same path as large links.
         return run_upload_video_analysis(
             file_path=str(path),
             output_dir=output_dir,

@@ -229,30 +229,47 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(config_call["fps"], 4.0)
         self.assertIn("https://video.example/video.mp4", FakeArkClient.calls[0]["video_urls"])
 
-    def test_model_size_above_budget_reduces_fps_before_analysis(self):
+    def test_model_size_above_budget_compresses_before_analysis(self):
         with TemporaryDirectory() as tmp:
             env_file = Path(tmp) / "douyin.env"
             env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
             output_json = Path(tmp) / "result.json"
             FakeResolver.video = FakeVideo(duration_ms=45_000, size_mb=86)
 
-            payload = run_adapter(
-                [
-                    "--input-url", "https://www.douyin.com/video/1",
-                    "--output-json", str(output_json),
-                    "--max-bytes", str(512 * 1024 * 1024),
-                    "--max-model-bytes", str(50 * 1024 * 1024),
-                    "--max-duration-seconds", "60",
-                    "--max-frames", "1200",
-                    "--env-file", str(env_file),
-                    "--no-shell",
-                ],
-                component_loader=fake_components,
-            )
+            def fake_download(_url, *, output_path, **_kwargs):
+                output_path.write_bytes(b"x" * (86 * 1024 * 1024))
+                return output_path.stat().st_size
+
+            def fake_compress(_input_path, *, output_path, **_kwargs):
+                output_path.write_bytes(b"compressed-video")
+                return output_path.stat().st_size
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_to_file", side_effect=fake_download) as download,
+                patch("openclaw_video.douyin_legacy_adapter._compress_video_for_model", side_effect=fake_compress) as compress,
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(output_json),
+                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-model-bytes", str(50 * 1024 * 1024),
+                        "--max-duration-seconds", "60",
+                        "--max-frames", "1200",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
 
         self.assertAlmostEqual(FakeConfig.calls[0]["fps"], 2.3256, places=4)
         self.assertAlmostEqual(payload["raw_tool_result"]["limits"]["fps"], 2.3256, places=4)
         self.assertEqual(payload["raw_tool_result"]["limits"]["max_model_video_bytes"], 50 * 1024 * 1024)
+        self.assertTrue(payload["raw_tool_result"]["model_input"]["compressed"])
+        self.assertEqual(payload["raw_tool_result"]["model_input"]["size_bytes"], len(b"compressed-video"))
+        self.assertTrue(FakeArkClient.calls[0]["video_urls"][0].startswith("data:video/mp4;base64,"))
+        download.assert_called_once()
+        compress.assert_called_once()
 
     def test_model_size_beyond_minimum_fps_fails_before_analysis(self):
         with TemporaryDirectory() as tmp:
@@ -430,11 +447,44 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(payload["summary"], "分析结果")
         self.assertEqual(payload["raw_tool_result"]["mode"], "inline-base64")
         self.assertEqual(payload["raw_tool_result"]["filename"], "clip.mp4")
+        self.assertEqual(payload["raw_tool_result"]["model_input"]["compressed"], False)
+        self.assertEqual(payload["raw_tool_result"]["model_input"]["size_bytes"], len(b"fake-video-bytes"))
         self.assertIn("Markdown", FakeArkClient.calls[0]["prompt"])
         self.assertIn("##", FakeArkClient.calls[0]["prompt"])
         # the model received an inline base64 data: URL, not a resolved link
         sent_url = FakeArkClient.calls[0]["video_urls"][0]
         self.assertTrue(sent_url.startswith("data:video/mp4;base64,"))
+
+    def test_input_file_above_model_budget_is_compressed_before_inline_analysis(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            video_file = Path(tmp) / "large.mp4"
+            video_file.write_bytes(b"x" * 2000)
+            output_json = Path(tmp) / "result.json"
+
+            def fake_compress(_input_path, *, output_path, **_kwargs):
+                output_path.write_bytes(b"small")
+                return output_path.stat().st_size
+
+            with patch("openclaw_video.douyin_legacy_adapter._compress_video_for_model", side_effect=fake_compress) as compress:
+                payload = run_adapter(
+                    [
+                        "--input-file", str(video_file),
+                        "--source-label", "upload://abc/large.mp4",
+                        "--output-json", str(output_json),
+                        "--max-bytes", "3000",
+                        "--max-model-bytes", "1000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        self.assertTrue(payload["raw_tool_result"]["model_input"]["compressed"])
+        self.assertEqual(payload["raw_tool_result"]["model_input"]["size_bytes"], len(b"small"))
+        self.assertTrue(FakeArkClient.calls[0]["video_urls"][0].startswith("data:video/mp4;base64,"))
+        compress.assert_called_once()
 
     def test_input_file_too_large_fails_closed(self):
         with TemporaryDirectory() as tmp:
