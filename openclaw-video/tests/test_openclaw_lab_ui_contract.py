@@ -49,8 +49,8 @@ class OpenClawLabUiContractTests(unittest.TestCase):
     def test_ui_has_chinese_landing_chat_history_and_hidden_diagnostics(self):
         # markup-level strings live in the built shell; handler/API strings live in source.
         in_shell = [
-            "OpenClaw 短视频智能分析", "登录后进入分析对话", "无需再登录 Dify 网页",
-            "历史对话", "新建对话", "视频分析", "nextAction",
+            "花火AI视频分析", "登录",
+            "历史对话", "新建对话", "视频分析", "发送消息或粘贴视频链接", "nextAction",
         ]
         for required in in_shell:
             with self.subTest(shell=required):
@@ -63,10 +63,13 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             "loadSessions", "renderSessions", "selectSession", "sendChat", "refreshMessages",
             "apiPrefix + '/chat'", "apiPrefix + '/sessions'",
             "apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages'",
+            "JOB_AUTO_POLL_ATTEMPTS", "hydrateCompletedJobMessages", "仍在分析中，可稍后刷新查看结果。",
+            "video_too_large", "视频理解 fps",
         ]
         for required in in_source:
             with self.subTest(source=required):
                 self.assertIn(required, self.source)
+        self.assertNotIn("分析超时，请稍后重试", self.built_js)
 
     def test_ui_does_not_expose_gateway_or_browser_secret_surfaces(self):
         for forbidden in ["localStorage", "OPENCLAW_GATEWAY_TOKEN", "openclaw-gateway:18789", "Authorization", "Cookie", "HUAHUO-access"]:

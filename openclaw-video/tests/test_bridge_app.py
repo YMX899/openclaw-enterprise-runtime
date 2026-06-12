@@ -186,10 +186,18 @@ def video_link_read_check_fixture():
         "limits": {
             "max_duration_seconds": 300,
             "max_download_bytes": 512 * 1024 * 1024,
+            "max_model_video_bytes": 50 * 1024 * 1024,
+            "default_video_understanding_fps": 4.0,
+            "min_video_understanding_fps": 0.2,
+            "max_video_understanding_fps": 5.0,
             "duration_known": True,
             "size_known": True,
             "duration_ok": True,
+            "download_size_ok": True,
+            "model_size_ok": True,
             "size_ok": True,
+            "video_understanding_fps": 4.0,
+            "fps_adjusted": False,
             "eligible_for_model_analysis": True,
         },
         "elapsed_ms": 123,
@@ -304,9 +312,9 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("text/html", shell.headers["content-type"])
         # productized shell markup + automation selectors (served HTML)
         for s in [
-            "OpenClaw 短视频智能分析", "让短视频链接直接进入可追踪的分析对话",
+            "花火AI视频分析",
             'id="openLogin"', 'id="landingPage"', 'id="chatApp"', 'id="sessionList"',
-            'id="prompt"', 'id="output"', "登录后进入分析对话", "无需再登录 Dify 网页",
+            'id="prompt"', 'id="output"', "登录",
             "历史对话", "新建对话", "视频分析",
         ]:
             with self.subTest(shell=s):
@@ -331,12 +339,12 @@ class BridgeAppTests(unittest.TestCase):
     def test_openclaw_lab_without_trailing_slash_is_served(self):
         response = self.client.get("/openclaw-lab")
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertIn("OpenClaw 短视频智能分析", response.text)
+        self.assertIn("花火AI视频分析", response.text)
 
     def test_ai_scoped_openclaw_lab_uses_ai_api_prefix_without_secret_surface(self):
         shell, bundle = self._lab_shell_and_bundle("/ai")
-        self.assertIn("OpenClaw 短视频智能分析", shell.text)
-        self.assertIn("登录后进入分析对话", shell.text)
+        self.assertIn("花火AI视频分析", shell.text)
+        self.assertIn("登录", shell.text)
         # the api-prefix literals live in the bundle (ascii string literals survive minification)
         self.assertIn("/api/openclaw-api", bundle)
         self.assertIn("/console/api/openclaw-api", bundle)
@@ -1279,6 +1287,68 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(read.json()["result"]["result"]["summary"], "ok")
         other = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth("account-b"))
         self.assertEqual(other.status_code, 404)
+
+    def test_reading_job_result_persists_assistant_message_once(self):
+        session = self.create_session("account-a")
+        job_response = self.client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        )
+        job_id = job_response.json()["job"]["job_id"]
+        result = {
+            "schema_version": "openclaw-video-result.v1",
+            "source": {"video_url_canonical": "https://v.douyin.com/abc", "platform": "douyin"},
+            "summary": "这是一条会被写入历史的分析总结",
+            "signals": {"hook": "ok"},
+            "raw_tool_result": {"ok": True},
+            "created_at": "2026-06-06T00:00:00Z",
+        }
+        self.jobs.complete_job(job_id, result, "openclaw-video-result.v1")
+
+        first = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth("account-a"))
+        second = self.client.get(f"/openclaw-api/jobs/{job_id}/result", headers=self.auth("account-a"))
+
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        messages = self.client.get(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(messages.status_code, 200, messages.text)
+        assistant_messages = [
+            item for item in messages.json()["messages"]
+            if item["role"] == "assistant" and item["job_id"] == job_id
+        ]
+        self.assertEqual(len(assistant_messages), 1)
+        self.assertEqual(assistant_messages[0]["content"], "这是一条会被写入历史的分析总结")
+        self.assertEqual(assistant_messages[0]["video_url"], "https://v.douyin.com/abc")
+
+    def test_failed_job_poll_persists_assistant_error_message_once(self):
+        session = self.create_session("account-a")
+        job_response = self.client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        )
+        job_id = job_response.json()["job"]["job_id"]
+        self.jobs.fail_job(job_id, "tool_timeout")
+
+        first = self.client.get(f"/openclaw-api/jobs/{job_id}", headers=self.auth("account-a"))
+        second = self.client.get(f"/openclaw-api/jobs/{job_id}", headers=self.auth("account-a"))
+
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        messages = self.client.get(
+            f"/openclaw-api/sessions/{session['id']}/messages",
+            headers=self.auth("account-a"),
+        )
+        assistant_messages = [
+            item for item in messages.json()["messages"]
+            if item["role"] == "assistant" and item["job_id"] == job_id
+        ]
+        self.assertEqual(len(assistant_messages), 1)
+        self.assertIn("没有在限定时间内完成", assistant_messages[0]["content"])
 
     def test_job_events_stream_returns_current_job_snapshot(self):
         session = self.create_session("account-a")

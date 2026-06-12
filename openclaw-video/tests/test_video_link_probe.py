@@ -105,6 +105,63 @@ class VideoLinkProbeTests(unittest.TestCase):
         self.assertTrue(payload["limits"]["size_ok"])
         self.assertFalse(payload["model_invoked"])
 
+    def test_probe_reduces_fps_above_default_model_video_size_limit(self):
+        fake_video = SimpleNamespace(
+            video_url="https://cdn.douyin.com/video.mp4",
+            playwm_url="",
+            source_url="",
+            share_url="",
+            video_id="",
+            content_type="video/mp4",
+            duration_ms=45_000,
+            size_mb=86,
+            video_url_source="direct",
+        )
+
+        payload = probe_video_link(
+            "https://www.douyin.com/video/123",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+        )
+
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["limits"]["max_download_bytes"], 512 * 1024 * 1024)
+        self.assertEqual(payload["limits"]["max_model_video_bytes"], 50 * 1024 * 1024)
+        self.assertTrue(payload["limits"]["eligible_for_model_analysis"])
+        self.assertTrue(payload["limits"]["download_size_ok"])
+        self.assertTrue(payload["limits"]["model_size_ok"])
+        self.assertTrue(payload["limits"]["fps_adjusted"])
+        self.assertAlmostEqual(payload["limits"]["video_understanding_fps"], 2.3256, places=4)
+
+    def test_probe_warns_only_after_minimum_fps_is_still_too_large(self):
+        fake_video = SimpleNamespace(
+            video_url="https://cdn.douyin.com/video.mp4",
+            playwm_url="",
+            source_url="",
+            share_url="",
+            video_id="",
+            content_type="video/mp4",
+            duration_ms=45_000,
+            size_mb=1200,
+            video_url_source="direct",
+        )
+
+        payload = probe_video_link(
+            "https://www.douyin.com/video/123",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+            config=VideoLinkProbeConfig(max_download_bytes=2 * 1024 * 1024 * 1024),
+        )
+
+        self.assertEqual(payload["status"], "WARN")
+        self.assertFalse(payload["limits"]["eligible_for_model_analysis"])
+        self.assertTrue(payload["limits"]["download_size_ok"])
+        self.assertFalse(payload["limits"]["model_size_ok"])
+        self.assertFalse(payload["limits"]["size_ok"])
+        self.assertEqual(payload["limits"]["video_understanding_fps"], 0.2)
+
     def test_probe_accepts_videos_up_to_five_minutes_by_default(self):
         fake_video = SimpleNamespace(
             video_url="https://cdn.douyin.com/video.mp4",

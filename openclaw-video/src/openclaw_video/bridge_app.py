@@ -26,7 +26,7 @@ from .identity import (
     derive_principal,
     hmac_sha256_hex,
 )
-from .job_state import TERMINAL_STATUSES
+from .job_state import TERMINAL_STATUSES, JobStatus
 from .job_store import InMemoryJobStore, JobNotFound, JobOwnershipError, VideoJob
 from .openclaw_gateway import (
     DisabledGatewayClient,
@@ -58,7 +58,14 @@ from .session_store import (
 from .upload_store import UploadStoreError, delete_upload_uri, store_upload_fileobj
 from .url_guard import UrlRejected
 from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_video_link
-from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS
+from .video_limits import (
+    DEFAULT_MAX_DOWNLOAD_BYTES,
+    DEFAULT_MAX_MODEL_VIDEO_BYTES,
+    DEFAULT_MAX_VIDEO_DURATION_SECONDS,
+    DEFAULT_VIDEO_UNDERSTANDING_FPS,
+    MAX_VIDEO_UNDERSTANDING_FPS,
+    MIN_VIDEO_UNDERSTANDING_FPS,
+)
 from .agent_persona import (
     NEW_SESSION_GREETING,
     build_agent_message,
@@ -122,6 +129,15 @@ def _serialize_result(result: Any) -> dict[str, Any]:
     }
 
 
+def _analysis_result_message(result: Any) -> str:
+    payload = getattr(result, "result", None)
+    if isinstance(payload, dict):
+        summary = str(payload.get("summary") or "").strip()
+        if summary:
+            return summary
+    return "分析完成，结果已就绪。"
+
+
 def _is_form_upload(value: Any) -> bool:
     return bool(
         value is not None
@@ -145,6 +161,19 @@ def _has_dify_login_material(headers: Any) -> bool:
 def _has_header(headers: Any, name: str) -> bool:
     lowered = name.lower()
     return any(key.lower() == lowered and bool(value) for key, value in headers.items())
+
+
+def positive_float_from_env(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a positive float") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be a positive float")
+    return value
 
 
 def _test_identity_headers_allowed(request: Request, enabled: bool, secret: str) -> bool:
@@ -378,6 +407,25 @@ def create_app(
         if phase4_config.account_allowlist_hashes and account_hash not in phase4_config.account_allowlist_hashes:
             return False
         return True
+
+    def ensure_job_assistant_message(principal: DifyPrincipal, job: VideoJob, content: str) -> None:
+        normalized = str(content or "").strip()
+        if not normalized:
+            return
+        try:
+            messages = session_store.list_messages(job.bridge_session_id, principal.principal_id)
+            if any(item.role == "assistant" and item.job_id == job.job_id for item in messages):
+                return
+            session_store.add_message(
+                job.bridge_session_id,
+                principal.principal_id,
+                "assistant",
+                normalized,
+                video_url=job.video_url_canonical,
+                job_id=job.job_id,
+            )
+        except (SessionNotFound, SessionOwnershipError, MessageValidationError):
+            return
 
     def enforce_principal_allowed(tenant_hash: str, account_hash: str) -> None:
         if not principal_allowed(tenant_hash, account_hash):
@@ -846,6 +894,10 @@ def create_app(
                 config=VideoLinkProbeConfig(
                     max_duration_seconds=positive_int_from_env("MAX_VIDEO_DURATION_SECONDS", DEFAULT_MAX_VIDEO_DURATION_SECONDS),
                     max_download_bytes=positive_int_from_env("MAX_DOWNLOAD_BYTES", DEFAULT_MAX_DOWNLOAD_BYTES),
+                    max_model_video_bytes=positive_int_from_env("MAX_MODEL_VIDEO_BYTES", DEFAULT_MAX_MODEL_VIDEO_BYTES),
+                    video_understanding_fps=positive_float_from_env("DOUYIN_CHONG_FPS", DEFAULT_VIDEO_UNDERSTANDING_FPS),
+                    min_video_understanding_fps=positive_float_from_env("MIN_VIDEO_UNDERSTANDING_FPS", MIN_VIDEO_UNDERSTANDING_FPS),
+                    max_video_understanding_fps=positive_float_from_env("MAX_VIDEO_UNDERSTANDING_FPS", MAX_VIDEO_UNDERSTANDING_FPS),
                 ),
             )
         except UrlRejected as exc:
@@ -912,6 +964,8 @@ def create_app(
             job = job_store.get_job(job_id, principal.principal_id)
         except (JobNotFound, JobOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="job not found") from exc
+        if job.status in {JobStatus.FAILED, JobStatus.TIMED_OUT, JobStatus.CANCELLED}:
+            ensure_job_assistant_message(principal, job, error_reply_for(job.error_code))
         return {"job": _serialize_job(job)}
 
     @app.get("/openclaw-api/jobs/{job_id}/result")
@@ -921,9 +975,11 @@ def create_app(
     async def get_job_result(job_id: str, request: Request) -> dict[str, Any]:
         principal = await current_principal(request)
         try:
+            job = job_store.get_job(job_id, principal.principal_id)
             result = job_store.get_result(job_id, principal.principal_id)
         except (JobNotFound, JobOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="job result not found") from exc
+        ensure_job_assistant_message(principal, job, _analysis_result_message(result))
         return {"result": _serialize_result(result)}
 
     @app.get("/openclaw-api/jobs/{job_id}/events")

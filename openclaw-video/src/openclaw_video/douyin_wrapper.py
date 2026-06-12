@@ -7,10 +7,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .result_schema import validate_result_payload
-from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
+from .video_limits import (
+    DEFAULT_MAX_DOWNLOAD_BYTES,
+    DEFAULT_MAX_MODEL_VIDEO_BYTES,
+    DEFAULT_MAX_VIDEO_DURATION_SECONDS,
+    DEFAULT_MAX_VIDEO_FRAMES,
+    DEFAULT_VIDEO_UNDERSTANDING_FPS,
+    MAX_VIDEO_UNDERSTANDING_FPS,
+    MIN_VIDEO_UNDERSTANDING_FPS,
+)
 
 
 class DouyinWrapperError(RuntimeError):
+    pass
+
+
+class VideoTooLargeForModelError(DouyinWrapperError):
     pass
 
 
@@ -27,6 +39,22 @@ def _positive_int(value: int, name: str) -> int:
     return value
 
 
+def _positive_float(value: float, name: str) -> float:
+    if value <= 0:
+        raise DouyinWrapperError(f"{name} must be positive")
+    return value
+
+
+def _raise_for_adapter_failure(prefix: str, completed: subprocess.CompletedProcess) -> None:
+    detail = "\n".join(
+        part for part in (str(getattr(completed, "stderr", "") or ""), str(getattr(completed, "stdout", "") or "")) if part
+    )
+    lowered = detail.lower()
+    if "input video" in lowered and "exceeds the limit" in lowered:
+        raise VideoTooLargeForModelError(f"{prefix} rejected the video because it exceeds the model input size limit")
+    raise DouyinWrapperError(f"{prefix} failed with exit code {completed.returncode}")
+
+
 def run_douyin_chong(
     *,
     video_url: str,
@@ -34,8 +62,12 @@ def run_douyin_chong(
     binary: str | None = None,
     timeout_seconds: int = 900,
     max_download_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
+    max_model_video_bytes: int = DEFAULT_MAX_MODEL_VIDEO_BYTES,
     max_duration_seconds: int = DEFAULT_MAX_VIDEO_DURATION_SECONDS,
     max_frames: int = DEFAULT_MAX_VIDEO_FRAMES,
+    video_understanding_fps: float = DEFAULT_VIDEO_UNDERSTANDING_FPS,
+    min_video_understanding_fps: float = MIN_VIDEO_UNDERSTANDING_FPS,
+    max_video_understanding_fps: float = MAX_VIDEO_UNDERSTANDING_FPS,
 ) -> DouyinAnalysisResult:
     """Run douyin_chong through a fixed-argument, no-shell wrapper.
 
@@ -47,8 +79,12 @@ def run_douyin_chong(
     if not executable:
         raise DouyinWrapperError("DOUYIN_CHONG_BIN is not configured")
     max_download_bytes = _positive_int(max_download_bytes, "max_download_bytes")
+    max_model_video_bytes = _positive_int(max_model_video_bytes, "max_model_video_bytes")
     max_duration_seconds = _positive_int(max_duration_seconds, "max_duration_seconds")
     max_frames = _positive_int(max_frames, "max_frames")
+    video_understanding_fps = _positive_float(video_understanding_fps, "video_understanding_fps")
+    min_video_understanding_fps = _positive_float(min_video_understanding_fps, "min_video_understanding_fps")
+    max_video_understanding_fps = _positive_float(max_video_understanding_fps, "max_video_understanding_fps")
     output_dir.mkdir(parents=True, exist_ok=True)
     output_json = output_dir / "result.json"
     cmd = [
@@ -59,10 +95,18 @@ def run_douyin_chong(
         str(output_json),
         "--max-bytes",
         str(max_download_bytes),
+        "--max-model-bytes",
+        str(max_model_video_bytes),
         "--max-duration-seconds",
         str(max_duration_seconds),
         "--max-frames",
         str(max_frames),
+        "--fps",
+        str(video_understanding_fps),
+        "--min-fps",
+        str(min_video_understanding_fps),
+        "--max-fps",
+        str(max_video_understanding_fps),
     ]
     env_file = os.environ.get("DOUYIN_CHONG_ENV_FILE")
     if env_file:
@@ -81,7 +125,7 @@ def run_douyin_chong(
     except FileNotFoundError as exc:
         raise DouyinWrapperError("douyin_chong binary was not found") from exc
     if completed.returncode != 0:
-        raise DouyinWrapperError(f"douyin_chong failed with exit code {completed.returncode}")
+        _raise_for_adapter_failure("douyin_chong", completed)
     if output_json.exists():
         payload = json.loads(output_json.read_text(encoding="utf-8"))
     else:
@@ -144,7 +188,7 @@ def run_upload_video_analysis(
     except FileNotFoundError as exc:
         raise DouyinWrapperError("upload analyzer binary was not found") from exc
     if completed.returncode != 0:
-        raise DouyinWrapperError(f"upload analyzer failed with exit code {completed.returncode}")
+        _raise_for_adapter_failure("upload analyzer", completed)
     if output_json.exists():
         payload = json.loads(output_json.read_text(encoding="utf-8"))
     else:

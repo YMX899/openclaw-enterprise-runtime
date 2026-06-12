@@ -48,7 +48,7 @@ MARKDOWN_OUTPUT_RULES = (
 # --- greetings -------------------------------------------------------------
 
 NEW_SESSION_GREETING = (
-    "你好，我是 OpenClaw 短视频分析助手，专门帮短视频创作者拆问题、给改法。\n\n"
+    "你好，我是花火AI视频分析，专门帮短视频创作者拆问题、给改法。\n\n"
     "你可以这样开始：\n"
     "1. 粘贴抖音视频链接，我会读取并完整分析；\n"
     "2. 点击输入框左侧 ＋ 上传视频文件；\n"
@@ -237,7 +237,7 @@ def guardrail_for_message(text: str) -> GuardrailReply | None:
     if intent == "change_topic_off":
         return GuardrailReply(
             content=(
-                "我是短视频分析助手，只能帮你拆抖音视频和给改法。"
+                "我是花火AI视频分析，只能帮你拆抖音视频和给改法。"
                 "你可以发抖音视频链接或上传视频，我们继续。"
             ),
             reason="off_topic",
@@ -356,6 +356,10 @@ _ERROR_REPLIES: dict[str, str] = {
     "upload_too_large": (
         "你上传的视频偏大，本次没法直接分析。\n"
         "可以把视频压到 60MB 以内再上传，或者直接发对应的抖音视频链接，我来读取分析。"
+    ),
+    "video_too_large": (
+        "这条视频链接可以识别，但即使把视频理解 fps 降到最低，仍超过当前模型可分析范围。\n"
+        "可以把视频压缩或裁剪后上传，或者换一条更短的视频链接再试。"
     ),
 }
 

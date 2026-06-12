@@ -4,7 +4,12 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from openclaw_video.douyin_wrapper import DouyinWrapperError, run_douyin_chong, run_upload_video_analysis
+from openclaw_video.douyin_wrapper import (
+    DouyinWrapperError,
+    VideoTooLargeForModelError,
+    run_douyin_chong,
+    run_upload_video_analysis,
+)
 
 
 class Completed:
@@ -17,6 +22,12 @@ class Completed:
     stderr = ""
 
 
+class VideoTooLargeCompleted:
+    returncode = 2
+    stdout = ""
+    stderr = "The request failed because the size of the input video (86 MiB) exceeds the limit (50 MiB)."
+
+
 class DouyinWrapperTests(unittest.TestCase):
     def test_runs_fixed_argument_command_with_resource_limits(self):
         with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
@@ -27,8 +38,12 @@ class DouyinWrapperTests(unittest.TestCase):
                 binary="/opt/douyin_chong/douyin_chong",
                 timeout_seconds=123,
                 max_download_bytes=1000,
+                max_model_video_bytes=200,
                 max_duration_seconds=300,
                 max_frames=6000,
+                video_understanding_fps=4.0,
+                min_video_understanding_fps=0.2,
+                max_video_understanding_fps=5.0,
             )
         command = run.call_args.args[0]
         kwargs = run.call_args.kwargs
@@ -37,10 +52,18 @@ class DouyinWrapperTests(unittest.TestCase):
         self.assertIn("--output-json", command)
         self.assertIn("--max-bytes", command)
         self.assertIn("1000", command)
+        self.assertIn("--max-model-bytes", command)
+        self.assertIn("200", command)
         self.assertIn("--max-duration-seconds", command)
         self.assertIn("300", command)
         self.assertIn("--max-frames", command)
         self.assertIn("6000", command)
+        self.assertIn("--fps", command)
+        self.assertIn("4.0", command)
+        self.assertIn("--min-fps", command)
+        self.assertIn("0.2", command)
+        self.assertIn("--max-fps", command)
+        self.assertIn("5.0", command)
         self.assertIn("--no-shell", command)
         self.assertNotIn("shell", kwargs)
         self.assertEqual(kwargs["timeout"], 123)
@@ -93,6 +116,16 @@ class DouyinWrapperTests(unittest.TestCase):
         with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
             run.return_value = InvalidCompleted()
             with self.assertRaises(ValueError):
+                run_douyin_chong(
+                    video_url="https://www.douyin.com/video/1",
+                    output_dir=Path(tmp),
+                    binary="/opt/douyin_chong/douyin_chong",
+                )
+
+    def test_model_video_size_limit_is_classified(self):
+        with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
+            run.return_value = VideoTooLargeCompleted()
+            with self.assertRaises(VideoTooLargeForModelError):
                 run_douyin_chong(
                     video_url="https://www.douyin.com/video/1",
                     output_dir=Path(tmp),

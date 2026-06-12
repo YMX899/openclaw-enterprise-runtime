@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from openclaw_video.douyin_wrapper import DouyinAnalysisResult
+from openclaw_video.douyin_wrapper import DouyinAnalysisResult, VideoTooLargeForModelError
 from openclaw_video.job_state import JobStatus
 from openclaw_video.job_store import InMemoryJobStore
 from openclaw_video.result_schema import RESULT_SCHEMA_VERSION
@@ -45,6 +45,10 @@ def invalid_analyzer(_video_url: str, _output_dir: Path) -> DouyinAnalysisResult
 
 def timeout_analyzer(_video_url: str, _output_dir: Path) -> DouyinAnalysisResult:
     raise TimeoutError("fixture timeout")
+
+
+def video_too_large_analyzer(_video_url: str, _output_dir: Path) -> DouyinAnalysisResult:
+    raise VideoTooLargeForModelError("fixture video too large")
 
 
 class WorkerServiceTests(unittest.TestCase):
@@ -98,6 +102,20 @@ class WorkerServiceTests(unittest.TestCase):
         self.assertEqual(failed.job_id, job.job_id)
         self.assertEqual(failed.status, JobStatus.TIMED_OUT)
         self.assertEqual(failed.error_code, "tool_timeout")
+
+    def test_run_once_marks_model_video_size_limit(self):
+        store = InMemoryJobStore()
+        job = store.create_job("owner", "session", "https://v.douyin.com/abc")
+        worker = VideoAnalysisWorker(
+            store,
+            analyzer=video_too_large_analyzer,
+            url_resolver=public_resolver,
+            redirect_fetcher=no_redirect,
+        )
+        failed = worker.run_once()
+        self.assertEqual(failed.job_id, job.job_id)
+        self.assertEqual(failed.status, JobStatus.FAILED)
+        self.assertEqual(failed.error_code, "video_too_large")
 
     def test_run_once_does_not_complete_after_lease_changes(self):
         store = InMemoryJobStore()

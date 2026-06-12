@@ -5,8 +5,10 @@ import DOMPurify from 'dompurify';
 
 marked.setOptions({ gfm: true, breaks: true });
 
-const DEFAULT_CONVERSATION_TITLE = '短视频分析助手';
+const DEFAULT_CONVERSATION_TITLE = '花火AI视频分析';
 const ASSISTANT_LABEL = '分析助手';
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_AUTO_POLL_ATTEMPTS = 480; // 16 minutes, matching the 15-minute worker window with a little slack.
 
 function renderMarkdownInto(inner, text) {
   // Render assistant text as sanitized Markdown; fall back to plain text on error.
@@ -92,7 +94,7 @@ const output = document.getElementById('output');
     const SESSION_PREVIEW_LIMIT = 28;
 
     function openLoginPanel() {
-      // login fields are now inline on the landing hero; just focus the account input
+      // Login fields are inline on the first screen; focus the account input.
       const acct = document.getElementById('loginAccount');
       if (acct) { try { acct.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {} window.setTimeout(() => acct.focus(), 30); }
     }
@@ -481,6 +483,19 @@ function addAttachmentChip(node, name) {
       inner.appendChild(grid);
       conversation.scrollTop = conversation.scrollHeight;
     }
+    function resultSummary(result) {
+      return result && result.body && result.body.result && result.body.result.result
+        ? result.body.result.result.summary
+        : '';
+    }
+    function renderJobResult(result, assistantNode) {
+      const summary = resultSummary(result) || '分析完成，结果已就绪。';
+      const shots = extractScreenshots(result);
+      const node = assistantNode || pushMessage('assistant', summary);
+      if (assistantNode) updateAssistantMessage(assistantNode, summary);
+      if (shots.length) addScreenshots(node, shots);
+      return node;
+    }
     function formatSessionTime(value) {
       if (!value) return '';
       const date = new Date(value);
@@ -491,6 +506,7 @@ function addAttachmentChip(node, name) {
       const value = String(title || '').trim();
       return !value
         || value === '短视频分析'
+        || value === '花火AI视频分析'
         || /^branch[-_]/i.test(value)
         || /^openclaw\s+(self test|security test|post-login acceptance|upload smoke)/i.test(value)
         || /^self[-_\s]?test/i.test(value)
@@ -535,7 +551,7 @@ function addAttachmentChip(node, name) {
         try {
           const result = await api(apiPrefix + '/sessions/' + encodeURIComponent(session.id) + '/messages');
           if (result.status === 200) {
-            const preview = firstUserPreviewFromMessages(result.body.messages || []) || '短视频分析对话';
+            const preview = firstUserPreviewFromMessages(result.body.messages || []) || '视频分析对话';
             changed = cacheSessionPreview(session.id, preview) || changed;
           }
         } catch (e) {
@@ -550,7 +566,7 @@ function addAttachmentChip(node, name) {
       const o = sessionOverrides[session.id];
       if (o && o.title) return o.title;
       const raw = String(session.title || '').trim();
-      return isTechnicalSessionTitle(raw) ? (sessionCachedPreview(session) || '短视频分析对话') : raw;
+      return isTechnicalSessionTitle(raw) ? (sessionCachedPreview(session) || '视频分析对话') : raw;
     }
     function sessionHeaderTitle(session) {
       const o = sessionOverrides[session.id];
@@ -560,7 +576,7 @@ function addAttachmentChip(node, name) {
     }
     function sessionDisplaySubtitle(session) {
       const time = formatSessionTime(session.updated_at || session.created_at);
-      return time ? '最近更新 ' + time : '短视频分析对话';
+      return time ? '最近更新 ' + time : '视频分析对话';
     }
     function setConversationTitle(value) {
       const title = document.getElementById('cgConvTitle');
@@ -711,6 +727,44 @@ function addAttachmentChip(node, name) {
         if (role === 'user' && looksLikeUrl(videoUrl)) addAttachmentChip(node, videoUrl);
       });
     }
+    async function hydrateCompletedJobMessages(messages, sessionId) {
+      let renderedResult = false;
+      const history = Array.isArray(messages) ? messages : [];
+      const persistedAssistantJobIds = new Set(history
+        .filter(message => message && message.role === 'assistant' && message.job_id)
+        .map(message => String(message.job_id)));
+      const jobIds = Array.from(new Set(history
+        .filter(message => message && message.role === 'user' && message.job_id)
+        .map(message => String(message.job_id))))
+        .filter(jobId => !persistedAssistantJobIds.has(jobId));
+      for (const jobId of jobIds) {
+        if (!isActiveSession(sessionId)) return renderedResult;
+        try {
+          const poll = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId));
+          if (!isActiveSession(sessionId)) return renderedResult;
+          const job = poll.body.job || null;
+          if (!job) continue;
+          if (job.status === 'succeeded') {
+            const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
+            if (!isActiveSession(sessionId)) return renderedResult;
+            renderJobResult(result);
+            renderedResult = true;
+            show({ job: poll, result });
+            setCurrentJob(jobId);
+            setRunState('结果已就绪', 'ok');
+            resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
+            activateFlow(4);
+          } else if (!terminalStatuses.has(job.status)) {
+            setCurrentJob(jobId);
+            setRunState('任务运行中', 'busy');
+            resultMetric.textContent = '等待中';
+          }
+        } catch (error) {
+          // History can still render if one job lookup fails.
+        }
+      }
+      return renderedResult;
+    }
     async function withBusy(label, task) {
       setRunState(label, 'busy');
       try {
@@ -726,7 +780,7 @@ function addAttachmentChip(node, name) {
       if (!session || !session.id) return;
       knownSessions = [session, ...knownSessions.filter(item => item.id !== session.id)];
       document.getElementById('sessionId').value = session.id;
-      document.getElementById('sessionTitle').value = session.title || '短视频分析';
+      document.getElementById('sessionTitle').value = session.title || '花火AI视频分析';
       setConversationTitle(sessionHeaderTitle(session));
       renderSessions(knownSessions);
     }
@@ -770,7 +824,7 @@ function addAttachmentChip(node, name) {
     async function selectSession(session, options = {}) {
       if (!session || !session.id) return;
       document.getElementById('sessionId').value = session.id;
-      document.getElementById('sessionTitle').value = session.title || '短视频分析';
+      document.getElementById('sessionTitle').value = session.title || '花火AI视频分析';
       setConversationTitle(sessionHeaderTitle(session));
       linkReadable = false;
       setCurrentJob('');
@@ -797,7 +851,8 @@ function addAttachmentChip(node, name) {
           if (active) setConversationTitle(sessionHeaderTitle(active));
         }
         renderMessages(messages);
-        setRunState('历史已刷新', 'ok');
+        const renderedResult = await hydrateCompletedJobMessages(messages, sessionId);
+        if (!renderedResult) setRunState('历史已刷新', 'ok');
       } else {
         setRunState('需要处理', 'fail');
       }
@@ -870,7 +925,7 @@ function addAttachmentChip(node, name) {
       return withBusy('创建对话', async () => {
       const result = await api(apiPrefix + '/sessions', {
         method: 'POST',
-        body: JSON.stringify({ title: document.getElementById('sessionTitle').value || '短视频分析' })
+        body: JSON.stringify({ title: document.getElementById('sessionTitle').value || '花火AI视频分析' })
       });
       if (result.body.session && result.body.session.id) {
         setSessionFromAcceptance(result.body.session);
@@ -1287,6 +1342,7 @@ function addAttachmentChip(node, name) {
         linkReadable = false;
         setRunState('链接检查结束', result.status >= 400 ? 'fail' : 'warn');
         resultMetric.textContent = '预检结束';
+        pushMessage('assistant', buildReadCheckFailureReply(result.body));
       }
       });
     }
@@ -1419,7 +1475,7 @@ function addAttachmentChip(node, name) {
       if (job && job.status === 'succeeded') {
         const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
         if (!isActiveSession(sessionId) || currentJobId !== jobId) return result;
-        pushMessage('assistant', '分析结果已就绪，请查看右侧结构化结果。');
+        renderJobResult(result);
         show({ job: jobResult, result });
         setRunState('结果已就绪', 'ok');
         resultMetric.textContent = result.body.result && result.body.result.schema_version || '已就绪';
@@ -1448,8 +1504,8 @@ function addAttachmentChip(node, name) {
       if (sessionId && !isActiveSession(sessionId)) return;
       const jobId = currentJobId;
       if (progress) progress.indeterminate('正在分析视频…');
-      for (let attempt = 0; attempt < 60; attempt += 1) {
-        await delay(2000);
+      for (let attempt = 0; attempt < JOB_AUTO_POLL_ATTEMPTS; attempt += 1) {
+        await delay(JOB_POLL_INTERVAL_MS);
         if (sessionId && !isActiveSession(sessionId)) return;
         if (currentJobId !== jobId) return;
         let poll;
@@ -1461,15 +1517,7 @@ function addAttachmentChip(node, name) {
           const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
           if (sessionId && !isActiveSession(sessionId)) return;
           if (progress) progress.done('分析完成');
-          const summary = result.body.result && result.body.result.result && result.body.result.result.summary;
-          const shots = extractScreenshots(result);
-          if (assistantNode) {
-            updateAssistantMessage(assistantNode, summary || '分析完成，结果已就绪。');
-            if (shots.length) addScreenshots(assistantNode, shots);
-          } else {
-            const node = pushMessage('assistant', summary || '分析完成，结果已就绪。');
-            if (shots.length) addScreenshots(node, shots);
-          }
+          renderJobResult(result, assistantNode);
           show({ job: poll, result });
           setRunState('结果已就绪', 'ok');
           resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
@@ -1488,12 +1536,18 @@ function addAttachmentChip(node, name) {
           return;
         }
       }
-      if (progress) progress.fail('分析超时，请稍后重试');
+      if (sessionId && !isActiveSession(sessionId)) return;
+      if (currentJobId !== jobId) return;
+      if (progress) progress.indeterminate('仍在分析中，可稍后刷新查看结果。');
+      setRunState('任务仍在分析', 'busy');
+      resultMetric.textContent = '等待中';
     }
     function buildJobErrorReply(errorCode) {
       const map = {
         url_rejected: '这个链接没有通过安全校验或无法解析。请发抖音/TikTok/B站单条视频页链接，不要发主页或其他暂未支持的平台链接。',
         tool_timeout: '这条视频解析超时了。可以稍后重试，或换一条更短的单条视频链接。',
+        upload_too_large: '这个视频文件超过当前上传分析上限。请压缩或裁剪后再上传。',
+        video_too_large: '这条视频链接可以识别，但即使把视频理解 fps 降到最低，仍超过当前模型可分析范围。请压缩或裁剪后上传，或换一条更短的视频链接。',
         tool_failed: '这条视频暂时没能成功解析，所以我不能假装看过它。可以确认视频未被删除/设为私密，或换完整视频页链接重试。'
       };
       return map[errorCode] || '分析任务未能完成。可以稍后重试，或换一条视频链接。';
@@ -1518,12 +1572,16 @@ function addAttachmentChip(node, name) {
         const duration = secondsLabel(payload.duration_seconds);
         const maxDuration = secondsLabel(limits.max_duration_seconds);
         const size = bytesLabel(payload.size_bytes);
-        const maxSize = bytesLabel(limits.max_download_bytes);
+        const maxDownloadSize = bytesLabel(limits.max_download_bytes);
+        const maxModelSize = bytesLabel(limits.max_model_video_bytes);
+        const minFps = Number(limits.min_video_understanding_fps);
         if (limits.duration_known && limits.duration_ok === false) {
           reasons.push(`视频时长 ${duration || '已识别'}，超过当前 ${maxDuration || '配置'} 上限。`);
         }
-        if (limits.size_known && limits.size_ok === false) {
-          reasons.push(`视频大小 ${size || '已识别'}，超过当前 ${maxSize || '配置'} 上限。`);
+        if (limits.size_known && limits.download_size_ok === false) {
+          reasons.push(`视频大小 ${size || '已识别'}，超过当前 ${maxDownloadSize || '配置'} 下载上限。`);
+        } else if (limits.size_known && limits.model_size_ok === false) {
+          reasons.push(`视频大小 ${size || '已识别'}，即使把视频理解 fps 降到 ${Number.isFinite(minFps) ? minFps : 0.2}，仍超过当前模型 ${maxModelSize || '配置'} 分析范围。`);
         }
         if (limits.duration_known === false) reasons.push('暂时无法确认视频时长。');
         if (limits.size_known === false) reasons.push('暂时无法确认视频大小。');
@@ -1532,7 +1590,7 @@ function addAttachmentChip(node, name) {
           '链接可以读取，但暂时不能进入模型分析。',
           '',
           ...reasons.map(reason => '- ' + reason),
-          '- 可以换一条 5 分钟以内的单条视频，或先裁剪后上传文件。'
+          '- 可以换一条更短的单条视频，或先压缩/裁剪后上传文件。'
         ].join('\n');
       }
       return buildJobErrorReply('url_rejected');
@@ -1819,7 +1877,7 @@ function addAttachmentChip(node, name) {
     });
     document.getElementById('aboutBtn').addEventListener('click', () => {
       closePop();
-      openModal({ title: '关于产品', desc: '短视频分析助手支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。', confirmText: '知道了' });
+      openModal({ title: '关于产品', desc: '花火AI视频分析支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。', confirmText: '知道了' });
     });
 
     // local session overrides (rename / delete). Session-scoped in-memory only —

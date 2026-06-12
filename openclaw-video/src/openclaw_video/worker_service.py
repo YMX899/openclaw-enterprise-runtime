@@ -7,7 +7,13 @@ from tempfile import TemporaryDirectory
 from threading import Event, Thread
 from typing import Callable
 
-from .douyin_wrapper import DouyinAnalysisResult, DouyinWrapperError, run_douyin_chong, run_upload_video_analysis
+from .douyin_wrapper import (
+    DouyinAnalysisResult,
+    DouyinWrapperError,
+    VideoTooLargeForModelError,
+    run_douyin_chong,
+    run_upload_video_analysis,
+)
 from .job_store import InMemoryJobStore, JobLeaseError, VideoJob
 from .result_schema import RESULT_SCHEMA_VERSION, ResultSchemaError, validate_result_payload
 from .upload_store import UploadNotFound, UploadStoreError, is_upload_uri, resolve_upload_uri
@@ -19,7 +25,15 @@ from .url_guard import (
     default_resolver,
     validate_video_url_with_redirects,
 )
-from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
+from .video_limits import (
+    DEFAULT_MAX_DOWNLOAD_BYTES,
+    DEFAULT_MAX_MODEL_VIDEO_BYTES,
+    DEFAULT_MAX_VIDEO_DURATION_SECONDS,
+    DEFAULT_MAX_VIDEO_FRAMES,
+    DEFAULT_VIDEO_UNDERSTANDING_FPS,
+    MAX_VIDEO_UNDERSTANDING_FPS,
+    MIN_VIDEO_UNDERSTANDING_FPS,
+)
 
 
 class UploadTooLargeError(RuntimeError):
@@ -35,8 +49,12 @@ class WorkerConfig:
     worker_id: str = "video-analysis-worker-1"
     heartbeat_interval_seconds: int = 30
     max_download_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES
+    max_model_video_bytes: int = DEFAULT_MAX_MODEL_VIDEO_BYTES
     max_duration_seconds: int = DEFAULT_MAX_VIDEO_DURATION_SECONDS
     max_frames: int = DEFAULT_MAX_VIDEO_FRAMES
+    video_understanding_fps: float = DEFAULT_VIDEO_UNDERSTANDING_FPS
+    min_video_understanding_fps: float = MIN_VIDEO_UNDERSTANDING_FPS
+    max_video_understanding_fps: float = MAX_VIDEO_UNDERSTANDING_FPS
     max_inline_upload_bytes: int = 60 * 1024 * 1024
 
 
@@ -64,8 +82,12 @@ class VideoAnalysisWorker:
             output_dir=output_dir,
             timeout_seconds=self.config.timeout_seconds,
             max_download_bytes=self.config.max_download_bytes,
+            max_model_video_bytes=self.config.max_model_video_bytes,
             max_duration_seconds=self.config.max_duration_seconds,
             max_frames=self.config.max_frames,
+            video_understanding_fps=self.config.video_understanding_fps,
+            min_video_understanding_fps=self.config.min_video_understanding_fps,
+            max_video_understanding_fps=self.config.max_video_understanding_fps,
         )
 
     def _analyze_uploaded_video(self, video_uri: str, output_dir: Path) -> DouyinAnalysisResult:
@@ -149,6 +171,8 @@ class VideoAnalysisWorker:
             return self._fail_job(job, "url_rejected")
         except UploadTooLargeError:
             return self._fail_job(job, "upload_too_large")
+        except VideoTooLargeForModelError:
+            return self._fail_job(job, "video_too_large")
         except (DouyinWrapperError, ResultSchemaError, ValueError, UploadStoreError, UploadNotFound):
             return self._fail_job(job, "tool_failed")
         except JobLeaseError:

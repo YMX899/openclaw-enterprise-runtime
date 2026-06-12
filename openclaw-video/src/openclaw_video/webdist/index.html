@@ -3,77 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OpenClaw 短视频智能分析</title>
+  <title>花火AI视频分析</title>
   
-  <script type="module" crossorigin src="./assets/index-DB19iB6q.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BLgO0OPR.css">
+  <script type="module" crossorigin src="./assets/index-CtOJ1eiV.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BoGfMG3Q.css">
 </head>
 <body>
   <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
-  <section id="landingPage" class="landing-page" aria-label="OpenClaw 产品介绍">
-    <header class="landing-header">
-      <div class="brand">
+  <section id="landingPage" class="landing-page" aria-label="登录">
+    <main class="login-page-main">
+      <div class="login-brand">
         <div class="brand-mark" aria-hidden="true">OC</div>
-        <div class="brand-copy">
-          <p class="eyebrow">OpenClaw 短视频智能分析</p>
-          <h1>让短视频链接直接进入可追踪的分析对话</h1>
+        <div>
+          <p class="eyebrow">花火AI</p>
+          <h1>花火AI视频分析</h1>
         </div>
       </div>
-      <button id="openLogin" class="login-entry" type="button">登录</button>
-    </header>
-    <main class="landing-main">
-      <section class="hero-section">
-        <div class="hero-copy">
-          <span class="hero-badge">服务运行中 · OpenClaw 自有登录</span>
-          <p class="hero-kicker">独立登录 · 视频链接读取 · 模型分析 · 历史对话</p>
-          <h2>把一个视频链接变成清晰、可复查、可继续追问的分析结果。</h2>
-          <p class="hero-text">OpenClaw 面向短视频运营、内容研究和业务分析场景，用户只需要在本站登录，提交视频链接或上传文件，就可以在同一个中文聊天界面里查看分析进度、结果摘要和历史会话。</p>
-          <div class="hero-stats" aria-label="平台能力概览">
-            <div>
-              <strong>3 步</strong>
-              <span>登录 · 读取 · 分析</span>
-            </div>
-            <div>
-              <strong>链接 / 上传</strong>
-              <span>双入口视频来源</span>
-            </div>
-            <div>
-              <strong>独立会话</strong>
-              <span>无需登录 Dify</span>
-            </div>
-          </div>
-        </div>
-        <div class="hero-login">
-          <div class="login-card-inline">
-            <p class="eyebrow">OpenClaw 账号</p>
-            <h2 id="loginHeading">登录后进入分析对话</h2>
-            <p class="section-note">直接在此填写 OpenClaw 账号登录；无需再登录 Dify 网页。</p>
-            <label for="loginAccount">账号</label>
-            <input id="loginAccount" autocomplete="username" inputmode="text" placeholder="请输入账号">
-            <label for="loginPassword">密码</label>
-            <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码">
-            <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
-            <button id="loginButton" class="primary-flow" type="button">登录</button>
-          </div>
-        </div>
-      </section>
-      <section class="capability-grid" aria-label="核心能力">
-        <article>
-          <span>01</span>
-          <h3>视频链接读取</h3>
-          <p>对分享链接进行服务端校验、重定向复核和直连候选解析，减少对浏览器登录状态的依赖。</p>
-        </article>
-        <article>
-          <span>02</span>
-          <h3>模型驱动分析</h3>
-          <p>围绕画面、动作、话术、场景和内容结构生成结构化结果，便于后续复盘。</p>
-        </article>
-        <article>
-          <span>03</span>
-          <h3>中文聊天工作台</h3>
-          <p>登录后进入对话界面，可新建会话、查看历史、继续追问并关联视频分析任务。</p>
-        </article>
-      </section>
+      <div class="login-card-inline">
+        <h2 id="loginHeading">登录</h2>
+        <label for="loginAccount">账号</label>
+        <input id="loginAccount" autocomplete="username" inputmode="text" placeholder="请输入账号">
+        <label for="loginPassword">密码</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码">
+        <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
+        <button id="loginButton" class="primary-flow" type="button">登录</button>
+      </div>
+      <button id="openLogin" class="login-entry sr-only" type="button" aria-label="聚焦登录表单">登录</button>
     </main>
   </section>
 
@@ -89,15 +44,15 @@
         <div class="brand cg-brand">
           <div class="brand-mark" aria-hidden="true">OC</div>
           <div class="brand-copy">
-            <p class="eyebrow">视频分析助手</p>
-            <h2 id="sessionHeading">短视频分析</h2>
+            <p class="eyebrow">花火AI</p>
+            <h2 id="sessionHeading">视频分析</h2>
           </div>
         </div>
         <button id="createSession" class="cg-new-chat primary-flow" type="button">＋ 新建对话</button>
       </div>
       <div class="cg-session-meta sr-only">
         <label for="sessionTitle">新会话标题</label>
-        <input id="sessionTitle" value="短视频分析">
+        <input id="sessionTitle" value="花火AI视频分析">
         <label for="sessionId" class="technical-label">当前会话 ID</label>
         <input id="sessionId" class="technical-field" autocomplete="off" placeholder="创建会话后自动写入">
       </div>
@@ -129,7 +84,7 @@
         <div id="userMenu" class="menu-pop" role="menu" aria-labelledby="userMenuBtn" hidden>
           <div class="menu-account">
             <strong id="menuUserName">未登录</strong>
-            <span id="menuUserSub">独立短视频分析会话</span>
+            <span id="menuUserSub">独立视频分析会话</span>
           </div>
           <div class="menu-sep"></div>
           <button type="button" role="menuitemradio" data-theme-choice="light" aria-checked="false">
@@ -167,13 +122,13 @@
           <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
         </button>
         <div class="cg-topbar-title">
-          <h1 id="cgConvTitle">短视频分析助手</h1>
+          <h1 id="cgConvTitle">花火AI视频分析</h1>
         </div>
         <div class="cg-topbar-status" aria-label="服务运行状态">
           <div id="runState" class="run-state todo">等待登录</div>
           <button id="refreshMe" class="secondary" type="button">刷新</button>
         </div>
-        <p id="cgFlowHint" class="sr-only">粘贴抖音/TikTok/B站视频链接或上传视频文件，也可以直接提问。</p>
+          <p id="cgFlowHint" class="sr-only">发送视频链接、上传视频，或直接提问。</p>
       </header>
 
       <nav class="flow-steps cg-flow-steps" aria-label="分析流程" hidden>
@@ -185,7 +140,7 @@
       </nav>
 
       <div id="conversation" class="cg-conversation conversation" aria-live="polite">
-        <div class="message assistant" data-role-label="分析助手"><div class="cg-msg-inner">你好，我是短视频分析助手。把抖音/TikTok/B站视频链接粘贴进下方输入框，或点击 ＋ 上传视频文件，我就开始分析；也可以直接提问。</div></div>
+        <div class="message assistant" data-role-label="分析助手"><div class="cg-msg-inner">你好，我是花火AI视频分析。发送视频链接、上传视频，或直接提问。</div></div>
       </div>
 
       <div id="nextAction" class="next-action cg-next-action" hidden><span>下一步</span>请先登录进入分析工作台。</div>
@@ -199,11 +154,11 @@
           <div id="composerLinkHint" class="cg-link-hint" hidden>检测到视频链接，将作为视频来源分析。</div>
           <div class="cg-composer-row">
             <button id="composerAttach" class="cg-attach-btn" type="button" aria-label="上传视频文件" title="上传视频文件">＋</button>
-            <textarea id="prompt" class="cg-input" rows="1" placeholder="发送消息，或粘贴抖音/TikTok/B站视频链接…"></textarea>
+            <textarea id="prompt" class="cg-input" rows="1" placeholder="发送消息或粘贴视频链接…"></textarea>
             <button id="sendChat" class="cg-send" type="button" aria-label="发送" title="发送">↑</button>
           </div>
         </div>
-        <p class="cg-composer-help">AI 可能会出错，请核对重要信息。视频分析结果以页面展示为准。</p>
+        <p class="cg-composer-help">请核对重要信息。</p>
       </div>
 
       <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/webm" class="sr-only" tabindex="-1" aria-hidden="true">

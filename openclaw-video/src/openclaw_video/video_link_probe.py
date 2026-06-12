@@ -18,7 +18,14 @@ from .url_guard import (
     default_resolver,
     validate_video_url_with_redirects,
 )
-from .video_limits import DEFAULT_MAX_DOWNLOAD_BYTES, DEFAULT_MAX_VIDEO_DURATION_SECONDS
+from .video_limits import (
+    DEFAULT_MAX_DOWNLOAD_BYTES,
+    DEFAULT_MAX_MODEL_VIDEO_BYTES,
+    DEFAULT_MAX_VIDEO_DURATION_SECONDS,
+    DEFAULT_VIDEO_UNDERSTANDING_FPS,
+    MAX_VIDEO_UNDERSTANDING_FPS,
+    MIN_VIDEO_UNDERSTANDING_FPS,
+)
 
 
 class VideoLinkProbeError(RuntimeError):
@@ -29,6 +36,10 @@ class VideoLinkProbeError(RuntimeError):
 class VideoLinkProbeConfig:
     max_duration_seconds: int = DEFAULT_MAX_VIDEO_DURATION_SECONDS
     max_download_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES
+    max_model_video_bytes: int = DEFAULT_MAX_MODEL_VIDEO_BYTES
+    video_understanding_fps: float = DEFAULT_VIDEO_UNDERSTANDING_FPS
+    min_video_understanding_fps: float = MIN_VIDEO_UNDERSTANDING_FPS
+    max_video_understanding_fps: float = MAX_VIDEO_UNDERSTANDING_FPS
 
 
 def _sha256_text(value: str) -> str:
@@ -84,16 +95,52 @@ def _video_candidate_count(video: Any) -> int:
     )
 
 
+def _clamp_fps(value: float, *, minimum: float, maximum: float) -> float:
+    return min(max(value, minimum), maximum)
+
+
+def _fps_status(*, size_bytes: int | None, config: VideoLinkProbeConfig) -> dict[str, Any]:
+    base_fps = _clamp_fps(
+        float(config.video_understanding_fps),
+        minimum=float(config.min_video_understanding_fps),
+        maximum=float(config.max_video_understanding_fps),
+    )
+    if size_bytes is None or size_bytes <= config.max_model_video_bytes:
+        return {
+            "video_understanding_fps": round(base_fps, 4),
+            "fps_adjusted": False,
+            "model_size_ok": size_bytes is not None,
+        }
+    required_fps = base_fps * (config.max_model_video_bytes / size_bytes)
+    model_size_ok = required_fps >= config.min_video_understanding_fps
+    effective_fps = required_fps if model_size_ok else config.min_video_understanding_fps
+    return {
+        "video_understanding_fps": round(_clamp_fps(effective_fps, minimum=config.min_video_understanding_fps, maximum=base_fps), 4),
+        "fps_adjusted": True,
+        "model_size_ok": model_size_ok,
+    }
+
+
 def _limit_status(*, duration: float | None, size_bytes: int | None, config: VideoLinkProbeConfig) -> dict[str, Any]:
     duration_ok = duration is not None and duration <= config.max_duration_seconds
-    size_ok = size_bytes is not None and size_bytes <= config.max_download_bytes
+    download_size_ok = size_bytes is not None and size_bytes <= config.max_download_bytes
+    fps_status = _fps_status(size_bytes=size_bytes, config=config)
+    size_ok = download_size_ok and fps_status["model_size_ok"]
     return {
         "max_duration_seconds": config.max_duration_seconds,
         "max_download_bytes": config.max_download_bytes,
+        "max_model_video_bytes": config.max_model_video_bytes,
+        "default_video_understanding_fps": config.video_understanding_fps,
+        "min_video_understanding_fps": config.min_video_understanding_fps,
+        "max_video_understanding_fps": config.max_video_understanding_fps,
         "duration_known": duration is not None,
         "size_known": size_bytes is not None,
         "duration_ok": duration_ok,
+        "download_size_ok": download_size_ok,
+        "model_size_ok": fps_status["model_size_ok"],
         "size_ok": size_ok,
+        "video_understanding_fps": fps_status["video_understanding_fps"],
+        "fps_adjusted": fps_status["fps_adjusted"],
         "eligible_for_model_analysis": duration_ok and size_ok,
     }
 

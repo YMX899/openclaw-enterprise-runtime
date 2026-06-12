@@ -14,7 +14,14 @@ from urllib.request import Request, urlopen
 
 from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
 from .url_guard import UrlRejected, validate_video_url_with_redirects
-from .video_limits import DEFAULT_MAX_VIDEO_DURATION_SECONDS, DEFAULT_MAX_VIDEO_FRAMES
+from .video_limits import (
+    DEFAULT_MAX_MODEL_VIDEO_BYTES,
+    DEFAULT_MAX_VIDEO_DURATION_SECONDS,
+    DEFAULT_MAX_VIDEO_FRAMES,
+    DEFAULT_VIDEO_UNDERSTANDING_FPS,
+    MAX_VIDEO_UNDERSTANDING_FPS,
+    MIN_VIDEO_UNDERSTANDING_FPS,
+)
 
 
 class LegacyAdapterError(RuntimeError):
@@ -34,9 +41,23 @@ LEGACY_CONFIG_ENV_KEYS = (
 @dataclass(frozen=True)
 class LegacyVideoLimits:
     max_download_bytes: int
+    max_model_video_bytes: int
     max_duration_seconds: int
     max_frames: int
     fps: float
+    min_fps: float = MIN_VIDEO_UNDERSTANDING_FPS
+    max_fps: float = MAX_VIDEO_UNDERSTANDING_FPS
+
+    def with_fps(self, fps: float) -> "LegacyVideoLimits":
+        return LegacyVideoLimits(
+            max_download_bytes=self.max_download_bytes,
+            max_model_video_bytes=self.max_model_video_bytes,
+            max_duration_seconds=self.max_duration_seconds,
+            max_frames=self.max_frames,
+            fps=fps,
+            min_fps=self.min_fps,
+            max_fps=self.max_fps,
+        )
 
 
 def _positive_int(value: int, name: str) -> int:
@@ -48,6 +69,15 @@ def _positive_int(value: int, name: str) -> int:
 def _positive_float(value: float, name: str) -> float:
     if value <= 0:
         raise LegacyAdapterError(f"{name} must be positive")
+    return value
+
+
+def _fps_in_range(value: float, name: str) -> float:
+    value = _positive_float(value, name)
+    if value < MIN_VIDEO_UNDERSTANDING_FPS or value > MAX_VIDEO_UNDERSTANDING_FPS:
+        raise LegacyAdapterError(
+            f"{name} must be between {MIN_VIDEO_UNDERSTANDING_FPS} and {MAX_VIDEO_UNDERSTANDING_FPS}"
+        )
     return value
 
 
@@ -147,15 +177,22 @@ def _probe_stream_size_bytes(
     return total
 
 
-def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
+def _effective_fps_for_size(size_bytes: int, limits: LegacyVideoLimits) -> float:
+    base_fps = min(max(limits.fps, limits.min_fps), limits.max_fps)
+    if size_bytes <= limits.max_model_video_bytes:
+        return base_fps
+    required_fps = base_fps * (limits.max_model_video_bytes / size_bytes)
+    if required_fps < limits.min_fps:
+        raise LegacyAdapterError("video model size exceeds limit at minimum fps")
+    return min(base_fps, max(limits.min_fps, required_fps))
+
+
+def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> float:
     duration = _duration_seconds(video)
     if duration is None:
         raise LegacyAdapterError("video duration is unavailable")
     if duration > limits.max_duration_seconds:
         raise LegacyAdapterError("video duration exceeds limit")
-    estimated_frames = duration * limits.fps
-    if estimated_frames > limits.max_frames:
-        raise LegacyAdapterError("video frame budget exceeds limit")
     size = _size_bytes(video)
     if size is None:
         source_url = str(getattr(video, "source_url", "") or "")
@@ -171,6 +208,11 @@ def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> None:
             pass
     if size > limits.max_download_bytes:
         raise LegacyAdapterError("video size exceeds limit")
+    effective_fps = _effective_fps_for_size(size, limits)
+    estimated_frames = duration * effective_fps
+    if estimated_frames > limits.max_frames:
+        raise LegacyAdapterError("video frame budget exceeds limit")
+    return round(effective_fps, 4)
 
 
 def _default_prompt() -> str:
@@ -255,9 +297,12 @@ def _build_payload(
         "usage": getattr(completion, "usage", None),
         "limits": {
             "max_download_bytes": limits.max_download_bytes,
+            "max_model_video_bytes": limits.max_model_video_bytes,
             "max_duration_seconds": limits.max_duration_seconds,
             "max_frames": limits.max_frames,
             "fps": limits.fps,
+            "min_fps": limits.min_fps,
+            "max_fps": limits.max_fps,
         },
     }
     payload = {
@@ -387,11 +432,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source-label", default=None, help="Traceable source label (e.g. upload:// URI) for the result payload.")
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--max-bytes", type=int, required=True)
+    parser.add_argument("--max-model-bytes", type=int, default=int(os.environ.get("MAX_MODEL_VIDEO_BYTES", str(DEFAULT_MAX_MODEL_VIDEO_BYTES))))
     parser.add_argument("--max-duration-seconds", type=int, default=int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", str(DEFAULT_MAX_VIDEO_DURATION_SECONDS))))
     parser.add_argument("--max-frames", type=int, default=int(os.environ.get("MAX_VIDEO_FRAMES", str(DEFAULT_MAX_VIDEO_FRAMES))))
     parser.add_argument("--env-file", required=True)
     parser.add_argument("--no-shell", action="store_true", required=True)
-    parser.add_argument("--fps", type=float, default=float(os.environ.get("DOUYIN_CHONG_FPS", "4.0")))
+    parser.add_argument("--fps", type=float, default=float(os.environ.get("DOUYIN_CHONG_FPS", str(DEFAULT_VIDEO_UNDERSTANDING_FPS))))
+    parser.add_argument("--min-fps", type=float, default=float(os.environ.get("MIN_VIDEO_UNDERSTANDING_FPS", str(MIN_VIDEO_UNDERSTANDING_FPS))))
+    parser.add_argument("--max-fps", type=float, default=float(os.environ.get("MAX_VIDEO_UNDERSTANDING_FPS", str(MAX_VIDEO_UNDERSTANDING_FPS))))
     parser.add_argument("--max-tokens", type=int, default=int(os.environ.get("DOUYIN_CHONG_MAX_TOKENS", "12000")))
     parser.add_argument("--connect-timeout", type=float, default=float(os.environ.get("DOUYIN_CHONG_CONNECT_TIMEOUT", "60")))
     parser.add_argument("--read-timeout", type=float, default=float(os.environ.get("DOUYIN_CHONG_READ_TIMEOUT", "900")))
@@ -413,23 +461,28 @@ def run_adapter(
 
     limits = LegacyVideoLimits(
         max_download_bytes=_positive_int(args.max_bytes, "max_bytes"),
+        max_model_video_bytes=_positive_int(args.max_model_bytes, "max_model_bytes"),
         max_duration_seconds=_positive_int(args.max_duration_seconds, "max_duration_seconds"),
         max_frames=_positive_int(args.max_frames, "max_frames"),
-        fps=_positive_float(args.fps, "fps"),
+        fps=_fps_in_range(args.fps, "fps"),
+        min_fps=_fps_in_range(args.min_fps, "min_fps"),
+        max_fps=_fps_in_range(args.max_fps, "max_fps"),
     )
+    if limits.min_fps > limits.max_fps:
+        raise LegacyAdapterError("min_fps must not be greater than max_fps")
     AppConfig, UniversalVideoResolver, ArkVideoClient = component_loader()
-    config = _load_config_from_explicit_env_file(
-        AppConfig,
-        env_file=env_file.resolve(),
-        limits=limits,
-        max_tokens=args.max_tokens,
-        connect_timeout=args.connect_timeout,
-        read_timeout=args.read_timeout,
-        retries=args.retries,
-    )
     if bool(args.input_file) == bool(args.input_url):
         raise LegacyAdapterError("exactly one of --input-url or --input-file is required")
     if args.input_file:
+        config = _load_config_from_explicit_env_file(
+            AppConfig,
+            env_file=env_file.resolve(),
+            limits=limits,
+            max_tokens=args.max_tokens,
+            connect_timeout=args.connect_timeout,
+            read_timeout=args.read_timeout,
+            retries=args.retries,
+        )
         payload = _analyze_uploaded_file(
             config,
             ArkVideoClient,
@@ -440,7 +493,16 @@ def run_adapter(
     else:
         resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
         video = UniversalVideoResolver().resolve(resolver_input_url)
-        _enforce_limits(video, limits)
+        effective_limits = limits.with_fps(_enforce_limits(video, limits))
+        config = _load_config_from_explicit_env_file(
+            AppConfig,
+            env_file=env_file.resolve(),
+            limits=effective_limits,
+            max_tokens=args.max_tokens,
+            connect_timeout=args.connect_timeout,
+            read_timeout=args.read_timeout,
+            retries=args.retries,
+        )
         video_urls = [
             url
             for url in (
@@ -454,7 +516,7 @@ def run_adapter(
             input_url=args.input_url,
             video=video,
             completion=completion,
-            limits=limits,
+            limits=effective_limits,
         )
     output_json = Path(args.output_json)
     output_json.parent.mkdir(parents=True, exist_ok=True)

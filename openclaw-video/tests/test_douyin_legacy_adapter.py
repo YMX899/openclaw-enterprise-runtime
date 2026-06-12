@@ -229,6 +229,55 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(config_call["fps"], 4.0)
         self.assertIn("https://video.example/video.mp4", FakeArkClient.calls[0]["video_urls"])
 
+    def test_model_size_above_budget_reduces_fps_before_analysis(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            output_json = Path(tmp) / "result.json"
+            FakeResolver.video = FakeVideo(duration_ms=45_000, size_mb=86)
+
+            payload = run_adapter(
+                [
+                    "--input-url", "https://www.douyin.com/video/1",
+                    "--output-json", str(output_json),
+                    "--max-bytes", str(512 * 1024 * 1024),
+                    "--max-model-bytes", str(50 * 1024 * 1024),
+                    "--max-duration-seconds", "60",
+                    "--max-frames", "1200",
+                    "--env-file", str(env_file),
+                    "--no-shell",
+                ],
+                component_loader=fake_components,
+            )
+
+        self.assertAlmostEqual(FakeConfig.calls[0]["fps"], 2.3256, places=4)
+        self.assertAlmostEqual(payload["raw_tool_result"]["limits"]["fps"], 2.3256, places=4)
+        self.assertEqual(payload["raw_tool_result"]["limits"]["max_model_video_bytes"], 50 * 1024 * 1024)
+
+    def test_model_size_beyond_minimum_fps_fails_before_analysis(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            FakeResolver.video = FakeVideo(duration_ms=45_000, size_mb=1200)
+
+            with self.assertRaises(LegacyAdapterError):
+                run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(Path(tmp) / "result.json"),
+                        "--max-bytes", str(2 * 1024 * 1024 * 1024),
+                        "--max-model-bytes", str(50 * 1024 * 1024),
+                        "--max-duration-seconds", "60",
+                        "--max-frames", "1200",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        self.assertEqual(FakeConfig.calls, [])
+        self.assertEqual(FakeArkClient.calls, [])
+
     def test_missing_explicit_env_file_fails_closed(self):
         with TemporaryDirectory() as tmp:
             with self.assertRaises(LegacyAdapterError):
