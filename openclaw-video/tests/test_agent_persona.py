@@ -247,7 +247,7 @@ class ErrorReplyTests(unittest.TestCase):
     def test_upload_too_large(self):
         reply = error_reply_for("upload_too_large")
         self.assertIn("偏大", reply)
-        self.assertIn("60MB", reply)
+        self.assertIn("50MB", reply)
 
     def test_none_code_fallback(self):
         self.assertTrue(error_reply_for(None))
@@ -330,7 +330,7 @@ class PersonaInjectionTests(unittest.TestCase):
         self.assertIn("抖音", SYSTEM_PERSONA)
 
     def test_greeting_is_chinese_and_actionable(self):
-        self.assertIn("OpenClaw", NEW_SESSION_GREETING)
+        self.assertIn("花火AI视频分析", NEW_SESSION_GREETING)
         self.assertIn("抖音", NEW_SESSION_GREETING)
         self.assertIn("上传", NEW_SESSION_GREETING)
 

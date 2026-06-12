@@ -232,7 +232,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         config_call = FakeConfig.calls[0]
         self.assertEqual(config_call["env_path"], env_file.resolve())
         self.assertEqual(config_call["max_workers"], 1)
-        self.assertEqual(config_call["fps"], 4.0)
+        self.assertEqual(config_call["fps"], 3.0)
         self.assertIn("https://video.example/video.mp4", FakeArkClient.calls[0]["video_urls"])
 
     def test_model_size_above_budget_compresses_before_analysis(self):
@@ -270,8 +270,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     component_loader=fake_components,
                 )
 
-        self.assertAlmostEqual(FakeConfig.calls[0]["fps"], 2.3256, places=4)
-        self.assertAlmostEqual(payload["raw_tool_result"]["limits"]["fps"], 2.3256, places=4)
+        self.assertAlmostEqual(FakeConfig.calls[0]["fps"], 1.7442, places=4)
+        self.assertAlmostEqual(payload["raw_tool_result"]["limits"]["fps"], 1.7442, places=4)
         self.assertEqual(payload["raw_tool_result"]["limits"]["max_model_video_bytes"], 50 * 1024 * 1024)
         self.assertTrue(payload["raw_tool_result"]["model_input"]["compressed"])
         self.assertEqual(payload["raw_tool_result"]["model_input"]["size_bytes"], len(b"compressed-video"))
@@ -320,7 +320,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertTrue(payload["raw_tool_result"]["model_input"]["downloaded"])
         self.assertEqual(payload["raw_tool_result"]["model_input"]["download_tool"], "yt-dlp")
         download.assert_called_once()
-        self.assertEqual(download.call_args.args[0], "https://upos.example/video.mp4")
+        self.assertEqual(download.call_args.args[0], "https://www.bilibili.com/video/BV1xx")
 
     def test_small_stable_direct_url_success_does_not_download(self):
         with TemporaryDirectory() as tmp:
@@ -449,6 +449,31 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             self.assertEqual(path.name, "source.mp4")
             self.assertEqual(tool, "yt-dlp+http-fallback")
             self.assertEqual(path.read_bytes(), b"http-video")
+            http_download.assert_called_once()
+
+    def test_bilibili_page_download_uses_media_url_for_http_fallback(self):
+        with TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            def fake_http(url, *, output_path, **_kwargs):
+                self.assertEqual(url, "https://upos.example/video.mp4")
+                output_path.write_bytes(b"http-bilibili-video")
+                return output_path.stat().st_size
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp", side_effect=LegacyAdapterError("yt-dlp failed")),
+                patch("openclaw_video.douyin_legacy_adapter._download_video_to_file", side_effect=fake_http) as http_download,
+            ):
+                path, tool = adapter_module._download_video_with_fallbacks(
+                    "https://www.bilibili.com/video/BV1xx",
+                    output_dir=output_dir,
+                    max_bytes=2000,
+                    referer="https://www.bilibili.com/",
+                    http_fallback_url="https://upos.example/video.mp4",
+                )
+
+            self.assertEqual(tool, "yt-dlp+http-fallback")
+            self.assertEqual(path.read_bytes(), b"http-bilibili-video")
             http_download.assert_called_once()
 
     def test_video_cache_cleanup_removes_entries_after_24_hours(self):

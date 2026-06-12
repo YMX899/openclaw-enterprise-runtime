@@ -1564,6 +1564,27 @@ function addAttachmentChip(node, name) {
       if (number >= 1024) return (Math.round(number / 102.4) / 10) + ' KB';
       return Math.round(number) + ' B';
     }
+    function platformLabelFromHost(host) {
+      const value = String(host || '').toLowerCase();
+      if (value.includes('bilibili') || value.includes('b23.tv')) return 'B 站';
+      if (value.includes('tiktok')) return 'TikTok';
+      if (value.includes('douyin') || value.includes('iesdouyin')) return '抖音';
+      return '视频平台';
+    }
+    function buildReadCheckPassReply(body) {
+      const payload = body && typeof body === 'object' ? body : {};
+      const limits = payload.limits && typeof payload.limits === 'object' ? payload.limits : {};
+      const duration = secondsLabel(payload.duration_seconds) || '暂未确认';
+      const size = bytesLabel(payload.size_bytes) || '暂未确认';
+      const fps = Number(limits.video_understanding_fps);
+      const fpsText = Number.isFinite(fps) ? `视频理解 fps：${fps}` : '视频理解 fps：按系统配置';
+      const platform = platformLabelFromHost(payload.canonical_host);
+      return [
+        `链接已识别，平台：${platform}。`,
+        `视频时长：${duration}；视频大小：${size}；${fpsText}。`,
+        '正在下载/读取并提交模型分析，视频越长等待时间越久，B 站链接通常需要更久一些，请耐心等待。'
+      ].join('\n');
+    }
     function buildReadCheckFailureReply(body) {
       const payload = body && typeof body === 'object' ? body : {};
       const limits = payload.limits && typeof payload.limits === 'object' ? payload.limits : {};
@@ -1641,12 +1662,15 @@ function addAttachmentChip(node, name) {
         show({ status: read.status, video_link_read_check: read.body });
         if (read.status === 200 && read.body.status === 'PASS') {
           linkReadable = true;
-          progress.indeterminate('链接可读取，正在提交分析…');
+          const waitingReply = buildReadCheckPassReply(read.body);
+          updateAssistantMessage(assistantNode, waitingReply);
+          progress.indeterminate('正在提交分析，请稍等…');
           const jobRes = await api(apiPrefix + '/jobs', { method: 'POST', body: JSON.stringify({ session_id: sessionId, video_url: link, content: promptText || '请分析这个视频。' }) });
           if (!isActiveSession(sessionId)) return;
           if (jobRes.body.job && jobRes.body.job.job_id) {
             setCurrentJob(jobRes.body.job.job_id);
             activateFlow(3);
+            progress.indeterminate('模型正在分析视频，请继续等待…');
             await autoPollCurrentJob(progress, assistantNode, sessionId);
           } else {
             progress.fail('提交分析失败，请重试');

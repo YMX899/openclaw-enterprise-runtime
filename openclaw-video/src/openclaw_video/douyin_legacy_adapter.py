@@ -159,6 +159,13 @@ def _referer_for_url(url: str) -> str:
     return "https://www.douyin.com/"
 
 
+def _best_download_url_for_platform(input_url: str, video: Any) -> str:
+    platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
+    if platform == "bilibili":
+        return input_url
+    return str(getattr(video, "video_url", "") or "") or input_url
+
+
 def _request_headers(*, referer: str = "https://www.douyin.com/") -> dict[str, str]:
     return {
         "User-Agent": (
@@ -324,6 +331,8 @@ def _download_video_with_ytdlp(
         _request_headers(referer=referer)["User-Agent"],
         "--referer",
         referer,
+        "--download-sections",
+        "*0-300",
         "-f",
         "bv*+ba/b[ext=mp4]/b",
         "--merge-output-format",
@@ -357,6 +366,7 @@ def _download_video_with_fallbacks(
     output_dir: Path,
     max_bytes: int,
     referer: str,
+    http_fallback_url: str | None = None,
 ) -> tuple[Path, str]:
     try:
         return _download_video_with_ytdlp(
@@ -367,9 +377,10 @@ def _download_video_with_fallbacks(
         ), "yt-dlp"
     except LegacyAdapterError as ytdlp_error:
         fallback_path = output_dir / "source.mp4"
+        fallback_url = http_fallback_url or url
         try:
             _download_video_to_file(
-                url,
+                fallback_url,
                 output_path=fallback_path,
                 max_bytes=max_bytes,
                 referer=referer,
@@ -612,10 +623,23 @@ def _prepare_local_video_for_model(
 
 def _default_prompt() -> str:
     return (
-        "Analyze this short video from the supported platform and write the final answer in Simplified Chinese. "
-        "Cover topic, opening hook, structure, visuals, actions, audience, risks, and improvement suggestions. "
-        "Use Markdown format: `##` section headings, short bullet lists, and bold key phrases. "
-        "Keep paragraphs compact and do not wrap the whole answer in a code block. "
+        "Analyze this short video and write the final answer in Simplified Chinese. "
+        "Be specific and generous with detail; do not stop at a brief summary. "
+        "Use Markdown with `##` section headings, short bullet lists, and **bold key phrases**. "
+        "Cover these sections: "
+        "1) one-sentence conclusion and whether the video is worth copying; "
+        "2) basic facts you can infer from the video: topic, scene, people/objects, pace, subtitles/audio if visible or audible; "
+        "3) opening 3-second hook: what makes users stop or why it is weak; "
+        "4) content structure: beat-by-beat progression, information density, emotional curve, retention points; "
+        "5) visual and editing analysis: framing, movement, lighting, transitions, captions, props, repeated motifs; "
+        "6) audience and account positioning: target user, pain/desire, why they would save/comment/share; "
+        "7) platform growth signals: title/cover/caption, interaction design, completion-rate risks, conversion intent; "
+        "8) risks and uncertainty: do not invent facts not visible in the video; "
+        "9) improvement plan: give at least three opening rewrites, a revised script outline, and a reshoot shot list; "
+        "10) alternative creative directions: at least three different angles for making the next version. "
+        "If audio or subtitles are unavailable, say which parts are inferred from visuals. "
+        "Keep the answer practical, varied, and directly actionable. "
+        "Do not wrap the whole answer in a code block. "
         "Do not include links, secrets, request headers, cookies, or internal paths."
     )
 
@@ -743,10 +767,13 @@ _UPLOAD_CONTENT_TYPES = {
 
 def _upload_prompt() -> str:
     return (
-        "请分析这条短视频，用简体中文回答：主题、开头 3 秒钩子、内容结构与信息密度、"
-        "画面与动作设计、目标人群、风险点，并给出可执行的改进建议（开头改法、脚本改法、复拍要点）。"
-        "必须使用 Markdown 格式：用 `##` 小标题、短列表、**加粗关键词**，段落保持紧凑，"
-        "不要把整段回复包在代码块里。"
+        "请完整分析这条上传视频，用简体中文输出，内容要比普通摘要更丰富、更可执行。"
+        "必须使用 Markdown：用 `##` 小标题、短列表、**加粗关键词**，不要把整段回复包在代码块里。"
+        "请至少覆盖：总体结论、主题与场景、开头 3 秒钩子、逐段内容结构、信息密度、情绪曲线、"
+        "画面/镜头/动作/字幕/声音分析、目标人群、账号定位匹配度、完播和互动风险、"
+        "标题/封面/文案建议、3 个开头改法、1 版优化脚本提纲、复拍分镜清单、3 个下一条视频选题方向。"
+        "如果听不到声音或看不到字幕，要明确说明哪些判断来自画面推断。"
+        "建议要具体，不要只给泛泛而谈的原则。"
         "不要输出任何链接、密钥、请求头、cookie 或内部路径。"
     )
 
@@ -871,12 +898,14 @@ def _prepare_downloaded_video_for_model(
         if entry_dir.exists():
             shutil.rmtree(entry_dir)
         entry_dir.mkdir(parents=True, exist_ok=True)
-        download_url = str(getattr(video, "video_url", "") or "") or input_url
+        download_url = _best_download_url_for_platform(input_url, video)
+        http_fallback_url = str(getattr(video, "video_url", "") or "") or None
         cached_path, download_tool = _download_video_with_fallbacks(
             download_url,
             output_dir=entry_dir,
             max_bytes=limits.max_download_bytes,
             referer=referer,
+            http_fallback_url=http_fallback_url,
         )
     return _prepare_local_video_for_model(
         cached_path,

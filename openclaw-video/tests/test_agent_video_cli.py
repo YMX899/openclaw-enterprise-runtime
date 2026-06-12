@@ -43,7 +43,7 @@ def fake_payload(input_url: str) -> dict:
                 "max_download_bytes": 10000,
                 "max_duration_seconds": 300,
                 "max_frames": 6000,
-                "fps": 4.0,
+                "fps": 3.0,
             },
         },
         "created_at": "2026-06-07T00:00:00+00:00",

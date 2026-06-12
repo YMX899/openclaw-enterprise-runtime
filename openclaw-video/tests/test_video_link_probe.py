@@ -132,7 +132,7 @@ class VideoLinkProbeTests(unittest.TestCase):
         self.assertTrue(payload["limits"]["download_size_ok"])
         self.assertTrue(payload["limits"]["model_size_ok"])
         self.assertTrue(payload["limits"]["fps_adjusted"])
-        self.assertAlmostEqual(payload["limits"]["video_understanding_fps"], 2.3256, places=4)
+        self.assertAlmostEqual(payload["limits"]["video_understanding_fps"], 1.7442, places=4)
 
     def test_probe_warns_only_after_minimum_fps_is_still_too_large(self):
         fake_video = SimpleNamespace(
