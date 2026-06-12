@@ -381,15 +381,18 @@ textarea:focus-visible {
 .chat-app {
   display: grid;
   grid-template-columns: 268px minmax(0, 1fr);
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
   background: var(--bg-panel);
 }
 
 .cg-sidebar {
   min-width: 0;
+  height: 100vh;
   min-height: 100vh;
   max-height: 100vh;
-  overflow-x: hidden;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -487,14 +490,16 @@ textarea:focus-visible {
 .cg-search-clear:hover { background: var(--bg-muted); color: var(--text-primary); }
 
 .cg-session-list {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   display: grid;
   align-content: start;
   gap: var(--space-1);
   padding-right: 2px;
+  padding-bottom: var(--space-1);
 }
 
 .cg-group-label {
@@ -576,10 +581,16 @@ textarea:focus-visible {
 }
 
 .cg-sidebar-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: 0 0 auto;
   min-width: 0;
   overflow-x: hidden;
+  margin-top: auto;
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
+  background: var(--bg-muted);
 }
 
 .cg-user-btn {

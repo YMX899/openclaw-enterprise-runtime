@@ -73,6 +73,21 @@ class OpenClawLabUiContractTests(unittest.TestCase):
                 self.assertIn(required, self.source)
         self.assertNotIn("分析超时，请稍后重试", self.built_js)
 
+    def test_sidebar_keeps_user_menu_visible_while_history_scrolls(self):
+        required_css = [
+            ".chat-app {\n  display: grid;\n  grid-template-columns: 268px minmax(0, 1fr);\n  height: 100vh;",
+            ".chat-app {\n  display: grid;\n  grid-template-columns: 268px minmax(0, 1fr);\n  height: 100vh;\n  min-height: 100vh;\n  overflow: hidden;",
+            ".cg-sidebar {\n  min-width: 0;\n  height: 100vh;",
+            "max-height: 100vh;\n  overflow: hidden;\n  display: flex;",
+            ".cg-session-list {\n  flex: 1 1 0;\n  min-height: 0;\n  overflow-y: auto;",
+            "overscroll-behavior: contain;",
+            ".cg-sidebar-footer {\n  position: sticky;\n  bottom: 0;\n  z-index: 2;\n  flex: 0 0 auto;",
+            "margin-top: auto;\n  padding-top: var(--space-3);",
+        ]
+        for required in required_css:
+            with self.subTest(css=required):
+                self.assertIn(required, self.source)
+
     def test_ui_does_not_expose_gateway_or_browser_secret_surfaces(self):
         for forbidden in ["localStorage", "OPENCLAW_GATEWAY_TOKEN", "openclaw-gateway:18789", "Authorization", "Cookie", "HUAHUO-access"]:
             with self.subTest(forbidden=forbidden):
