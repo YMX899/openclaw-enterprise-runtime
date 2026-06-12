@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import logging
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
@@ -34,6 +35,9 @@ from .video_limits import (
     MAX_VIDEO_UNDERSTANDING_FPS,
     MIN_VIDEO_UNDERSTANDING_FPS,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class UploadTooLargeError(RuntimeError):
@@ -140,6 +144,15 @@ class VideoAnalysisWorker:
         except JobLeaseError:
             return self.store.get_job(job.job_id)
 
+    def _log_failure(self, job: VideoJob, error_code: str, exc: BaseException) -> None:
+        logger.warning(
+            "video job failed job_id=%s error_code=%s exception=%s detail=%s",
+            job.job_id,
+            error_code,
+            type(exc).__name__,
+            str(exc)[:500],
+        )
+
     def run_once(self) -> VideoJob | None:
         job = self.store.claim_next(self.config.worker_id, self.config.timeout_seconds)
         if not job:
@@ -164,15 +177,20 @@ class VideoAnalysisWorker:
                 RESULT_SCHEMA_VERSION,
                 worker_id=self.config.worker_id,
             )
-        except TimeoutError:
+        except TimeoutError as exc:
+            self._log_failure(job, "tool_timeout", exc)
             return self._fail_job(job, "tool_timeout", timed_out=True)
-        except UrlRejected:
+        except UrlRejected as exc:
+            self._log_failure(job, "url_rejected", exc)
             return self._fail_job(job, "url_rejected")
-        except UploadTooLargeError:
+        except UploadTooLargeError as exc:
+            self._log_failure(job, "upload_too_large", exc)
             return self._fail_job(job, "upload_too_large")
-        except VideoTooLargeForModelError:
+        except VideoTooLargeForModelError as exc:
+            self._log_failure(job, "video_too_large", exc)
             return self._fail_job(job, "video_too_large")
-        except (DouyinWrapperError, ResultSchemaError, ValueError, UploadStoreError, UploadNotFound):
+        except (DouyinWrapperError, ResultSchemaError, ValueError, UploadStoreError, UploadNotFound) as exc:
+            self._log_failure(job, "tool_failed", exc)
             return self._fail_job(job, "tool_failed")
         except JobLeaseError:
             return self.store.get_job(job.job_id)

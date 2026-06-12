@@ -56,6 +56,8 @@ def _raise_for_adapter_failure(prefix: str, completed: subprocess.CompletedProce
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because compression did not fit the model limit")
     if "video model size exceeds limit at minimum fps" in lowered:
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because minimum fps still exceeds the model limit")
+    if "serveroverloaded" in lowered or "too many requests" in lowered or "status_code=429" in lowered:
+        raise TimeoutError(f"{prefix} model service is overloaded; retry later")
     raise DouyinWrapperError(f"{prefix} failed with exit code {completed.returncode}")
 
 

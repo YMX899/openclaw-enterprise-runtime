@@ -181,6 +181,14 @@ def _cache_key_for_url(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()
 
 
+def _cache_key_for_video(input_url: str, video: Any) -> str:
+    platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
+    video_id = str(getattr(video, "video_id", "") or "").strip()
+    if video_id:
+        return _cache_key_for_url(f"{platform}:{video_id}")
+    return _cache_key_for_url(input_url)
+
+
 def _cleanup_video_cache(cache_root: Path, *, now: float | None = None, ttl_seconds: int = VIDEO_CACHE_TTL_SECONDS) -> None:
     now = time.time() if now is None else now
     try:
@@ -341,6 +349,35 @@ def _download_video_with_ytdlp(
     if size_bytes > max_bytes:
         raise LegacyAdapterError("downloaded video exceeds download limit")
     return selected
+
+
+def _download_video_with_fallbacks(
+    url: str,
+    *,
+    output_dir: Path,
+    max_bytes: int,
+    referer: str,
+) -> tuple[Path, str]:
+    try:
+        return _download_video_with_ytdlp(
+            url,
+            output_dir=output_dir,
+            max_bytes=max_bytes,
+            referer=referer,
+        ), "yt-dlp"
+    except LegacyAdapterError as ytdlp_error:
+        fallback_path = output_dir / "source.mp4"
+        try:
+            _download_video_to_file(
+                url,
+                output_path=fallback_path,
+                max_bytes=max_bytes,
+                referer=referer,
+                timeout_seconds=180.0,
+            )
+            return fallback_path, "yt-dlp+http-fallback"
+        except LegacyAdapterError as http_error:
+            raise LegacyAdapterError(f"{ytdlp_error}; http fallback failed: {http_error}") from http_error
 
 
 def _probe_file_duration_seconds(path: Path) -> float | None:
@@ -822,19 +859,20 @@ def _prepare_downloaded_video_for_model(
 ) -> PreparedModelVideo:
     cache_root = _cache_root()
     _cleanup_video_cache(cache_root)
-    cache_key = _cache_key_for_url(input_url)
+    cache_key = _cache_key_for_video(input_url, video)
     cached_path = _cached_video_path(cache_root, cache_key)
     source_url = str(getattr(video, "source_url", "") or "")
     share_url = str(getattr(video, "share_url", "") or "")
     referer = share_url or _referer_for_url(source_url or input_url)
     cache_hit = cached_path is not None
+    download_tool = "cache"
     if cached_path is None:
         entry_dir = cache_root / cache_key
         if entry_dir.exists():
             shutil.rmtree(entry_dir)
         entry_dir.mkdir(parents=True, exist_ok=True)
         download_url = str(getattr(video, "video_url", "") or "") or input_url
-        cached_path = _download_video_with_ytdlp(
+        cached_path, download_tool = _download_video_with_fallbacks(
             download_url,
             output_dir=entry_dir,
             max_bytes=limits.max_download_bytes,
@@ -847,7 +885,7 @@ def _prepare_downloaded_video_for_model(
         duration_seconds=_duration_seconds(video),
         downloaded=True,
         cache_hit=cache_hit,
-        download_tool="yt-dlp",
+        download_tool=download_tool,
         cache_key=cache_key,
     )
 

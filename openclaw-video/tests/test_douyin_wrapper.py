@@ -28,6 +28,12 @@ class VideoTooLargeCompleted:
     stderr = "The request failed because the size of the input video (86 MiB) exceeds the limit (50 MiB)."
 
 
+class ServerOverloadedCompleted:
+    returncode = 2
+    stdout = ""
+    stderr = "Error code: 429 - {'error': {'code': 'ServerOverloaded', 'message': 'service overloaded'}}"
+
+
 class DouyinWrapperTests(unittest.TestCase):
     def test_runs_fixed_argument_command_with_resource_limits(self):
         with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
@@ -126,6 +132,16 @@ class DouyinWrapperTests(unittest.TestCase):
         with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
             run.return_value = VideoTooLargeCompleted()
             with self.assertRaises(VideoTooLargeForModelError):
+                run_douyin_chong(
+                    video_url="https://www.douyin.com/video/1",
+                    output_dir=Path(tmp),
+                    binary="/opt/douyin_chong/douyin_chong",
+                )
+
+    def test_model_overload_maps_to_timeout_retry_error(self):
+        with TemporaryDirectory() as tmp, patch("openclaw_video.douyin_wrapper.subprocess.run") as run:
+            run.return_value = ServerOverloadedCompleted()
+            with self.assertRaises(TimeoutError):
                 run_douyin_chong(
                     video_url="https://www.douyin.com/video/1",
                     output_dir=Path(tmp),

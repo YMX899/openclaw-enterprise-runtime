@@ -388,7 +388,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             env_file = Path(tmp) / "douyin.env"
             env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
             cache_root = Path(tmp) / "cache"
-            cache_key = adapter_module._cache_key_for_url("https://www.bilibili.com/video/BV1xx")
+            cache_key = adapter_module._cache_key_for_url("bilibili:1")
             entry_dir = cache_root / cache_key
             entry_dir.mkdir(parents=True)
             (entry_dir / "source.mp4").write_bytes(b"cached-video")
@@ -419,6 +419,37 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
 
         self.assertTrue(payload["raw_tool_result"]["model_input"]["cache_hit"])
         download.assert_not_called()
+
+    def test_download_cache_key_uses_platform_video_id(self):
+        video = FakeVideo(source_url="https://www.bilibili.com/video/BV1xx", video_id="BV1xx")
+        first = adapter_module._cache_key_for_video("https://www.bilibili.com/video/BV1xx?a=1", video)
+        second = adapter_module._cache_key_for_video("https://www.bilibili.com/video/BV1xx?b=2", video)
+        self.assertEqual(first, second)
+        self.assertEqual(first, adapter_module._cache_key_for_url("bilibili:BV1xx"))
+
+    def test_ytdlp_download_falls_back_to_bounded_http_download(self):
+        with TemporaryDirectory() as tmp:
+            output_dir = Path(tmp)
+
+            def fake_http(_url, *, output_path, **_kwargs):
+                output_path.write_bytes(b"http-video")
+                return output_path.stat().st_size
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp", side_effect=LegacyAdapterError("yt-dlp failed")),
+                patch("openclaw_video.douyin_legacy_adapter._download_video_to_file", side_effect=fake_http) as http_download,
+            ):
+                path, tool = adapter_module._download_video_with_fallbacks(
+                    "https://video.example/video.mp4",
+                    output_dir=output_dir,
+                    max_bytes=2000,
+                    referer="https://www.bilibili.com/",
+                )
+
+            self.assertEqual(path.name, "source.mp4")
+            self.assertEqual(tool, "yt-dlp+http-fallback")
+            self.assertEqual(path.read_bytes(), b"http-video")
+            http_download.assert_called_once()
 
     def test_video_cache_cleanup_removes_entries_after_24_hours(self):
         with TemporaryDirectory() as tmp:

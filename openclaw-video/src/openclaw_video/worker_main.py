@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 
@@ -19,6 +20,7 @@ from .worker_service import VideoAnalysisWorker, WorkerConfig
 def main() -> None:
     """Worker entrypoint for the V1 low-concurrency durable queue."""
 
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is required for video-analysis-worker")
