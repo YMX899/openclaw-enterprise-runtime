@@ -36,6 +36,8 @@ class FakeCompletion:
     usage: dict | None = None
     request_id: str = "req-1"
     error_message: str = ""
+    error_type: str = ""
+    api_error_code: str = ""
     api_error_message: str = ""
 
 
@@ -65,12 +67,15 @@ class FakeResolver:
 class FakeArkClient:
     calls = []
     completion = FakeCompletion()
+    completions = []
 
     def __init__(self, config):
         self.config = config
 
     def analyze(self, *, video_urls, prompt):
         self.calls.append({"video_urls": video_urls, "prompt": prompt})
+        if self.completions:
+            return self.completions.pop(0)
         return self.completion
 
 
@@ -83,6 +88,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         FakeConfig.calls = []
         FakeConfig.env_snapshots = []
         FakeArkClient.calls = []
+        FakeArkClient.completions = []
         FakeResolver.video = FakeVideo()
         FakeArkClient.completion = FakeCompletion()
 
@@ -236,17 +242,19 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             output_json = Path(tmp) / "result.json"
             FakeResolver.video = FakeVideo(duration_ms=45_000, size_mb=86)
 
-            def fake_download(_url, *, output_path, **_kwargs):
-                output_path.write_bytes(b"x" * (86 * 1024 * 1024))
-                return output_path.stat().st_size
+            def fake_download(_url, *, output_dir, **_kwargs):
+                path = output_dir / "source.mp4"
+                path.write_bytes(b"x" * (86 * 1024 * 1024))
+                return path
 
             def fake_compress(_input_path, *, output_path, **_kwargs):
                 output_path.write_bytes(b"compressed-video")
                 return output_path.stat().st_size
 
             with (
-                patch("openclaw_video.douyin_legacy_adapter._download_video_to_file", side_effect=fake_download) as download,
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp", side_effect=fake_download) as download,
                 patch("openclaw_video.douyin_legacy_adapter._compress_video_for_model", side_effect=fake_compress) as compress,
+                patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"OPENCLAW_VIDEO_CACHE_DIR": str(Path(tmp) / "cache")}),
             ):
                 payload = run_adapter(
                     [
@@ -270,6 +278,167 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertTrue(FakeArkClient.calls[0]["video_urls"][0].startswith("data:video/mp4;base64,"))
         download.assert_called_once()
         compress.assert_called_once()
+
+    def test_bilibili_small_video_downloads_before_analysis(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            output_json = Path(tmp) / "result.json"
+            FakeResolver.video = FakeVideo(
+                source_url="https://www.bilibili.com/video/BV1xx",
+                share_url="https://www.bilibili.com/video/BV1xx",
+                video_url="https://upos.example/video.mp4",
+                playwm_url="https://upos.example/video.mp4",
+                size_mb=9,
+            )
+
+            def fake_download(_url, *, output_dir, **_kwargs):
+                path = output_dir / "source.mp4"
+                path.write_bytes(b"bilibili-video")
+                return path
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp", side_effect=fake_download) as download,
+                patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"OPENCLAW_VIDEO_CACHE_DIR": str(Path(tmp) / "cache")}),
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.bilibili.com/video/BV1xx",
+                        "--output-json", str(output_json),
+                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-model-bytes", str(50 * 1024 * 1024),
+                        "--max-duration-seconds", "300",
+                        "--max-frames", "6000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        self.assertEqual(len(FakeArkClient.calls), 1)
+        self.assertTrue(FakeArkClient.calls[0]["video_urls"][0].startswith("data:video/mp4;base64,"))
+        self.assertTrue(payload["raw_tool_result"]["model_input"]["downloaded"])
+        self.assertEqual(payload["raw_tool_result"]["model_input"]["download_tool"], "yt-dlp")
+        download.assert_called_once()
+        self.assertEqual(download.call_args.args[0], "https://upos.example/video.mp4")
+
+    def test_small_stable_direct_url_success_does_not_download(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+
+            with patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp") as download:
+                run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(Path(tmp) / "result.json"),
+                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-model-bytes", str(50 * 1024 * 1024),
+                        "--max-duration-seconds", "300",
+                        "--max-frames", "6000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        self.assertIn("https://video.example/video.mp4", FakeArkClient.calls[0]["video_urls"])
+        download.assert_not_called()
+
+    def test_invalid_direct_url_falls_back_to_ytdlp_download(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            FakeArkClient.completions = [
+                FakeCompletion(output_text="", api_error_code="InvalidParameter", api_error_message="Invalid video_url."),
+                FakeCompletion(output_text="下载后分析结果"),
+            ]
+
+            def fake_download(_url, *, output_dir, **_kwargs):
+                path = output_dir / "source.mp4"
+                path.write_bytes(b"downloaded-video")
+                return path
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp", side_effect=fake_download) as download,
+                patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"OPENCLAW_VIDEO_CACHE_DIR": str(Path(tmp) / "cache")}),
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(Path(tmp) / "result.json"),
+                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-model-bytes", str(50 * 1024 * 1024),
+                        "--max-duration-seconds", "300",
+                        "--max-frames", "6000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        self.assertEqual(payload["summary"], "下载后分析结果")
+        self.assertEqual(len(FakeArkClient.calls), 2)
+        self.assertIn("https://video.example/video.mp4", FakeArkClient.calls[0]["video_urls"])
+        self.assertTrue(FakeArkClient.calls[1]["video_urls"][0].startswith("data:video/mp4;base64,"))
+        download.assert_called_once()
+
+    def test_download_cache_reuses_video_for_24_hours(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            cache_root = Path(tmp) / "cache"
+            cache_key = adapter_module._cache_key_for_url("https://www.bilibili.com/video/BV1xx")
+            entry_dir = cache_root / cache_key
+            entry_dir.mkdir(parents=True)
+            (entry_dir / "source.mp4").write_bytes(b"cached-video")
+            FakeResolver.video = FakeVideo(
+                source_url="https://www.bilibili.com/video/BV1xx",
+                share_url="https://www.bilibili.com/video/BV1xx",
+                video_url="https://upos.example/video.mp4",
+                size_mb=9,
+            )
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp") as download,
+                patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"OPENCLAW_VIDEO_CACHE_DIR": str(cache_root)}),
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.bilibili.com/video/BV1xx",
+                        "--output-json", str(Path(tmp) / "result.json"),
+                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-model-bytes", str(50 * 1024 * 1024),
+                        "--max-duration-seconds", "300",
+                        "--max-frames", "6000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                    ],
+                    component_loader=fake_components,
+                )
+
+        self.assertTrue(payload["raw_tool_result"]["model_input"]["cache_hit"])
+        download.assert_not_called()
+
+    def test_video_cache_cleanup_removes_entries_after_24_hours(self):
+        with TemporaryDirectory() as tmp:
+            cache_root = Path(tmp) / "cache"
+            fresh = cache_root / "fresh"
+            stale = cache_root / "stale"
+            fresh.mkdir(parents=True)
+            stale.mkdir()
+            (fresh / "source.mp4").write_bytes(b"fresh")
+            (stale / "source.mp4").write_bytes(b"stale")
+            now = 2_000_000.0
+            old = now - adapter_module.VIDEO_CACHE_TTL_SECONDS - 10
+            adapter_module.os.utime(stale, (old, old))
+            adapter_module.os.utime(stale / "source.mp4", (old, old))
+
+            adapter_module._cleanup_video_cache(cache_root, now=now)
+
+            self.assertTrue(fresh.exists())
+            self.assertFalse(stale.exists())
+
 
     def test_model_size_beyond_minimum_fps_fails_before_analysis(self):
         with TemporaryDirectory() as tmp:

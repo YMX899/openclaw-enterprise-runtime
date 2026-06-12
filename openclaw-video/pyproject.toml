@@ -14,7 +14,8 @@ dependencies = [
   "websockets>=14,<17",
   "cryptography>=43,<46",
   "requests>=2.32,<3",
-  "volcengine-python-sdk>=5.0,<6"
+  "volcengine-python-sdk>=5.0,<6",
+  "yt-dlp>=2025.6.9"
 ]
 
 [project.scripts]

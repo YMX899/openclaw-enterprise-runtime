@@ -4,12 +4,14 @@ import argparse
 import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 from typing import Any, Callable
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -29,6 +31,10 @@ from .video_limits import (
 class LegacyAdapterError(RuntimeError):
     pass
 
+
+MODEL_INLINE_TARGET_BYTES = 45 * 1024 * 1024
+VIDEO_CACHE_TTL_SECONDS = 24 * 60 * 60
+DEFAULT_VIDEO_CACHE_DIR = "/tmp/openclaw-video/cache"
 
 LEGACY_CONFIG_ENV_KEYS = (
     "ARK_API_KEY",
@@ -68,6 +74,10 @@ class PreparedModelVideo:
     size_bytes: int
     fps: float
     compressed: bool
+    downloaded: bool = False
+    cache_hit: bool = False
+    download_tool: str = ""
+    cache_key: str = ""
 
 
 def _positive_int(value: int, name: str) -> int:
@@ -159,6 +169,51 @@ def _request_headers(*, referer: str = "https://www.douyin.com/") -> dict[str, s
     }
 
 
+def _model_inline_target_bytes(limits: LegacyVideoLimits) -> int:
+    return min(MODEL_INLINE_TARGET_BYTES, max(1, int(limits.max_model_video_bytes * 0.90)))
+
+
+def _cache_root() -> Path:
+    return Path(os.environ.get("OPENCLAW_VIDEO_CACHE_DIR", DEFAULT_VIDEO_CACHE_DIR))
+
+
+def _cache_key_for_url(url: str) -> str:
+    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+
+
+def _cleanup_video_cache(cache_root: Path, *, now: float | None = None, ttl_seconds: int = VIDEO_CACHE_TTL_SECONDS) -> None:
+    now = time.time() if now is None else now
+    try:
+        cache_root.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+    for path in cache_root.iterdir():
+        try:
+            if now - path.stat().st_mtime <= ttl_seconds:
+                continue
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        except OSError:
+            continue
+
+
+def _cached_video_path(cache_root: Path, key: str) -> Path | None:
+    entry_dir = cache_root / key
+    if not entry_dir.is_dir():
+        return None
+    for candidate in sorted(entry_dir.iterdir()):
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            try:
+                os.utime(entry_dir, None)
+                os.utime(candidate, None)
+            except OSError:
+                pass
+            return candidate
+    return None
+
+
 def _probe_stream_size_bytes(
     url: str,
     *,
@@ -231,6 +286,63 @@ def _download_video_to_file(
     return total
 
 
+def _download_video_with_ytdlp(
+    url: str,
+    *,
+    output_dir: Path,
+    max_bytes: int,
+    referer: str,
+    timeout_seconds: float = 900.0,
+) -> Path:
+    ytdlp = shutil.which("yt-dlp")
+    if not ytdlp:
+        raise LegacyAdapterError("yt-dlp is required to download platform video")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_template = str(output_dir / "source.%(ext)s")
+    cmd = [
+        ytdlp,
+        "--no-playlist",
+        "--no-progress",
+        "--no-warnings",
+        "--retries",
+        "3",
+        "--fragment-retries",
+        "3",
+        "--socket-timeout",
+        "30",
+        "--max-filesize",
+        str(_positive_int(max_bytes, "max_bytes")),
+        "--user-agent",
+        _request_headers(referer=referer)["User-Agent"],
+        "--referer",
+        referer,
+        "-f",
+        "bv*+ba/b[ext=mp4]/b",
+        "--merge-output-format",
+        "mp4",
+        "-o",
+        output_template,
+        url,
+    ]
+    try:
+        completed = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        raise LegacyAdapterError("yt-dlp download timed out") from exc
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        raise LegacyAdapterError(f"yt-dlp download failed: {detail[:800]}")
+    candidates = [path for path in output_dir.iterdir() if path.is_file() and path.name.startswith("source.")]
+    if not candidates:
+        raise LegacyAdapterError("yt-dlp produced no video file")
+    selected = max(candidates, key=lambda path: path.stat().st_size)
+    size_bytes = selected.stat().st_size
+    if size_bytes <= 0:
+        raise LegacyAdapterError("downloaded video is empty")
+    if size_bytes > max_bytes:
+        raise LegacyAdapterError("downloaded video exceeds download limit")
+    return selected
+
+
 def _probe_file_duration_seconds(path: Path) -> float | None:
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
@@ -274,7 +386,7 @@ def _compress_video_for_model(
     duration = duration_seconds or _probe_file_duration_seconds(input_path)
     if duration is None or duration <= 0:
         raise LegacyAdapterError("video duration is unavailable")
-    target_bytes = int(limits.max_model_video_bytes * 0.90)
+    target_bytes = _model_inline_target_bytes(limits)
     audio_bitrate = 64_000
     total_bitrate = max(180_000, int((target_bytes * 8) / duration * 0.92))
     video_bitrate = max(120_000, total_bitrate - audio_bitrate)
@@ -322,7 +434,7 @@ def _compress_video_for_model(
     size_bytes = output_path.stat().st_size if output_path.exists() else 0
     if size_bytes <= 0:
         raise LegacyAdapterError("compressed video is empty")
-    if size_bytes > limits.max_model_video_bytes:
+    if size_bytes > _model_inline_target_bytes(limits):
         raise LegacyAdapterError("compressed video still exceeds model size limit")
     return size_bytes
 
@@ -365,12 +477,64 @@ def _enforce_limits(video: Any, limits: LegacyVideoLimits) -> float:
     return round(effective_fps, 4)
 
 
+def _is_unstable_external_video(video: Any, input_url: str) -> bool:
+    platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
+    if platform == "bilibili":
+        return True
+    direct_host = (urlparse(str(getattr(video, "video_url", "") or "")).hostname or "").lower()
+    return "bilivideo.com" in direct_host
+
+
+def _should_try_direct_model_url(video: Any, input_url: str, limits: LegacyVideoLimits) -> bool:
+    size = _size_bytes(video)
+    if size is None:
+        return False
+    if size > _model_inline_target_bytes(limits):
+        return False
+    return not _is_unstable_external_video(video, input_url)
+
+
+def _completion_ok(completion: Any) -> bool:
+    return bool(_safe_text(getattr(completion, "output_text", "")))
+
+
+def _should_download_after_model_failure(completion: Any) -> bool:
+    detail = " ".join(
+        str(value or "")
+        for value in (
+            getattr(completion, "api_error_code", ""),
+            getattr(completion, "api_error_message", ""),
+            getattr(completion, "error_message", ""),
+            getattr(completion, "error_type", ""),
+        )
+    ).lower()
+    retry_markers = (
+        "invalid video_url",
+        "invalidargumenterror",
+        "timeout occurred while processing video",
+        "timeout",
+        "timed out",
+        "exceeds the limit",
+        "exceed",
+        "too large",
+        "download",
+        "fetch",
+        "403",
+        "404",
+    )
+    return any(marker in detail for marker in retry_markers)
+
+
 def _prepare_local_video_for_model(
     input_path: Path,
     *,
     output_dir: Path,
     limits: LegacyVideoLimits,
     duration_seconds: float | None,
+    downloaded: bool = False,
+    cache_hit: bool = False,
+    download_tool: str = "",
+    cache_key: str = "",
 ) -> PreparedModelVideo:
     size_bytes = input_path.stat().st_size
     if size_bytes <= 0:
@@ -378,8 +542,17 @@ def _prepare_local_video_for_model(
     if size_bytes > limits.max_download_bytes:
         raise LegacyAdapterError("video size exceeds download limit")
     effective_fps = _effective_fps_for_size(size_bytes, limits)
-    if size_bytes <= limits.max_model_video_bytes:
-        return PreparedModelVideo(path=input_path, size_bytes=size_bytes, fps=round(effective_fps, 4), compressed=False)
+    if size_bytes <= _model_inline_target_bytes(limits):
+        return PreparedModelVideo(
+            path=input_path,
+            size_bytes=size_bytes,
+            fps=round(effective_fps, 4),
+            compressed=False,
+            downloaded=downloaded,
+            cache_hit=cache_hit,
+            download_tool=download_tool,
+            cache_key=cache_key,
+        )
     compressed_path = output_dir / "model-input-compressed.mp4"
     compressed_size = _compress_video_for_model(
         input_path,
@@ -388,7 +561,16 @@ def _prepare_local_video_for_model(
         duration_seconds=duration_seconds,
         fps=round(effective_fps, 4),
     )
-    return PreparedModelVideo(path=compressed_path, size_bytes=compressed_size, fps=round(effective_fps, 4), compressed=True)
+    return PreparedModelVideo(
+        path=compressed_path,
+        size_bytes=compressed_size,
+        fps=round(effective_fps, 4),
+        compressed=True,
+        downloaded=downloaded,
+        cache_hit=cache_hit,
+        download_tool=download_tool,
+        cache_key=cache_key,
+    )
 
 
 def _default_prompt() -> str:
@@ -487,6 +669,10 @@ def _build_payload(
             "compressed": model_input.compressed,
             "size_bytes": model_input.size_bytes,
             "fps": model_input.fps,
+            "downloaded": model_input.downloaded,
+            "cache_hit": model_input.cache_hit,
+            "download_tool": model_input.download_tool,
+            "cache_key_sha256": model_input.cache_key,
         }
     payload = {
         "schema_version": RESULT_SCHEMA_VERSION,
@@ -558,6 +744,10 @@ def _build_upload_payload(
             "compressed": model_input.compressed,
             "size_bytes": model_input.size_bytes,
             "fps": model_input.fps,
+            "downloaded": model_input.downloaded,
+            "cache_hit": model_input.cache_hit,
+            "download_tool": model_input.download_tool,
+            "cache_key_sha256": model_input.cache_key,
         }
     payload = {
         "schema_version": RESULT_SCHEMA_VERSION,
@@ -612,9 +802,7 @@ def _analyze_uploaded_file(
         limits=limits,
         duration_seconds=None,
     )
-    content_type = _UPLOAD_CONTENT_TYPES.get(model_input.path.suffix.lower(), "video/mp4")
-    encoded = base64.b64encode(model_input.path.read_bytes()).decode("ascii")
-    data_url = f"data:{content_type};base64,{encoded}"
+    data_url = _data_url_for_model_input(model_input)
     completion = ark_video_client(config).analyze(video_urls=[data_url], prompt=_upload_prompt())
     return _build_upload_payload(
         source_label=source_label,
@@ -623,6 +811,51 @@ def _analyze_uploaded_file(
         completion=completion,
         model_input=model_input,
     )
+
+
+def _prepare_downloaded_video_for_model(
+    *,
+    input_url: str,
+    video: Any,
+    output_dir: Path,
+    limits: LegacyVideoLimits,
+) -> PreparedModelVideo:
+    cache_root = _cache_root()
+    _cleanup_video_cache(cache_root)
+    cache_key = _cache_key_for_url(input_url)
+    cached_path = _cached_video_path(cache_root, cache_key)
+    source_url = str(getattr(video, "source_url", "") or "")
+    share_url = str(getattr(video, "share_url", "") or "")
+    referer = share_url or _referer_for_url(source_url or input_url)
+    cache_hit = cached_path is not None
+    if cached_path is None:
+        entry_dir = cache_root / cache_key
+        if entry_dir.exists():
+            shutil.rmtree(entry_dir)
+        entry_dir.mkdir(parents=True, exist_ok=True)
+        download_url = str(getattr(video, "video_url", "") or "") or input_url
+        cached_path = _download_video_with_ytdlp(
+            download_url,
+            output_dir=entry_dir,
+            max_bytes=limits.max_download_bytes,
+            referer=referer,
+        )
+    return _prepare_local_video_for_model(
+        cached_path,
+        output_dir=output_dir,
+        limits=limits,
+        duration_seconds=_duration_seconds(video),
+        downloaded=True,
+        cache_hit=cache_hit,
+        download_tool="yt-dlp",
+        cache_key=cache_key,
+    )
+
+
+def _data_url_for_model_input(model_input: PreparedModelVideo) -> str:
+    content_type = _UPLOAD_CONTENT_TYPES.get(model_input.path.suffix.lower(), "video/mp4")
+    encoded = base64.b64encode(model_input.path.read_bytes()).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -716,28 +949,21 @@ def run_adapter(
             retries=args.retries,
         )
         model_input = None
-        video_urls = [url for url in (getattr(video, "video_url", ""), getattr(video, "playwm_url", "")) if url]
-        original_size = _size_bytes(video)
-        if original_size is not None and original_size > limits.max_model_video_bytes:
-            direct_url = str(getattr(video, "video_url", "") or "")
-            source_url = str(getattr(video, "source_url", "") or "")
-            share_url = str(getattr(video, "share_url", "") or "")
-            downloaded_path = output_json.parent / "model-input-original.mp4"
-            _download_video_to_file(
-                direct_url,
-                output_path=downloaded_path,
-                max_bytes=limits.max_download_bytes,
-                referer=share_url or _referer_for_url(source_url),
-            )
-            model_input = _prepare_local_video_for_model(
-                downloaded_path,
+        direct_video_urls = [url for url in (getattr(video, "video_url", ""), getattr(video, "playwm_url", "")) if url]
+        client = ArkVideoClient(config)
+        completion = None
+        if _should_try_direct_model_url(video, args.input_url, effective_limits):
+            completion = client.analyze(video_urls=direct_video_urls, prompt=_default_prompt())
+        if completion is None or (not _completion_ok(completion) and _should_download_after_model_failure(completion)):
+            model_input = _prepare_downloaded_video_for_model(
+                input_url=resolver_input_url,
+                video=video,
                 output_dir=output_json.parent,
                 limits=limits,
-                duration_seconds=_duration_seconds(video),
             )
-            encoded = base64.b64encode(model_input.path.read_bytes()).decode("ascii")
-            video_urls = [f"data:video/mp4;base64,{encoded}"]
-        completion = ArkVideoClient(config).analyze(video_urls=video_urls, prompt=_default_prompt())
+            effective_limits = effective_limits.with_fps(model_input.fps)
+            data_url = _data_url_for_model_input(model_input)
+            completion = client.analyze(video_urls=[data_url], prompt=_default_prompt())
         payload = _build_payload(
             input_url=args.input_url,
             video=video,
