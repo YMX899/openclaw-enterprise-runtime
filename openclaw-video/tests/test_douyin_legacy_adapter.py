@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -7,12 +8,15 @@ from unittest.mock import patch
 
 import openclaw_video.douyin_legacy_adapter as adapter_module
 from openclaw_video.douyin_legacy_adapter import (
+    FILES_API_MODE,
+    INLINE_LEGACY_MODE,
     LegacyAdapterError,
     _canonicalize_input_for_resolver,
     _load_legacy_components,
     _platform_from_url,
     run_adapter,
 )
+from openclaw_video.video_limits import MAX_VIDEO_BYTES
 
 
 @dataclass(frozen=True)
@@ -79,26 +83,161 @@ class FakeArkClient:
         return self.completion
 
 
+class FakeFilesClient:
+    calls = []
+    upload_statuses = []
+    retrieve_statuses = []
+    output_text = "【视频摘要】\n摘要结果\n【视频详细内容】\n逐段细节"
+
+    def __init__(self, *, api_key, base_url, timeout_seconds):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.timeout_seconds = timeout_seconds
+        self.calls.append({"method": "init", "api_key": api_key, "base_url": base_url, "timeout_seconds": timeout_seconds})
+
+    def upload_user_data_file(self, path, mime_type):
+        self.calls.append({"method": "upload", "path": str(path), "mime_type": mime_type})
+        return {"id": "file-test", "status": self.upload_statuses.pop(0) if self.upload_statuses else "processing"}
+
+    def retrieve_file(self, file_id):
+        status = self.retrieve_statuses.pop(0) if self.retrieve_statuses else "active"
+        self.calls.append({"method": "retrieve", "file_id": file_id, "status": status})
+        return {"id": file_id, "status": status}
+
+    def wait_file_active(self, file_id, *, timeout_seconds=300, poll_interval_seconds=2.0):
+        self.calls.append({"method": "wait", "file_id": file_id, "timeout_seconds": timeout_seconds})
+        return self.retrieve_file(file_id)
+
+    def create_video_response(self, *, model, file_id, prompt, max_tokens=12000, temperature=0.1, fps=None):
+        self.calls.append({
+            "method": "responses",
+            "model": model,
+            "file_id": file_id,
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "fps": fps,
+        })
+        return {"id": "resp-test", "output_text": self.output_text, "usage": {"total_tokens": 1}}
+
+    @staticmethod
+    def extract_output_text(payload):
+        return str(payload.get("output_text") or "")
+
+
 def fake_components():
     return FakeConfig, FakeResolver, FakeArkClient
 
 
 class DouyinLegacyAdapterTests(unittest.TestCase):
     def setUp(self):
+        self._previous_input_mode = os.environ.get("VIDEO_ANALYSIS_INPUT_MODE")
+        os.environ["VIDEO_ANALYSIS_INPUT_MODE"] = INLINE_LEGACY_MODE
         FakeConfig.calls = []
         FakeConfig.env_snapshots = []
         FakeArkClient.calls = []
         FakeArkClient.completions = []
+        FakeFilesClient.calls = []
+        FakeFilesClient.upload_statuses = []
+        FakeFilesClient.retrieve_statuses = []
+        FakeFilesClient.output_text = "【视频摘要】\n摘要结果\n【视频详细内容】\n逐段细节"
         FakeResolver.video = FakeVideo()
         FakeArkClient.completion = FakeCompletion()
+
+    def tearDown(self):
+        if self._previous_input_mode is None:
+            os.environ.pop("VIDEO_ANALYSIS_INPUT_MODE", None)
+        else:
+            os.environ["VIDEO_ANALYSIS_INPUT_MODE"] = self._previous_input_mode
 
     def test_model_prompts_require_markdown_format(self):
         default_prompt = adapter_module._default_prompt()
         upload_prompt = adapter_module._upload_prompt()
         for prompt in (default_prompt, upload_prompt):
-            self.assertIn("Markdown", prompt)
-            self.assertIn("##", prompt)
-            self.assertTrue("代码块" in prompt or "code block" in prompt)
+            self.assertIn("【视频摘要】", prompt)
+            self.assertIn("【视频详细内容】", prompt)
+            self.assertIn("声音", prompt)
+
+    def test_split_video_analysis_output_extracts_summary_and_detail(self):
+        summary, detail, status = adapter_module._split_video_analysis_output(
+            "【视频摘要】\n摘要\n【视频详细内容】\n00:00 细节"
+        )
+        self.assertEqual(summary, "摘要")
+        self.assertEqual(detail, "00:00 细节")
+        self.assertEqual(status, "parsed_sections")
+
+    def test_files_api_input_file_uploads_waits_and_calls_responses(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+            video_file = Path(tmp) / "clip.mp4"
+            video_file.write_bytes(b"fake-video-bytes")
+            output_json = Path(tmp) / "result.json"
+
+            payload = run_adapter(
+                [
+                    "--input-file", str(video_file),
+                    "--source-label", "upload://abc/clip.mp4",
+                    "--output-json", str(output_json),
+                    "--max-bytes", "2000000",
+                    "--max-duration-seconds", "60",
+                    "--max-frames", "1200",
+                    "--env-file", str(env_file),
+                    "--no-shell",
+                    "--input-mode", FILES_API_MODE,
+                ],
+                component_loader=fake_components,
+                files_client_factory=FakeFilesClient,
+            )
+
+        self.assertEqual(payload["source"]["platform"], "upload")
+        self.assertEqual(payload["summary"], "摘要结果")
+        self.assertEqual(payload["analysis_detail"], "逐段细节")
+        self.assertEqual(payload["raw_tool_result"]["mode"], FILES_API_MODE)
+        self.assertEqual(payload["raw_tool_result"]["file_id"], "file-test")
+        self.assertEqual(payload["raw_tool_result"]["mime_type"], "video/mp4")
+        self.assertEqual(payload["raw_tool_result"]["model"], "doubao-seed-2-0-lite-260428")
+        self.assertEqual(payload["raw_tool_result"]["analysis_fps"], 1.0)
+        self.assertEqual(FakeFilesClient.calls[-1]["fps"], 1.0)
+        methods = [call["method"] for call in FakeFilesClient.calls]
+        self.assertEqual(methods, ["init", "upload", "wait", "retrieve", "responses"])
+
+    def test_files_api_url_downloads_with_ytdlp_before_upload(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=test\nARK_RESPONSES_MODEL=custom-video-model\n", encoding="utf-8")
+
+            def fake_download(_url, *, output_dir, **_kwargs):
+                path = output_dir / "source.mp4"
+                path.write_bytes(b"downloaded-video")
+                return path
+
+            with (
+                patch("openclaw_video.douyin_legacy_adapter._download_video_with_ytdlp", side_effect=fake_download) as download,
+                patch.dict("openclaw_video.douyin_legacy_adapter.os.environ", {"OPENCLAW_VIDEO_CACHE_DIR": str(Path(tmp) / "cache")}),
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-url", "https://www.douyin.com/video/1",
+                        "--output-json", str(Path(tmp) / "result.json"),
+                        "--max-bytes", "2000000",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                        "--input-mode", FILES_API_MODE,
+                    ],
+                    component_loader=fake_components,
+                    files_client_factory=FakeFilesClient,
+                )
+
+        self.assertEqual(payload["summary"], "摘要结果")
+        self.assertEqual(payload["analysis_detail"], "逐段细节")
+        self.assertEqual(payload["raw_tool_result"]["tool"], "ark-files-responses")
+        self.assertEqual(payload["raw_tool_result"]["download_tool"], "yt-dlp")
+        self.assertEqual(payload["raw_tool_result"]["model"], "custom-video-model")
+        self.assertEqual(payload["raw_tool_result"]["analysis_fps"], 2.0)
+        self.assertEqual(FakeFilesClient.calls[-1]["fps"], 2.0)
+        self.assertFalse(FakeArkClient.calls)
+        download.assert_called_once()
 
     def test_vendored_candidate_components_are_importable(self):
         vendor_root = Path(__file__).resolve().parents[1] / "vendor"
@@ -191,6 +330,23 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(_platform_from_url("https://vm.tiktok.com/abc"), "tiktok")
         self.assertEqual(_platform_from_url("https://www.bilibili.com/video/BV1xx"), "bilibili")
         self.assertEqual(_platform_from_url("https://b23.tv/abc"), "bilibili")
+        self.assertEqual(_platform_from_url("https://www.xiaohongshu.com/explore/abc"), "xiaohongshu")
+        self.assertEqual(_platform_from_url("https://xhslink.com/a/abc"), "xiaohongshu")
+
+    def test_files_api_analysis_fps_policy_uses_video_duration(self):
+        cases = [
+            (None, 1.0),
+            (0, 1.0),
+            (60, 2.0),
+            (60.1, 1.0),
+            (300, 1.0),
+            (300.1, 0.5),
+            (1200, 0.5),
+            (1200.1, 0.2),
+        ]
+        for duration, expected in cases:
+            with self.subTest(duration=duration):
+                self.assertEqual(adapter_module._files_api_analysis_fps_for_duration(duration), expected)
 
     def test_writes_committed_result_schema_without_default_env(self):
         with TemporaryDirectory() as tmp:
@@ -225,8 +381,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(payload["source"]["platform"], "douyin")
         self.assertEqual(payload["summary"], "分析结果")
         self.assertEqual(written_payload, payload)
-        self.assertIn("Markdown", FakeArkClient.calls[0]["prompt"])
-        self.assertIn("##", FakeArkClient.calls[0]["prompt"])
+        self.assertIn("【视频摘要】", FakeArkClient.calls[0]["prompt"])
+        self.assertIn("【视频详细内容】", FakeArkClient.calls[0]["prompt"])
         self.assertEqual(FakeConfig.env_snapshots[0]["ARK_API_KEY"], None)
         self.assertEqual(FakeConfig.env_snapshots[0]["MODEL"], None)
         config_call = FakeConfig.calls[0]
@@ -260,7 +416,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     [
                         "--input-url", "https://www.douyin.com/video/1",
                         "--output-json", str(output_json),
-                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-bytes", str(MAX_VIDEO_BYTES),
                         "--max-model-bytes", str(50 * 1024 * 1024),
                         "--max-duration-seconds", "60",
                         "--max-frames", "1200",
@@ -305,7 +461,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     [
                         "--input-url", "https://www.bilibili.com/video/BV1xx",
                         "--output-json", str(output_json),
-                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-bytes", str(MAX_VIDEO_BYTES),
                         "--max-model-bytes", str(50 * 1024 * 1024),
                         "--max-duration-seconds", "300",
                         "--max-frames", "6000",
@@ -332,7 +488,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     [
                         "--input-url", "https://www.douyin.com/video/1",
                         "--output-json", str(Path(tmp) / "result.json"),
-                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-bytes", str(MAX_VIDEO_BYTES),
                         "--max-model-bytes", str(50 * 1024 * 1024),
                         "--max-duration-seconds", "300",
                         "--max-frames", "6000",
@@ -367,7 +523,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     [
                         "--input-url", "https://www.douyin.com/video/1",
                         "--output-json", str(Path(tmp) / "result.json"),
-                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-bytes", str(MAX_VIDEO_BYTES),
                         "--max-model-bytes", str(50 * 1024 * 1024),
                         "--max-duration-seconds", "300",
                         "--max-frames", "6000",
@@ -407,7 +563,7 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     [
                         "--input-url", "https://www.bilibili.com/video/BV1xx",
                         "--output-json", str(Path(tmp) / "result.json"),
-                        "--max-bytes", str(512 * 1024 * 1024),
+                        "--max-bytes", str(MAX_VIDEO_BYTES),
                         "--max-model-bytes", str(50 * 1024 * 1024),
                         "--max-duration-seconds", "300",
                         "--max-frames", "6000",
@@ -660,6 +816,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                     "--source-label", "upload://abc/clip.mp4",
                     "--output-json", str(output_json),
                     "--max-bytes", "2000000",
+                    "--max-duration-seconds", "60",
+                    "--max-frames", "1200",
                     "--env-file", str(env_file),
                     "--no-shell",
                 ],
@@ -674,8 +832,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(payload["raw_tool_result"]["filename"], "clip.mp4")
         self.assertEqual(payload["raw_tool_result"]["model_input"]["compressed"], False)
         self.assertEqual(payload["raw_tool_result"]["model_input"]["size_bytes"], len(b"fake-video-bytes"))
-        self.assertIn("Markdown", FakeArkClient.calls[0]["prompt"])
-        self.assertIn("##", FakeArkClient.calls[0]["prompt"])
+        self.assertIn("【视频摘要】", FakeArkClient.calls[0]["prompt"])
+        self.assertIn("【视频详细内容】", FakeArkClient.calls[0]["prompt"])
         # the model received an inline base64 data: URL, not a resolved link
         sent_url = FakeArkClient.calls[0]["video_urls"][0]
         self.assertTrue(sent_url.startswith("data:video/mp4;base64,"))
@@ -700,6 +858,8 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
                         "--output-json", str(output_json),
                         "--max-bytes", "3000",
                         "--max-model-bytes", "1000",
+                        "--max-duration-seconds", "60",
+                        "--max-frames", "1200",
                         "--env-file", str(env_file),
                         "--no-shell",
                     ],

@@ -1553,9 +1553,9 @@ function addAttachmentChip(node, name) {
     function buildJobErrorReply(errorCode) {
       const map = {
         url_rejected: '这个链接没有通过安全校验或无法解析。请发抖音/TikTok/B站单条视频页链接，不要发主页或其他暂未支持的平台链接。',
-        tool_timeout: '这条视频解析超时了。可以稍后重试，或换一条更短的单条视频链接。',
-        upload_too_large: '这个视频文件超过当前上传分析上限。请压缩或裁剪后再上传。',
-        video_too_large: '这条视频链接可以识别，但即使把视频理解 fps 降到最低，仍超过当前模型可分析范围。请压缩或裁剪后上传，或换一条更短的视频链接。',
+        tool_timeout: '这条视频解析超时了。可以稍后重试，或换一条更小的单条视频链接。',
+        upload_too_large: '这个视频文件超过 500MB，暂时无法分析。请换一个 500MB 以内的 mp4 视频文件。',
+        video_too_large: '这条视频链接可以识别，但视频超过 500MB，暂时无法分析。请换一条 500MB 以内的 mp4 视频链接或文件。',
         tool_failed: '这条视频暂时没能成功解析，所以我不能假装看过它。可以确认视频未被删除/设为私密，或换完整视频页链接重试。'
       };
       return map[errorCode] || '分析任务未能完成。可以稍后重试，或换一条视频链接。';
@@ -1584,13 +1584,11 @@ function addAttachmentChip(node, name) {
       const limits = payload.limits && typeof payload.limits === 'object' ? payload.limits : {};
       const duration = secondsLabel(payload.duration_seconds) || '暂未确认';
       const size = bytesLabel(payload.size_bytes) || '暂未确认';
-      const fps = Number(limits.video_understanding_fps);
-      const fpsText = Number.isFinite(fps) ? `视频理解 fps：${fps}` : '视频理解 fps：按系统配置';
       const platform = platformLabelFromHost(payload.canonical_host);
       return [
         `链接已识别，平台：${platform}。`,
-        `视频时长：${duration}；视频大小：${size}；${fpsText}。`,
-        '正在下载/读取并提交模型分析，视频越长等待时间越久，B 站链接通常需要更久一些，请耐心等待。'
+        `视频时长：${duration}；视频大小：${size}；分析上限：500MB。`,
+        '正在下载/读取并上传至视频分析模型，视频越长等待时间越久，B 站链接通常需要更久一些，请耐心等待。'
       ].join('\n');
     }
     function buildReadCheckFailureReply(body) {
@@ -1598,28 +1596,18 @@ function addAttachmentChip(node, name) {
       const limits = payload.limits && typeof payload.limits === 'object' ? payload.limits : {};
       if (payload.status === 'WARN' && limits.eligible_for_model_analysis === false) {
         const reasons = [];
-        const duration = secondsLabel(payload.duration_seconds);
-        const maxDuration = secondsLabel(limits.max_duration_seconds);
         const size = bytesLabel(payload.size_bytes);
         const maxDownloadSize = bytesLabel(limits.max_download_bytes);
-        const maxModelSize = bytesLabel(limits.max_model_video_bytes);
-        const minFps = Number(limits.min_video_understanding_fps);
-        if (limits.duration_known && limits.duration_ok === false) {
-          reasons.push(`视频时长 ${duration || '已识别'}，超过当前 ${maxDuration || '配置'} 上限。`);
-        }
         if (limits.size_known && limits.download_size_ok === false) {
-          reasons.push(`视频大小 ${size || '已识别'}，超过当前 ${maxDownloadSize || '配置'} 下载上限。`);
-        } else if (limits.size_known && limits.model_size_ok === false) {
-          reasons.push(`视频大小 ${size || '已识别'}，即使把视频理解 fps 降到 ${Number.isFinite(minFps) ? minFps : 0.2}，仍超过当前模型 ${maxModelSize || '配置'} 分析范围。`);
+          reasons.push(`视频大小 ${size || '已识别'}，超过当前 ${maxDownloadSize || '500MB'} 分析上限。`);
         }
-        if (limits.duration_known === false) reasons.push('暂时无法确认视频时长。');
         if (limits.size_known === false) reasons.push('暂时无法确认视频大小。');
-        if (!reasons.length) reasons.push('链接已解析出媒体候选，但没有通过当前模型分析限制。');
+        if (!reasons.length) reasons.push('链接已解析出媒体候选，但没有通过当前 500MB 分析限制。');
         return [
           '链接可以读取，但暂时不能进入模型分析。',
           '',
           ...reasons.map(reason => '- ' + reason),
-          '- 可以换一条更短的单条视频，或先压缩/裁剪后上传文件。'
+          '- 请换一个 500MB 以内的 mp4 视频链接或文件后再试。'
         ].join('\n');
       }
       return buildJobErrorReply('url_rejected');

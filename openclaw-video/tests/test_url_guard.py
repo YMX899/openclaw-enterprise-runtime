@@ -32,6 +32,14 @@ class UrlGuardTests(unittest.TestCase):
         result = validate_video_url("https://www.bilibili.com/video/BV1xx?p=2", resolver("8.8.8.8"))
         self.assertEqual(result.host, "www.bilibili.com")
 
+    def test_accepts_public_xiaohongshu_https(self):
+        result = validate_video_url("https://www.xiaohongshu.com/explore/abc?p=2", resolver("8.8.8.8"))
+        self.assertEqual(result.host, "www.xiaohongshu.com")
+
+    def test_accepts_public_xhslink_https(self):
+        result = validate_video_url("https://xhslink.com/a/abc", resolver("8.8.8.8"))
+        self.assertEqual(result.host, "xhslink.com")
+
     def test_accepts_bilibili_short_redirect_target(self):
         result = validate_video_url_with_redirects(
             "https://b23.tv/abc",

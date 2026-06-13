@@ -89,9 +89,9 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn('mkdir -p "$HOME/.openclaw" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_DATA_HOME"', entrypoint)
         self.assertIn('chown -R "$APP_UID:$APP_GID" "$HOME"', entrypoint)
         self.assertIn('DOUYIN_CHONG_PYTHONPATH="${DOUYIN_CHONG_PYTHONPATH:-/app/vendor}"', entrypoint)
-        self.assertIn('MAX_DOWNLOAD_BYTES="${MAX_DOWNLOAD_BYTES:-536870912}"', entrypoint)
-        self.assertIn('MAX_VIDEO_DURATION_SECONDS="${MAX_VIDEO_DURATION_SECONDS:-300}"', entrypoint)
-        self.assertIn('MAX_VIDEO_FRAMES="${MAX_VIDEO_FRAMES:-6000}"', entrypoint)
+        self.assertIn('MAX_DOWNLOAD_BYTES="${MAX_DOWNLOAD_BYTES:-524288000}"', entrypoint)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS="${MAX_VIDEO_DURATION_SECONDS:-0}"', entrypoint)
+        self.assertIn('MAX_VIDEO_FRAMES="${MAX_VIDEO_FRAMES:-0}"', entrypoint)
         self.assertIn("HOME=/var/lib/openclaw", dockerfile)
         self.assertIn("XDG_CONFIG_HOME=/var/lib/openclaw/.config", dockerfile)
         self.assertIn('exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --clear-groups "$@"', entrypoint)
@@ -191,13 +191,17 @@ class ComposeContractTests(unittest.TestCase):
         for required in [
             "WORKER_CONCURRENCY: \"1\"",
             "JOB_TIMEOUT_SECONDS: \"900\"",
-            "MAX_DOWNLOAD_BYTES: \"536870912\"",
-            "MAX_VIDEO_DURATION_SECONDS: \"300\"",
-            "MAX_VIDEO_FRAMES: \"6000\"",
+            "VIDEO_ANALYSIS_INPUT_MODE: files_api",
+            "ARK_RESPONSES_BASE_URL: ${ARK_RESPONSES_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}",
+            "ARK_RESPONSES_MODEL: ${ARK_RESPONSES_MODEL:-doubao-seed-2-0-lite-260428}",
+            "FILES_API_TIMEOUT_SECONDS: ${FILES_API_TIMEOUT_SECONDS:-300}",
+            "MAX_DOWNLOAD_BYTES: \"524288000\"",
+            "MAX_VIDEO_DURATION_SECONDS: \"0\"",
+            "MAX_VIDEO_FRAMES: \"0\"",
             "DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter",
             "DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env",
             "BRIDGE_UPLOAD_DIR: /data/uploads",
-            "MAX_UPLOAD_BYTES: \"536870912\"",
+            "MAX_UPLOAD_BYTES: \"524288000\"",
             "./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro",
             "./vendor/douyin_chong:/app/vendor/douyin_chong:ro",
             "- worker-tmp:/tmp/openclaw-video",
@@ -251,8 +255,8 @@ class ComposeContractTests(unittest.TestCase):
         compose = COMPOSE.read_text(encoding="utf-8")
 
         self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
-        self.assertIn('MAX_DOWNLOAD_BYTES: "536870912"', compose)
-        self.assertIn('MAX_VIDEO_DURATION_SECONDS: "300"', compose)
+        self.assertIn('MAX_DOWNLOAD_BYTES: "524288000"', compose)
+        self.assertIn('MAX_VIDEO_DURATION_SECONDS: "0"', compose)
 
     def test_base_images_default_to_official_and_can_be_overridden_for_isolated_hosts(self):
         compose = COMPOSE.read_text(encoding="utf-8")
@@ -359,6 +363,7 @@ class ComposeContractTests(unittest.TestCase):
             "clients/douyin.py",
             "clients/resolver.py",
             "clients/tiktok.py",
+            "clients/xiaohongshu.py",
             "config.py",
             "models.py",
             "README.md",

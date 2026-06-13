@@ -148,6 +148,12 @@ def _is_form_upload(value: Any) -> bool:
     )
 
 
+def _validate_upload_mime_type(value: Any) -> None:
+    content_type = str(getattr(value, "content_type", "") or "").lower().strip()
+    if content_type and content_type not in {"video/mp4", "application/mp4", "application/octet-stream"}:
+        raise UploadStoreError("当前优先支持 mp4 视频，请转成 mp4 后再上传")
+
+
 def _sse_event(event: str, data: dict[str, Any]) -> str:
     payload = json.dumps(data, separators=(",", ":"), ensure_ascii=True)
     return f"event: {event}\ndata: {payload}\n\n"
@@ -892,7 +898,7 @@ def create_app(
             return probe_video_link(
                 video_url,
                 config=VideoLinkProbeConfig(
-                    max_duration_seconds=positive_int_from_env("MAX_VIDEO_DURATION_SECONDS", DEFAULT_MAX_VIDEO_DURATION_SECONDS),
+                    max_duration_seconds=positive_int_from_env("MAX_VIDEO_DURATION_SECONDS", 0),
                     max_download_bytes=positive_int_from_env("MAX_DOWNLOAD_BYTES", DEFAULT_MAX_DOWNLOAD_BYTES),
                     max_model_video_bytes=positive_int_from_env("MAX_MODEL_VIDEO_BYTES", DEFAULT_MAX_MODEL_VIDEO_BYTES),
                     video_understanding_fps=positive_float_from_env("DOUYIN_CHONG_FPS", DEFAULT_VIDEO_UNDERSTANDING_FPS),
@@ -921,6 +927,7 @@ def create_app(
             session_store.get_session(session_id, principal.principal_id)
             enforce_job_submission_controls(principal)
             max_upload_bytes = positive_int_from_env("MAX_UPLOAD_BYTES", phase4_config.max_upload_bytes)
+            _validate_upload_mime_type(file)
             await file.seek(0)
             stored = store_upload_fileobj(
                 file.file,
@@ -1162,11 +1169,11 @@ def create_app(
                 video_result = job_store.get_result(current_video_job_id, principal.principal_id)
                 payload = getattr(video_result, "result", None)
                 if isinstance(payload, dict):
-                    analysis_summary = str(payload.get("summary") or "")
+                    analysis_summary = str(payload.get("analysis_detail") or payload.get("summary") or "")
             except (JobNotFound, JobOwnershipError):
                 pass
             agent_content = build_branch_prompt(
-                content, state=state, intent=intent, analysis_summary=analysis_summary,
+                content, state=state, intent=intent, analysis_context=analysis_summary,
             )
         else:
             agent_content = build_agent_message(content, is_first_turn=is_first_turn, state=state)

@@ -42,9 +42,9 @@ services:
       BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: ${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}
       BRIDGE_TEST_IDENTITY_SECRET: ${BRIDGE_TEST_IDENTITY_SECRET:-}
       BRIDGE_UPLOAD_DIR: /data/uploads
-      MAX_UPLOAD_BYTES: "536870912"
-      MAX_DOWNLOAD_BYTES: "536870912"
-      MAX_VIDEO_DURATION_SECONDS: "300"
+      MAX_UPLOAD_BYTES: "524288000"
+      MAX_DOWNLOAD_BYTES: "524288000"
+      MAX_VIDEO_DURATION_SECONDS: "0"
     ports:
       - "127.0.0.1:18181:3000"
     volumes:
@@ -100,9 +100,9 @@ services:
     environment:
       DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
       DOUYIN_CHONG_PYTHONPATH: /app/vendor
-      MAX_DOWNLOAD_BYTES: "536870912"
-      MAX_VIDEO_DURATION_SECONDS: "300"
-      MAX_VIDEO_FRAMES: "6000"
+      MAX_DOWNLOAD_BYTES: "524288000"
+      MAX_VIDEO_DURATION_SECONDS: "0"
+      MAX_VIDEO_FRAMES: "0"
     volumes:
       - ./secrets/openclaw_gateway_token:/run/secrets/openclaw_gateway_token:ro
       - ./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro
@@ -130,12 +130,16 @@ services:
       DOUYIN_CHONG_BIN: /usr/local/bin/openclaw-douyin-adapter
       DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env
       DOUYIN_CHONG_PYTHONPATH: /app/vendor
+      VIDEO_ANALYSIS_INPUT_MODE: files_api
+      ARK_RESPONSES_BASE_URL: ${ARK_RESPONSES_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+      ARK_RESPONSES_MODEL: ${ARK_RESPONSES_MODEL:-doubao-seed-2-0-lite-260428}
+      FILES_API_TIMEOUT_SECONDS: ${FILES_API_TIMEOUT_SECONDS:-300}
       WORKER_CONCURRENCY: "1"
       JOB_TIMEOUT_SECONDS: "900"
-      MAX_DOWNLOAD_BYTES: "536870912"
-      MAX_INLINE_UPLOAD_BYTES: "536870912"
-      MAX_VIDEO_DURATION_SECONDS: "300"
-      MAX_VIDEO_FRAMES: "6000"
+      MAX_DOWNLOAD_BYTES: "524288000"
+      MAX_INLINE_UPLOAD_BYTES: "524288000"
+      MAX_VIDEO_DURATION_SECONDS: "0"
+      MAX_VIDEO_FRAMES: "0"
       BRIDGE_UPLOAD_DIR: /data/uploads
     volumes:
       - ./vendor/douyin_chong:/app/vendor/douyin_chong:ro

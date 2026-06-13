@@ -66,12 +66,37 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             "apiPrefix + '/chat'", "apiPrefix + '/sessions'",
             "apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages'",
             "JOB_AUTO_POLL_ATTEMPTS", "hydrateCompletedJobMessages", "仍在分析中，可稍后刷新查看结果。",
-            "video_too_large", "视频理解 fps",
+            "video_too_large", "500MB", "上传至视频分析模型",
         ]
         for required in in_source:
             with self.subTest(source=required):
                 self.assertIn(required, self.source)
         self.assertNotIn("分析超时，请稍后重试", self.built_js)
+        self.assertNotIn("视频理解 fps", self.source)
+
+    def test_video_submission_status_copy_matches_files_api_flow(self):
+        expected_status_copy = [
+            "已收到视频文件，正在上传…",
+            "准备上传…",
+            "上传完成，正在分析视频…",
+            "正在读取视频链接…",
+            "读取链接中…",
+            "正在提交分析，请稍等…",
+            "模型正在分析视频，请继续等待…",
+            "正在下载/读取并上传至视频分析模型",
+            "分析上限：500MB",
+            "这个视频文件超过 500MB",
+            "500MB 以内的 mp4",
+            'accept="video/mp4"',
+        ]
+        for required in expected_status_copy:
+            with self.subTest(status_copy=required):
+                self.assertIn(required, self.source)
+                self.assertIn(required, self.built_js + self.index_html)
+        for forbidden in ["压缩后再上传", "视频理解 fps", "512MB", "video/quicktime", "video/webm"]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, self.source)
+                self.assertNotIn(forbidden, self.built_js + self.index_html)
 
     def test_sidebar_keeps_user_menu_visible_while_history_scrolls(self):
         required_css = [

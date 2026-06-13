@@ -36,7 +36,7 @@ services:
       BRIDGE_ENABLE_TEST_IDENTITY_HEADERS: "0"
       BRIDGE_TEST_IDENTITY_SECRET: ""
       BRIDGE_UPLOAD_DIR: /data/uploads
-      MAX_UPLOAD_BYTES: "536870912"
+      MAX_UPLOAD_BYTES: "524288000"
     ports:
       - "127.0.0.1:18182:3000"
     volumes:

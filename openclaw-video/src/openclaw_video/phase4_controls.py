@@ -69,7 +69,7 @@ def read_version_file(path: str | None) -> str | None:
 
 
 def load_phase4_config() -> Phase4Config:
-    max_upload_bytes = _parse_positive_int("MAX_UPLOAD_BYTES", 512 * 1024 * 1024)
+    max_upload_bytes = _parse_positive_int("MAX_UPLOAD_BYTES", 500 * 1024 * 1024)
     return Phase4Config(
         tenant_allowlist_hashes=parse_hash_allowlist(
             os.environ.get("OPENCLAW_TENANT_ALLOWLIST_HASHES"),

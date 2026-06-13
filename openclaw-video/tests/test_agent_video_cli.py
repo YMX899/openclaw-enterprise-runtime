@@ -40,9 +40,9 @@ def fake_payload(input_url: str) -> dict:
             "request_id": "req-1",
             "usage": {"total_tokens": 10},
             "limits": {
-                "max_download_bytes": 10000,
-                "max_duration_seconds": 300,
-                "max_frames": 6000,
+                "max_download_bytes": 500 * 1024 * 1024,
+                "max_duration_seconds": 0,
+                "max_frames": 0,
                 "fps": 3.0,
             },
         },

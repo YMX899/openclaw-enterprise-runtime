@@ -101,8 +101,8 @@ class VideoAnalysisWorker:
             raise DouyinWrapperError("uploaded video is empty")
         if size_bytes > self.config.max_inline_upload_bytes:
             raise UploadTooLargeError("uploaded video exceeds preprocessing size limit")
-        # Let the adapter compress oversized local videos before it inline-base64s
-        # the model input. This keeps uploads on the same path as large links.
+        # Let the adapter enforce the shared 500 MiB Files API boundary and
+        # submit uploads through the same Responses video path as links.
         return run_upload_video_analysis(
             file_path=str(path),
             output_dir=output_dir,

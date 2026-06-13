@@ -359,6 +359,22 @@ engineering_owner: bob
         self.assertEqual(result.status, "PASS")
         self.assertIn("link-read mode", result.evidence)
 
+    def test_video_link_read_mode_rejects_missing_files_api_call(self):
+        with TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            write(repo / "artifacts/douyin_chong/LINK_READ_DECISION.md", LINK_READ_DECISION_PASS)
+            write_link_read_runtime(repo)
+            adapter = repo / "openclaw-video" / "src" / "openclaw_video" / "douyin_legacy_adapter.py"
+            adapter.write_text(
+                adapter.read_text(encoding="utf-8").replace("create_video_response(", "create_text_response("),
+                encoding="utf-8",
+            )
+
+            result = audit_module.check_video_link_read_mode(repo)
+
+        self.assertEqual(result.status, "NO_GO")
+        self.assertIn("Responses video analysis", result.evidence)
+
     def test_real_video_analysis_evidence_requires_current_release(self):
         with TemporaryDirectory() as tmp:
             repo = Path(tmp)

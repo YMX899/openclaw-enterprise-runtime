@@ -22,6 +22,8 @@ ALLOWED_HOST_SUFFIXES = (
     "douyin.com",
     "iesdouyin.com",
     "tiktok.com",
+    "xiaohongshu.com",
+    "xhslink.com",
 )
 
 BLOCKED_IPS = {

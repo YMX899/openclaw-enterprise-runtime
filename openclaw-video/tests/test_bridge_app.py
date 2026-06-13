@@ -184,8 +184,8 @@ def video_link_read_check_fixture():
         "size_bytes": 2_621_440,
         "video_url_source": "direct",
         "limits": {
-            "max_duration_seconds": 300,
-            "max_download_bytes": 512 * 1024 * 1024,
+            "max_duration_seconds": 0,
+            "max_download_bytes": 500 * 1024 * 1024,
             "max_model_video_bytes": 50 * 1024 * 1024,
             "default_video_understanding_fps": 3.0,
             "min_video_understanding_fps": 0.2,
@@ -982,7 +982,16 @@ class BridgeAppTests(unittest.TestCase):
                 headers=self.auth("account-a"),
             )
             self.assertEqual(invalid.status_code, 400, invalid.text)
-            self.assertIn("unsupported video file type", invalid.text)
+            self.assertIn("mp4", invalid.text)
+
+            invalid_mime = self.client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"]},
+                files={"video": ("sample.mp4", b"not video", "text/plain")},
+                headers=self.auth("account-a"),
+            )
+            self.assertEqual(invalid_mime.status_code, 400, invalid_mime.text)
+            self.assertIn("mp4", invalid_mime.text)
 
             oversized = self.client.post(
                 "/openclaw-api/uploads",
@@ -1576,6 +1585,116 @@ class BridgeAppTests(unittest.TestCase):
         sent = gateway.requests[-1].content
         self.assertIn("开头三秒用了悬念但选题偏窄", sent)  # real summary injected
         self.assertIn("严格基于它回答", sent)
+
+    def test_chat_follow_up_prefers_analysis_detail(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        payload = self._analysis_result("短摘要")
+        payload["analysis_detail"] = "00:00-00:03 详细画面和声音"
+        self.jobs.complete_job(job["job_id"], payload, "openclaw-video-result.v1")
+        r = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "为什么不爆"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        sent = gateway.requests[-1].content
+        self.assertIn("00:00-00:03 详细画面和声音", sent)
+        self.assertNotIn("短摘要\n\n用户消息", sent)
+
+    def test_simulated_user_chat_paths_cover_state_machine_branches(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+
+        # 新会话普通寒暄：进入 Gateway agent。
+        session = client.post("/openclaw-api/sessions", json={"title": "user paths"}, headers=self.auth("account-a")).json()["session"]
+        hello = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "你好"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(hello.status_code, 200, hello.text)
+        self.assertEqual(len(gateway.requests), 1)
+        self.assertIn("状态：新会话", gateway.requests[-1].content)
+
+        # 用户想分析但没给视频：固定引导，不调用 Gateway。
+        waiting = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "帮我看看哪里有问题"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(waiting.status_code, 200, waiting.text)
+        self.assertIn("上传视频", waiting.json()["message"]["content"])
+        self.assertEqual(len(gateway.requests), 1)
+
+        # 视频任务运行中：固定等待回复，不调用 Gateway。
+        running_job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/running"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        analyzing = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "开头怎么改"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(analyzing.status_code, 200, analyzing.text)
+        self.assertIn("还在分析中", analyzing.json()["message"]["content"])
+        self.assertEqual(len(gateway.requests), 1)
+        self.jobs.complete_job(
+            running_job["job_id"],
+            {
+                **self._analysis_result("短摘要"),
+                "analysis_detail": "00:00-00:03 开头画面；00:03-00:08 口播声音",
+            },
+            "openclaw-video-result.v1",
+        )
+
+        # 视频完成后，普通追问和所有改法追问都进入 Gateway，并注入 detail。
+        follow_ups = [
+            ("哪里最该改", "短视频分析方法论"),
+            ("开头怎么改", "前 3 秒钩子要点"),
+            ("帮我写一版脚本", "新脚本结构"),
+            ("怎么复拍", "分镜方案"),
+            ("画面怎么改", "画面设计六原则"),
+            ("为什么不爆", "短视频分析方法论"),
+        ]
+        before = len(gateway.requests)
+        for message, expected in follow_ups:
+            with self.subTest(message=message):
+                response = client.post(
+                    "/openclaw-api/chat",
+                    json={"session_id": session["id"], "content": message},
+                    headers=self.auth("account-a"),
+                )
+                self.assertEqual(response.status_code, 200, response.text)
+                sent = gateway.requests[-1].content
+                self.assertIn("00:00-00:03 开头画面", sent)
+                self.assertIn(expected, sent)
+        self.assertEqual(len(gateway.requests), before + len(follow_ups))
+
+        # 最新任务失败后：错误恢复固定回复，不再让 Gateway 编造。
+        failed_job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/failed"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        self.jobs.fail_job(failed_job["job_id"], "video_too_large")
+        before_error = len(gateway.requests)
+        recovering = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "那怎么改"},
+            headers=self.auth("account-a"),
+        )
+        self.assertEqual(recovering.status_code, 200, recovering.text)
+        self.assertIn("500MB", recovering.json()["message"]["content"])
+        self.assertEqual(len(gateway.requests), before_error)
 
     def test_chat_error_recovering_fixed_reply_on_failed_job(self):
         gateway = FakeGateway()

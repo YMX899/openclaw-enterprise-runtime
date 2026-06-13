@@ -21,6 +21,9 @@ CURRENT_ROOT_CHROME_EVIDENCE_CANDIDATES = (
 PRODUCTIZED_LOGIN_EVIDENCE_CANDIDATES = (
     REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-ui-productized-root-acceptance-20260607.json",
 )
+PUBLIC_SMOKE_EVIDENCE_CANDIDATES = (
+    REPO_ROOT / "artifacts" / "evidence" / "phase4" / "openclaw-public-smoke-summary-20260607.json",
+)
 
 EXPECTED_DIFY_CORE = {
     "api": ("1eec6380496cebc40172a2e26e1a117f87dc480b5e917b8de4688a7f9afb7631", "2026-01-05T11:17:20.555976179Z"),
@@ -268,6 +271,12 @@ def check_public_smoke_summary(path: Path | None) -> GateResult:
     return GateResult("public_smoke_latest", "PASS", "latest public smoke summary passed with sanitized metadata")
 
 
+def _resolve_public_smoke_summary(repo: Path, path: Path | None) -> Path | None:
+    if path is not None and path.exists():
+        return path
+    return _first_existing(repo, PUBLIC_SMOKE_EVIDENCE_CANDIDATES)
+
+
 def check_authenticated_browser_gate(repo: Path) -> GateResult:
     productized_path = next(
         (
@@ -323,11 +332,12 @@ def check_real_video_analysis_root_evidence(repo: Path) -> GateResult:
 
 
 def audit(repo: Path, *, smoke_summary: Path | None = None, include_git_clean: bool = False) -> dict[str, Any]:
+    resolved_smoke_summary = _resolve_public_smoke_summary(repo, smoke_summary)
     gates = [
         check_phase4_deployment_evidence(repo),
         check_current_root_chrome_evidence(repo),
         check_chrome_runner_ready(repo),
-        check_public_smoke_summary(smoke_summary),
+        check_public_smoke_summary(resolved_smoke_summary),
         check_authenticated_browser_gate(repo),
         check_video_link_read_mode(repo),
         check_real_video_analysis_root_evidence(repo),

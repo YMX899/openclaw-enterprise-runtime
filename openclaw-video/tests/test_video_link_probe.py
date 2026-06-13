@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from openclaw_video.url_guard import UrlRejected
 from openclaw_video.video_link_probe import VideoLinkProbeConfig, probe_video_link
+from openclaw_video.video_limits import MAX_VIDEO_BYTES
 
 
 def public_resolver(host, port):
@@ -78,7 +79,7 @@ class VideoLinkProbeTests(unittest.TestCase):
         for key in ("input_url_sha256", "canonical_url_sha256", "source_url_sha256", "share_url_sha256", "video_id_sha256"):
             self.assertRegex(payload[key], r"^[a-f0-9]{64}$")
 
-    def test_probe_warns_when_video_is_outside_model_limits(self):
+    def test_probe_does_not_reject_by_duration(self):
         fake_video = SimpleNamespace(
             video_url="https://cdn.douyin.com/video.mp4",
             playwm_url="",
@@ -96,16 +97,16 @@ class VideoLinkProbeTests(unittest.TestCase):
             resolver=public_resolver,
             redirect_fetcher=lambda url: None,
             legacy_resolver=FakeResolver(fake_video),
-            config=VideoLinkProbeConfig(max_duration_seconds=60, max_download_bytes=512 * 1024 * 1024),
+            config=VideoLinkProbeConfig(max_duration_seconds=60, max_download_bytes=MAX_VIDEO_BYTES),
         )
 
-        self.assertEqual(payload["status"], "WARN")
-        self.assertFalse(payload["limits"]["eligible_for_model_analysis"])
-        self.assertFalse(payload["limits"]["duration_ok"])
+        self.assertEqual(payload["status"], "PASS")
+        self.assertTrue(payload["limits"]["eligible_for_model_analysis"])
+        self.assertTrue(payload["limits"]["duration_ok"])
         self.assertTrue(payload["limits"]["size_ok"])
         self.assertFalse(payload["model_invoked"])
 
-    def test_probe_reduces_fps_above_default_model_video_size_limit(self):
+    def test_probe_ignores_legacy_model_size_budget_for_files_api(self):
         fake_video = SimpleNamespace(
             video_url="https://cdn.douyin.com/video.mp4",
             playwm_url="",
@@ -126,7 +127,7 @@ class VideoLinkProbeTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["status"], "PASS")
-        self.assertEqual(payload["limits"]["max_download_bytes"], 512 * 1024 * 1024)
+        self.assertEqual(payload["limits"]["max_download_bytes"], 500 * 1024 * 1024)
         self.assertEqual(payload["limits"]["max_model_video_bytes"], 50 * 1024 * 1024)
         self.assertTrue(payload["limits"]["eligible_for_model_analysis"])
         self.assertTrue(payload["limits"]["download_size_ok"])
@@ -134,7 +135,7 @@ class VideoLinkProbeTests(unittest.TestCase):
         self.assertTrue(payload["limits"]["fps_adjusted"])
         self.assertAlmostEqual(payload["limits"]["video_understanding_fps"], 1.7442, places=4)
 
-    def test_probe_warns_only_after_minimum_fps_is_still_too_large(self):
+    def test_probe_warns_when_video_exceeds_500mib_download_limit(self):
         fake_video = SimpleNamespace(
             video_url="https://cdn.douyin.com/video.mp4",
             playwm_url="",
@@ -152,15 +153,13 @@ class VideoLinkProbeTests(unittest.TestCase):
             resolver=public_resolver,
             redirect_fetcher=lambda url: None,
             legacy_resolver=FakeResolver(fake_video),
-            config=VideoLinkProbeConfig(max_download_bytes=2 * 1024 * 1024 * 1024),
+            config=VideoLinkProbeConfig(max_download_bytes=500 * 1024 * 1024),
         )
 
         self.assertEqual(payload["status"], "WARN")
         self.assertFalse(payload["limits"]["eligible_for_model_analysis"])
-        self.assertTrue(payload["limits"]["download_size_ok"])
-        self.assertFalse(payload["limits"]["model_size_ok"])
+        self.assertFalse(payload["limits"]["download_size_ok"])
         self.assertFalse(payload["limits"]["size_ok"])
-        self.assertEqual(payload["limits"]["video_understanding_fps"], 0.2)
 
     def test_probe_accepts_videos_up_to_five_minutes_by_default(self):
         fake_video = SimpleNamespace(
@@ -183,11 +182,11 @@ class VideoLinkProbeTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["status"], "PASS")
-        self.assertEqual(payload["limits"]["max_duration_seconds"], 300)
+        self.assertEqual(payload["limits"]["max_duration_seconds"], 0)
         self.assertTrue(payload["limits"]["eligible_for_model_analysis"])
         self.assertTrue(payload["limits"]["duration_ok"])
 
-    def test_probe_warns_when_video_exceeds_five_minutes_by_default(self):
+    def test_probe_accepts_video_longer_than_five_minutes_by_default(self):
         fake_video = SimpleNamespace(
             video_url="https://cdn.douyin.com/video.mp4",
             playwm_url="",
@@ -207,10 +206,10 @@ class VideoLinkProbeTests(unittest.TestCase):
             legacy_resolver=FakeResolver(fake_video),
         )
 
-        self.assertEqual(payload["status"], "WARN")
-        self.assertEqual(payload["limits"]["max_duration_seconds"], 300)
-        self.assertFalse(payload["limits"]["eligible_for_model_analysis"])
-        self.assertFalse(payload["limits"]["duration_ok"])
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["limits"]["max_duration_seconds"], 0)
+        self.assertTrue(payload["limits"]["eligible_for_model_analysis"])
+        self.assertTrue(payload["limits"]["duration_ok"])
 
     def test_probe_accepts_bilibili_link(self):
         fake_video = SimpleNamespace(
@@ -259,6 +258,30 @@ class VideoLinkProbeTests(unittest.TestCase):
         self.assertEqual(payload["status"], "PASS")
         self.assertEqual(payload["canonical_host"], "www.tiktok.com")
         self.assertEqual(payload["video_id_present"], True)
+
+    def test_probe_accepts_xiaohongshu_link(self):
+        fake_video = SimpleNamespace(
+            video_url="https://sns-video.example/video.mp4",
+            playwm_url="",
+            source_url="https://www.xiaohongshu.com/explore/abc",
+            share_url="https://www.xiaohongshu.com/explore/abc",
+            video_id="abc",
+            content_type="video/mp4",
+            duration_ms=90_000,
+            size_mb=5,
+            video_url_source="yt-dlp",
+        )
+
+        payload = probe_video_link(
+            "https://www.xiaohongshu.com/explore/abc",
+            resolver=public_resolver,
+            redirect_fetcher=lambda url: None,
+            legacy_resolver=FakeResolver(fake_video),
+        )
+
+        self.assertEqual(payload["status"], "PASS")
+        self.assertEqual(payload["canonical_host"], "www.xiaohongshu.com")
+        self.assertEqual(payload["video_url_source"], "yt-dlp")
 
     def test_probe_reuses_url_guard_rejections(self):
         with self.assertRaises(UrlRejected):

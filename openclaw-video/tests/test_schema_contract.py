@@ -119,8 +119,8 @@ def video_link_read_check_fixture():
         "size_bytes": 2_621_440,
         "video_url_source": "direct",
         "limits": {
-            "max_duration_seconds": 300,
-            "max_download_bytes": 512 * 1024 * 1024,
+            "max_duration_seconds": 0,
+            "max_download_bytes": 500 * 1024 * 1024,
             "max_model_video_bytes": 50 * 1024 * 1024,
             "default_video_understanding_fps": 3.0,
             "min_video_understanding_fps": 0.2,
@@ -265,6 +265,7 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
                 "duration_seconds": 1,
             },
             "summary": "ok",
+            "analysis_detail": "00:00-00:01 detail",
             "signals": {"hook": "ok"},
             "raw_tool_result": {"ok": True},
             "created_at": "2026-06-06T00:00:00Z",
@@ -307,6 +308,7 @@ class BridgeApiSchemaContractTests(unittest.TestCase):
                 "duration_seconds": None,
             },
             "summary": "uploaded file validated",
+            "analysis_detail": "00:00-00:01 uploaded detail",
             "signals": {"visual_notes": "uploaded_file=sample.mp4; size_bytes=11"},
             "raw_tool_result": {
                 "tool": "openclaw-upload-file-analyzer",

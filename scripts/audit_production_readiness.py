@@ -166,7 +166,11 @@ def check_video_link_read_mode(repo: Path) -> GateResult:
         (adapter_text, "_canonicalize_input_for_resolver(args.input_url)", "adapter does not canonicalize input link before resolving"),
         (adapter_text, 'getattr(video, "video_url"', "adapter does not use resolved direct video URL"),
         (adapter_text, 'getattr(video, "playwm_url"', "adapter does not use resolved fallback video URL"),
-        (adapter_text, "ArkVideoClient(config).analyze(video_urls=video_urls", "adapter does not analyze resolved video URLs"),
+        (adapter_text, "ArkFilesClient", "adapter does not use Ark Files API client"),
+        (adapter_text, "upload_user_data_file(path, mime_type)", "adapter does not upload video through Files API"),
+        (adapter_text, "wait_file_active(file_id", "adapter does not wait for Files API processing"),
+        (adapter_text, "create_video_response(", "adapter does not invoke Responses video analysis"),
+        (adapter_text, "_build_files_payload(", "adapter does not persist Files API video analysis payload"),
     ]
     for source, needle, message in required_source:
         if needle not in source:

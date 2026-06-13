@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from .bilibili import BilibiliVideoResolver
 from .douyin import DouyinVideoResolver
 from .tiktok import TikTokVideoResolver
+from .xiaohongshu import XiaohongshuVideoResolver
 
 
 class UniversalVideoResolver:
@@ -12,6 +13,7 @@ class UniversalVideoResolver:
         self.bilibili = BilibiliVideoResolver()
         self.douyin = DouyinVideoResolver()
         self.tiktok = TikTokVideoResolver()
+        self.xiaohongshu = XiaohongshuVideoResolver()
 
     def resolve(self, source_url: str):
         return self._pick_resolver(source_url).resolve(source_url)
@@ -25,4 +27,6 @@ class UniversalVideoResolver:
             return self.bilibili
         if any(domain in hostname for domain in ("tiktok.com", "vm.tiktok.com", "vt.tiktok.com")):
             return self.tiktok
+        if any(domain in hostname for domain in ("xiaohongshu.com", "xhslink.com")):
+            return self.xiaohongshu
         return self.douyin

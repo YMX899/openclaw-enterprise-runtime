@@ -16,9 +16,11 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from .ark_files_client import DEFAULT_ARK_API_BASE, DEFAULT_ARK_RESPONSES_MODEL, ArkFilesClient
 from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
 from .url_guard import UrlRejected, validate_video_url_with_redirects
 from .video_limits import (
+    MAX_VIDEO_BYTES,
     DEFAULT_MAX_MODEL_VIDEO_BYTES,
     DEFAULT_MAX_VIDEO_DURATION_SECONDS,
     DEFAULT_MAX_VIDEO_FRAMES,
@@ -35,6 +37,8 @@ class LegacyAdapterError(RuntimeError):
 MODEL_INLINE_TARGET_BYTES = 45 * 1024 * 1024
 VIDEO_CACHE_TTL_SECONDS = 24 * 60 * 60
 DEFAULT_VIDEO_CACHE_DIR = "/tmp/openclaw-video/cache"
+FILES_API_MODE = "files_api"
+INLINE_LEGACY_MODE = "inline_legacy"
 
 LEGACY_CONFIG_ENV_KEYS = (
     "ARK_API_KEY",
@@ -83,6 +87,12 @@ class PreparedModelVideo:
 def _positive_int(value: int, name: str) -> int:
     if value <= 0:
         raise LegacyAdapterError(f"{name} must be positive")
+    return value
+
+
+def _nonnegative_int(value: int, name: str) -> int:
+    if value < 0:
+        raise LegacyAdapterError(f"{name} must be zero or positive")
     return value
 
 
@@ -147,6 +157,13 @@ def _platform_from_url(url: str) -> str:
         return "bilibili"
     if host == "tiktok.com" or host.endswith(".tiktok.com"):
         return "tiktok"
+    if (
+        host == "xiaohongshu.com"
+        or host.endswith(".xiaohongshu.com")
+        or host == "xhslink.com"
+        or host.endswith(".xhslink.com")
+    ):
+        return "xiaohongshu"
     return "douyin"
 
 
@@ -156,12 +173,14 @@ def _referer_for_url(url: str) -> str:
         return "https://www.bilibili.com/"
     if platform == "tiktok":
         return "https://www.tiktok.com/"
+    if platform == "xiaohongshu":
+        return "https://www.xiaohongshu.com/"
     return "https://www.douyin.com/"
 
 
 def _best_download_url_for_platform(input_url: str, video: Any) -> str:
     platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
-    if platform == "bilibili":
+    if platform in {"bilibili", "xiaohongshu"}:
         return input_url
     return str(getattr(video, "video_url", "") or "") or input_url
 
@@ -331,8 +350,6 @@ def _download_video_with_ytdlp(
         _request_headers(referer=referer)["User-Agent"],
         "--referer",
         referer,
-        "--download-sections",
-        "*0-300",
         "-f",
         "bv*+ba/b[ext=mp4]/b",
         "--merge-output-format",
@@ -418,6 +435,18 @@ def _probe_file_duration_seconds(path: Path) -> float | None:
     except ValueError:
         return None
     return duration if duration > 0 else None
+
+
+def _files_api_analysis_fps_for_duration(duration_seconds: float | None) -> float:
+    if duration_seconds is None or duration_seconds <= 0:
+        return 1.0
+    if duration_seconds <= 60:
+        return 2.0
+    if duration_seconds <= 5 * 60:
+        return 1.0
+    if duration_seconds <= 20 * 60:
+        return 0.5
+    return 0.2
 
 
 def _compress_video_for_model(
@@ -623,24 +652,30 @@ def _prepare_local_video_for_model(
 
 def _default_prompt() -> str:
     return (
-        "Analyze this short video and write the final answer in Simplified Chinese. "
-        "Be specific and generous with detail; do not stop at a brief summary. "
-        "Use Markdown with `##` section headings, short bullet lists, and **bold key phrases**. "
-        "Cover these sections: "
-        "1) one-sentence conclusion and whether the video is worth copying; "
-        "2) basic facts you can infer from the video: topic, scene, people/objects, pace, subtitles/audio if visible or audible; "
-        "3) opening 3-second hook: what makes users stop or why it is weak; "
-        "4) content structure: beat-by-beat progression, information density, emotional curve, retention points; "
-        "5) visual and editing analysis: framing, movement, lighting, transitions, captions, props, repeated motifs; "
-        "6) audience and account positioning: target user, pain/desire, why they would save/comment/share; "
-        "7) platform growth signals: title/cover/caption, interaction design, completion-rate risks, conversion intent; "
-        "8) risks and uncertainty: do not invent facts not visible in the video; "
-        "9) improvement plan: give at least three opening rewrites, a revised script outline, and a reshoot shot list; "
-        "10) alternative creative directions: at least three different angles for making the next version. "
-        "If audio or subtitles are unavailable, say which parts are inferred from visuals. "
-        "Keep the answer practical, varied, and directly actionable. "
-        "Do not wrap the whole answer in a code block. "
-        "Do not include links, secrets, request headers, cookies, or internal paths."
+        "你是一个专业的视频内容解析与短视频诊断助手。你的任务不是简单总结视频，"
+        "而是尽可能完整、客观地还原视频内容，并为后续短视频优化提供可靠素材。\n\n"
+        "请只基于视频中真实可见、可听、可推断但有依据的信息作答。"
+        "不要编造视频中没有出现的人物、台词、产品效果、播放量、点赞数、账号数据或拍摄意图。\n\n"
+        "最终输出必须严格包含两个一级部分：\n"
+        "【视频摘要】\n"
+        "【视频详细内容】\n\n"
+        "不要输出其他一级标题。\n\n"
+        "【视频摘要】用于直接展示给用户。要求：\n"
+        "1. 先给一句直接结论，说明这条视频的核心内容和主要问题/亮点。\n"
+        "2. 概括视频主题、主要场景、主要人物或主体、主要动作、声音/字幕、整体风格。\n"
+        "3. 简要指出选题、目标用户、前 3 秒钩子、内容结构、画面设计、转化引导上的关键观察。\n"
+        "4. 不要过度压缩，必须覆盖关键点，但不要写成逐秒流水账。\n"
+        "5. 如果音频、字幕或画面有不确定处，明确写“不确定”或“未能听清/看清”。\n\n"
+        "【视频详细内容】用于后续 agent 追问时作为上下文。要求：\n"
+        "1. 按时间顺序描述视频全过程。\n"
+        "2. 尽量给出时间段，例如 00:00-00:03、00:03-00:08。\n"
+        "3. 每个时间段尽量包含画面内容、镜头与剪辑、声音内容、信息作用。\n"
+        "4. 如果出现重要字幕、屏幕文字、品牌名、商品名、地点、账号名，应尽量记录。\n"
+        "5. 如果视频较长，可以按自然段落合并，但必须覆盖完整视频。\n"
+        "6. 不要直接给拍摄建议，除非视频中已经能客观判断某处问题。"
+        "建议部分应在摘要中简短出现，详细内容主要负责还原事实。\n"
+        "7. 输出中文，表达清晰、具体、自然，避免空泛评价。\n"
+        "8. 不要输出链接、cookie、token、请求头、内部路径、密钥或系统信息。"
     )
 
 
@@ -683,6 +718,22 @@ def _safe_text(value: Any, *, limit: int = 12000) -> str:
     return text
 
 
+def _split_video_analysis_output(output_text: str) -> tuple[str, str, str]:
+    text = _safe_text(output_text, limit=120000)
+    if not text:
+        return "", "", "empty"
+    summary_marker = "【视频摘要】"
+    detail_marker = "【视频详细内容】"
+    summary_index = text.find(summary_marker)
+    detail_index = text.find(detail_marker)
+    if summary_index >= 0 and detail_index > summary_index:
+        summary = text[summary_index + len(summary_marker):detail_index].strip()
+        detail = text[detail_index + len(detail_marker):].strip()
+        if summary and detail:
+            return summary, detail, "parsed_sections"
+    return text, text, "fallback_full_text"
+
+
 def _build_payload(
     *,
     input_url: str,
@@ -700,6 +751,7 @@ def _build_payload(
         )
         raise LegacyAdapterError(f"legacy tool returned no analysis output: {detail}")
 
+    summary, analysis_detail, parse_status = _split_video_analysis_output(output_text)
     duration = _duration_seconds(video)
     size = _size_bytes(video)
     platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
@@ -715,6 +767,7 @@ def _build_payload(
         "video_url_source": str(getattr(video, "video_url_source", "") or ""),
         "request_id": str(getattr(completion, "request_id", "") or ""),
         "usage": getattr(completion, "usage", None),
+        "analysis_parse_status": parse_status,
         "limits": {
             "max_download_bytes": limits.max_download_bytes,
             "max_model_video_bytes": limits.max_model_video_bytes,
@@ -742,13 +795,14 @@ def _build_payload(
             "platform": platform,
             "duration_seconds": duration,
         },
-        "summary": output_text,
+        "summary": summary,
+        "analysis_detail": analysis_detail,
         "signals": {
             "hook": None,
             "topic": None,
             "audience": None,
             "structure": None,
-            "visual_notes": output_text,
+            "visual_notes": analysis_detail,
             "risk_notes": None,
         },
         "raw_tool_result": raw_tool_result,
@@ -766,16 +820,7 @@ _UPLOAD_CONTENT_TYPES = {
 
 
 def _upload_prompt() -> str:
-    return (
-        "请完整分析这条上传视频，用简体中文输出，内容要比普通摘要更丰富、更可执行。"
-        "必须使用 Markdown：用 `##` 小标题、短列表、**加粗关键词**，不要把整段回复包在代码块里。"
-        "请至少覆盖：总体结论、主题与场景、开头 3 秒钩子、逐段内容结构、信息密度、情绪曲线、"
-        "画面/镜头/动作/字幕/声音分析、目标人群、账号定位匹配度、完播和互动风险、"
-        "标题/封面/文案建议、3 个开头改法、1 版优化脚本提纲、复拍分镜清单、3 个下一条视频选题方向。"
-        "如果听不到声音或看不到字幕，要明确说明哪些判断来自画面推断。"
-        "建议要具体，不要只给泛泛而谈的原则。"
-        "不要输出任何链接、密钥、请求头、cookie 或内部路径。"
-    )
+    return _default_prompt()
 
 
 def _build_upload_payload(
@@ -794,6 +839,7 @@ def _build_upload_payload(
             or "empty analysis output"
         )
         raise LegacyAdapterError(f"legacy tool returned no analysis output: {detail}")
+    summary, analysis_detail, parse_status = _split_video_analysis_output(output_text)
     raw_tool_result: dict[str, Any] = {
         "tool": "openclaw-upload-analyzer",
         "adapter": "openclaw_video.douyin_legacy_adapter",
@@ -802,6 +848,7 @@ def _build_upload_payload(
         "size_bytes": size_bytes,
         "request_id": str(getattr(completion, "request_id", "") or ""),
         "usage": getattr(completion, "usage", None),
+        "analysis_parse_status": parse_status,
     }
     if model_input is not None:
         raw_tool_result["model_input"] = {
@@ -820,13 +867,14 @@ def _build_upload_payload(
             "platform": "upload",
             "duration_seconds": None,
         },
-        "summary": output_text,
+        "summary": summary,
+        "analysis_detail": analysis_detail,
         "signals": {
             "hook": None,
             "topic": None,
             "audience": None,
             "structure": None,
-            "visual_notes": output_text,
+            "visual_notes": analysis_detail,
             "risk_notes": None,
         },
         "raw_tool_result": raw_tool_result,
@@ -919,16 +967,241 @@ def _prepare_downloaded_video_for_model(
     )
 
 
+def _prepare_downloaded_video_for_files_api(
+    *,
+    input_url: str,
+    video: Any,
+    output_dir: Path,
+    limits: LegacyVideoLimits,
+) -> PreparedModelVideo:
+    cache_root = _cache_root()
+    _cleanup_video_cache(cache_root)
+    cache_key = _cache_key_for_video(input_url, video)
+    cached_path = _cached_video_path(cache_root, cache_key)
+    source_url = str(getattr(video, "source_url", "") or "")
+    share_url = str(getattr(video, "share_url", "") or "")
+    referer = share_url or _referer_for_url(source_url or input_url)
+    cache_hit = cached_path is not None
+    download_tool = "cache"
+    if cached_path is None:
+        entry_dir = cache_root / cache_key
+        if entry_dir.exists():
+            shutil.rmtree(entry_dir)
+        entry_dir.mkdir(parents=True, exist_ok=True)
+        download_url = _best_download_url_for_platform(input_url, video)
+        http_fallback_url = str(getattr(video, "video_url", "") or "") or None
+        cached_path, download_tool = _download_video_with_fallbacks(
+            download_url,
+            output_dir=entry_dir,
+            max_bytes=limits.max_download_bytes,
+            referer=referer,
+            http_fallback_url=http_fallback_url,
+        )
+    size_bytes = _ensure_file_for_files_api(cached_path, max_bytes=limits.max_download_bytes)
+    return PreparedModelVideo(
+        path=cached_path,
+        size_bytes=size_bytes,
+        fps=0,
+        compressed=False,
+        downloaded=True,
+        cache_hit=cache_hit,
+        download_tool=download_tool,
+        cache_key=cache_key,
+    )
+
+
 def _data_url_for_model_input(model_input: PreparedModelVideo) -> str:
     content_type = _UPLOAD_CONTENT_TYPES.get(model_input.path.suffix.lower(), "video/mp4")
     encoded = base64.b64encode(model_input.path.read_bytes()).decode("ascii")
     return f"data:{content_type};base64,{encoded}"
 
 
+def _read_env_file_value(env_file: Path, key: str) -> str | None:
+    try:
+        lines = env_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        raw_key, raw_value = stripped.split("=", 1)
+        if raw_key.strip() != key:
+            continue
+        value = raw_value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        return value
+    return None
+
+
+def _load_ark_files_config(env_file: Path) -> tuple[str, str, str]:
+    api_key = _read_env_file_value(env_file, "ARK_API_KEY") or os.environ.get("ARK_API_KEY", "")
+    model = (
+        _read_env_file_value(env_file, "ARK_RESPONSES_MODEL")
+        or os.environ.get("ARK_RESPONSES_MODEL")
+        or DEFAULT_ARK_RESPONSES_MODEL
+    )
+    base_url = (
+        _read_env_file_value(env_file, "ARK_RESPONSES_BASE_URL")
+        or os.environ.get("ARK_RESPONSES_BASE_URL")
+        or DEFAULT_ARK_API_BASE
+    )
+    if not api_key.strip():
+        raise LegacyAdapterError(f"Missing ARK_API_KEY in {env_file}.")
+    return api_key.strip(), model.strip(), base_url.strip()
+
+
+def _mime_type_for_video(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix != ".mp4":
+        raise LegacyAdapterError("当前优先支持 mp4 视频，请转成 mp4 后再上传")
+    return "video/mp4"
+
+
+def _ensure_file_for_files_api(path: Path, *, max_bytes: int) -> int:
+    if not path.is_file():
+        raise LegacyAdapterError("video file does not exist")
+    size_bytes = path.stat().st_size
+    if size_bytes <= 0:
+        raise LegacyAdapterError("video file is empty")
+    if size_bytes > _positive_int(max_bytes, "max_bytes"):
+        raise LegacyAdapterError("视频超过500MB，暂不支持分析")
+    _mime_type_for_video(path)
+    return size_bytes
+
+
+def _responses_completion_from_files_api(
+    *,
+    path: Path,
+    prompt: str,
+    env_file: Path,
+    max_bytes: int,
+    max_tokens: int,
+    timeout_seconds: int,
+    duration_seconds: float | None,
+    client_factory: Callable[..., ArkFilesClient] = ArkFilesClient,
+) -> tuple[Any, dict[str, Any]]:
+    size_bytes = _ensure_file_for_files_api(path, max_bytes=max_bytes)
+    mime_type = _mime_type_for_video(path)
+    api_key, model, base_url = _load_ark_files_config(env_file)
+    started = time.monotonic()
+    client = client_factory(api_key=api_key, base_url=base_url, timeout_seconds=timeout_seconds)
+    uploaded = client.upload_user_data_file(path, mime_type)
+    file_id = str(uploaded.get("id") or "")
+    if not file_id:
+        raise LegacyAdapterError("Files API upload response did not include file id")
+    active_file = client.wait_file_active(file_id, timeout_seconds=timeout_seconds)
+    analysis_fps = _files_api_analysis_fps_for_duration(duration_seconds)
+    response = client.create_video_response(
+        model=model,
+        file_id=file_id,
+        prompt=prompt,
+        max_tokens=_positive_int(max_tokens, "max_tokens"),
+        temperature=0.1,
+        fps=analysis_fps,
+    )
+    output_text = client.extract_output_text(response)
+    completion = type(
+        "ResponsesCompletion",
+        (),
+        {
+            "output_text": output_text,
+            "usage": response.get("usage"),
+            "request_id": str(response.get("id") or ""),
+            "api_error_message": "",
+            "error_message": "",
+        },
+    )()
+    metadata = {
+        "input_mode": FILES_API_MODE,
+        "file_id": file_id,
+        "filename": path.name,
+        "size_bytes": size_bytes,
+        "mime_type": mime_type,
+        "model": model,
+        "base_url": base_url,
+        "upload_status": str(uploaded.get("status") or ""),
+        "file_status": str(active_file.get("status") or ""),
+        "analysis_fps": analysis_fps,
+        "duration_seconds": duration_seconds,
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+    }
+    return completion, metadata
+
+
+def _build_files_payload(
+    *,
+    source_label: str,
+    platform: str,
+    duration_seconds: float | None,
+    completion: Any,
+    files_metadata: dict[str, Any],
+    video: Any | None = None,
+) -> dict[str, Any]:
+    output_text = _safe_text(getattr(completion, "output_text", ""))
+    if not output_text:
+        raise LegacyAdapterError("Responses API returned no analysis output")
+    summary, analysis_detail, parse_status = _split_video_analysis_output(output_text)
+    raw_tool_result: dict[str, Any] = {
+        "tool": "ark-files-responses",
+        "adapter": "openclaw_video.douyin_legacy_adapter",
+        "mode": FILES_API_MODE,
+        "platform": platform,
+        "file_id": files_metadata.get("file_id"),
+        "filename": files_metadata.get("filename"),
+        "size_bytes": files_metadata.get("size_bytes"),
+        "mime_type": files_metadata.get("mime_type"),
+        "file_status": files_metadata.get("file_status"),
+        "upload_status": files_metadata.get("upload_status"),
+        "model": files_metadata.get("model"),
+        "request_id": str(getattr(completion, "request_id", "") or ""),
+        "usage": getattr(completion, "usage", None),
+        "analysis_parse_status": parse_status,
+        "elapsed_ms": files_metadata.get("elapsed_ms"),
+        "analysis_fps": files_metadata.get("analysis_fps"),
+        "duration_seconds": files_metadata.get("duration_seconds"),
+    }
+    for optional_key in ("download_tool", "cache_hit", "cache_key_sha256"):
+        if optional_key in files_metadata:
+            raw_tool_result[optional_key] = files_metadata[optional_key]
+    if video is not None:
+        raw_tool_result.update(
+            {
+                "video_id": str(getattr(video, "video_id", "") or ""),
+                "author": str(getattr(video, "author", "") or ""),
+                "desc": _safe_text(getattr(video, "desc", ""), limit=500),
+                "content_type": getattr(video, "content_type", None),
+                "video_url_source": str(getattr(video, "video_url_source", "") or ""),
+            }
+        )
+    payload = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "source": {
+            "video_url_canonical": source_label,
+            "platform": platform,
+            "duration_seconds": duration_seconds,
+        },
+        "summary": summary,
+        "analysis_detail": analysis_detail,
+        "signals": {
+            "hook": None,
+            "topic": None,
+            "audience": None,
+            "structure": None,
+            "visual_notes": analysis_detail,
+            "risk_notes": None,
+        },
+        "raw_tool_result": raw_tool_result,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    return validate_result_payload(payload)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="OpenClaw-safe adapter for the legacy douyin_chong package.")
     parser.add_argument("--input-url", default=None, help="Douyin video link (URL mode).")
-    parser.add_argument("--input-file", default=None, help="Local video file path (upload inline-base64 mode).")
+    parser.add_argument("--input-file", default=None, help="Local video file path.")
     parser.add_argument("--source-label", default=None, help="Traceable source label (e.g. upload:// URI) for the result payload.")
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--max-bytes", type=int, required=True)
@@ -944,6 +1217,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--connect-timeout", type=float, default=float(os.environ.get("DOUYIN_CHONG_CONNECT_TIMEOUT", "60")))
     parser.add_argument("--read-timeout", type=float, default=float(os.environ.get("DOUYIN_CHONG_READ_TIMEOUT", "900")))
     parser.add_argument("--retries", type=int, default=int(os.environ.get("DOUYIN_CHONG_RETRIES", "1")))
+    parser.add_argument(
+        "--input-mode",
+        choices=(FILES_API_MODE, INLINE_LEGACY_MODE),
+        default=os.environ.get("VIDEO_ANALYSIS_INPUT_MODE", FILES_API_MODE),
+    )
+    parser.add_argument("--files-api-timeout-seconds", type=int, default=int(os.environ.get("FILES_API_TIMEOUT_SECONDS", "300")))
     return parser
 
 
@@ -951,6 +1230,7 @@ def run_adapter(
     argv: list[str] | None = None,
     *,
     component_loader: Callable[[], tuple[type, type, type]] = _load_legacy_components,
+    files_client_factory: Callable[..., ArkFilesClient] = ArkFilesClient,
 ) -> dict[str, Any]:
     args = build_parser().parse_args(argv)
     if not args.no_shell:
@@ -962,20 +1242,75 @@ def run_adapter(
     limits = LegacyVideoLimits(
         max_download_bytes=_positive_int(args.max_bytes, "max_bytes"),
         max_model_video_bytes=_positive_int(args.max_model_bytes, "max_model_bytes"),
-        max_duration_seconds=_positive_int(args.max_duration_seconds, "max_duration_seconds"),
-        max_frames=_positive_int(args.max_frames, "max_frames"),
+        max_duration_seconds=_nonnegative_int(args.max_duration_seconds, "max_duration_seconds"),
+        max_frames=_nonnegative_int(args.max_frames, "max_frames"),
         fps=_fps_in_range(args.fps, "fps"),
         min_fps=_fps_in_range(args.min_fps, "min_fps"),
         max_fps=_fps_in_range(args.max_fps, "max_fps"),
     )
     if limits.min_fps > limits.max_fps:
         raise LegacyAdapterError("min_fps must not be greater than max_fps")
-    AppConfig, UniversalVideoResolver, ArkVideoClient = component_loader()
     if bool(args.input_file) == bool(args.input_url):
         raise LegacyAdapterError("exactly one of --input-url or --input-file is required")
     output_json = Path(args.output_json)
     output_json.parent.mkdir(parents=True, exist_ok=True)
-    if args.input_file:
+    if args.input_mode == FILES_API_MODE:
+        _, UniversalVideoResolver, _ = component_loader()
+        if args.input_file:
+            path = Path(args.input_file)
+            completion, files_metadata = _responses_completion_from_files_api(
+                path=path,
+                prompt=_upload_prompt(),
+                env_file=env_file.resolve(),
+                max_bytes=limits.max_download_bytes,
+                max_tokens=args.max_tokens,
+                timeout_seconds=args.files_api_timeout_seconds,
+                duration_seconds=_probe_file_duration_seconds(path),
+                client_factory=files_client_factory,
+            )
+            payload = _build_files_payload(
+                source_label=args.source_label or path.name,
+                platform="upload",
+                duration_seconds=_probe_file_duration_seconds(path),
+                completion=completion,
+                files_metadata=files_metadata,
+            )
+        else:
+            resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
+            video = UniversalVideoResolver().resolve(resolver_input_url)
+            model_input = _prepare_downloaded_video_for_files_api(
+                input_url=resolver_input_url,
+                video=video,
+                output_dir=output_json.parent,
+                limits=limits,
+            )
+            completion, files_metadata = _responses_completion_from_files_api(
+                path=model_input.path,
+                prompt=_default_prompt(),
+                env_file=env_file.resolve(),
+                max_bytes=limits.max_download_bytes,
+                max_tokens=args.max_tokens,
+                timeout_seconds=args.files_api_timeout_seconds,
+                duration_seconds=_duration_seconds(video),
+                client_factory=files_client_factory,
+            )
+            payload = _build_files_payload(
+                source_label=args.input_url,
+                platform=_platform_from_url(args.input_url),
+                duration_seconds=_duration_seconds(video),
+                completion=completion,
+                files_metadata={
+                    **files_metadata,
+                    "download_tool": model_input.download_tool,
+                    "cache_hit": model_input.cache_hit,
+                    "cache_key_sha256": model_input.cache_key,
+                },
+                video=video,
+            )
+    elif args.input_file:
+        _positive_int(limits.max_duration_seconds, "max_duration_seconds")
+        _positive_int(limits.max_frames, "max_frames")
+        AppConfig, _, ArkVideoClient = component_loader()
         model_input = _prepare_local_video_for_model(
             Path(args.input_file),
             output_dir=output_json.parent,
@@ -1003,6 +1338,9 @@ def run_adapter(
             prepared_model_input=model_input,
         )
     else:
+        _positive_int(limits.max_duration_seconds, "max_duration_seconds")
+        _positive_int(limits.max_frames, "max_frames")
+        AppConfig, UniversalVideoResolver, ArkVideoClient = component_loader()
         resolver_input_url = _canonicalize_input_for_resolver(args.input_url)
         video = UniversalVideoResolver().resolve(resolver_input_url)
         effective_limits = limits.with_fps(_enforce_limits(video, limits))

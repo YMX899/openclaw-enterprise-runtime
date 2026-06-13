@@ -45,8 +45,8 @@ class DouyinWrapperTests(unittest.TestCase):
                 timeout_seconds=123,
                 max_download_bytes=1000,
                 max_model_video_bytes=200,
-                max_duration_seconds=300,
-                max_frames=6000,
+                max_duration_seconds=0,
+                max_frames=0,
                 video_understanding_fps=4.0,
                 min_video_understanding_fps=0.2,
                 max_video_understanding_fps=5.0,
@@ -61,9 +61,9 @@ class DouyinWrapperTests(unittest.TestCase):
         self.assertIn("--max-model-bytes", command)
         self.assertIn("200", command)
         self.assertIn("--max-duration-seconds", command)
-        self.assertIn("300", command)
+        self.assertIn("0", command)
         self.assertIn("--max-frames", command)
-        self.assertIn("6000", command)
+        self.assertIn("0", command)
         self.assertIn("--fps", command)
         self.assertIn("4.0", command)
         self.assertIn("--min-fps", command)

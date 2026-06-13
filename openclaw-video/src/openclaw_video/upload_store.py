@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from .video_limits import MAX_VIDEO_BYTES
+
 
 class UploadStoreError(ValueError):
     pass
@@ -19,7 +21,7 @@ class UploadNotFound(FileNotFoundError):
     pass
 
 
-ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4"}
 UPLOAD_URI_RE = re.compile(r"^upload://([0-9a-fA-F-]{36})/([^/]+)$")
 
 
@@ -43,7 +45,7 @@ def _safe_filename(filename: str) -> str:
     candidate = candidate.strip("._") or "video.mp4"
     suffix = Path(candidate).suffix.lower()
     if suffix not in ALLOWED_VIDEO_EXTENSIONS:
-        raise UploadStoreError("unsupported video file type")
+        raise UploadStoreError("当前优先支持 mp4 视频，请转成 mp4 后再上传")
     return candidate[:120]
 
 
@@ -60,7 +62,7 @@ def store_upload_chunks(
     *,
     filename: str,
     upload_dir: Path | None = None,
-    max_bytes: int = 512 * 1024 * 1024,
+    max_bytes: int = MAX_VIDEO_BYTES,
 ) -> StoredUpload:
     safe_name = _safe_filename(filename)
     upload_id = str(uuid.uuid4())
@@ -100,7 +102,7 @@ def store_upload_fileobj(
     *,
     filename: str,
     upload_dir: Path | None = None,
-    max_bytes: int = 512 * 1024 * 1024,
+    max_bytes: int = MAX_VIDEO_BYTES,
 ) -> StoredUpload:
     return store_upload_chunks(
         iter(lambda: fileobj.read(1024 * 1024), b""),
@@ -115,7 +117,7 @@ def store_upload_bytes(
     *,
     filename: str,
     upload_dir: Path | None = None,
-    max_bytes: int = 512 * 1024 * 1024,
+    max_bytes: int = MAX_VIDEO_BYTES,
 ) -> StoredUpload:
     return store_upload_chunks(
         [data],

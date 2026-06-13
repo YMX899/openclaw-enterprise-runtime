@@ -3,9 +3,9 @@ set -euo pipefail
 
 : "${DOUYIN_CHONG_BIN:?DOUYIN_CHONG_BIN is required}"
 : "${SAMPLE_DOUYIN_URL:?SAMPLE_DOUYIN_URL is required}"
-: "${MAX_DOWNLOAD_BYTES:=536870912}"
-: "${MAX_VIDEO_DURATION_SECONDS:=60}"
-: "${MAX_VIDEO_FRAMES:=1200}"
+: "${MAX_DOWNLOAD_BYTES:=524288000}"
+: "${MAX_VIDEO_DURATION_SECONDS:=0}"
+: "${MAX_VIDEO_FRAMES:=0}"
 
 tmpdir="$(mktemp -d)"
 cleanup() {

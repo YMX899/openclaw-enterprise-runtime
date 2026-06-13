@@ -3,6 +3,10 @@ import unittest
 from types import SimpleNamespace
 
 from openclaw_video.agent_persona import (
+    INTENT_RULES,
+    REWRITE_INTENTS,
+    STATES,
+    WANT_ANALYSIS_INTENTS,
     MARKDOWN_OUTPUT_RULES,
     NEW_SESSION_GREETING,
     SYSTEM_PERSONA,
@@ -77,10 +81,9 @@ class GuardrailTests(unittest.TestCase):
     def test_no_guardrail_for_tiktok_link(self):
         self.assertIsNone(guardrail_for_message("https://www.tiktok.com/@demo/video/123"))
 
-    def test_guardrail_xiaohongshu(self):
-        g = guardrail_for_message("https://www.xiaohongshu.com/explore/abc")
-        self.assertIsNotNone(g)
-        self.assertIn("小红书", g.content)
+    def test_no_guardrail_for_xiaohongshu_link(self):
+        self.assertIsNone(guardrail_for_message("https://www.xiaohongshu.com/explore/abc"))
+        self.assertIsNone(guardrail_for_message("https://xhslink.com/a/abc"))
 
     def test_guardrail_profile_link(self):
         g = guardrail_for_message("https://www.douyin.com/user/MS4wLjA")
@@ -108,6 +111,58 @@ class GuardrailTests(unittest.TestCase):
 
 
 class StateMachineTests(unittest.TestCase):
+    def test_all_declared_states_can_build_agent_messages(self):
+        for state in sorted(STATES):
+            with self.subTest(state=state):
+                message = build_agent_message("测试消息", is_first_turn=False, state=state)
+                self.assertIn("Markdown", message)
+                self.assertIn("用户消息：测试消息", message)
+
+    def test_all_intents_have_deterministic_state_for_core_contexts(self):
+        intents = [name for name, _keywords in INTENT_RULES]
+        intents.append("casual_chat")
+        contexts = [
+            {"has_user_history": False, "has_terminal_video": False, "video_failed": False, "has_current_video": False, "video_analyzing": False},
+            {"has_user_history": True, "has_terminal_video": False, "video_failed": False, "has_current_video": False, "video_analyzing": False},
+            {"has_user_history": True, "has_terminal_video": True, "video_failed": False, "has_current_video": True, "video_analyzing": False},
+            {"has_user_history": True, "has_terminal_video": True, "video_failed": False, "has_current_video": False, "video_analyzing": True},
+            {"has_user_history": True, "has_terminal_video": True, "video_failed": True, "has_current_video": True, "video_analyzing": False},
+        ]
+        for intent in intents:
+            for context in contexts:
+                with self.subTest(intent=intent, context=context):
+                    state = derive_state(intent=intent, **context)
+                    self.assertIn(state, STATES)
+
+    def test_rewrite_intents_follow_up_after_successful_video(self):
+        for intent in sorted(REWRITE_INTENTS):
+            with self.subTest(intent=intent):
+                self.assertEqual(
+                    derive_state(
+                        has_user_history=True,
+                        has_terminal_video=True,
+                        has_current_video=True,
+                        video_failed=False,
+                        video_analyzing=False,
+                        intent=intent,
+                    ),
+                    "follow_up",
+                )
+
+    def test_want_analysis_intents_get_waiting_for_video_fixed_reply(self):
+        for intent in sorted(WANT_ANALYSIS_INTENTS):
+            with self.subTest(intent=intent):
+                reply = fixed_state_reply("waiting_for_video", intent)
+                self.assertIsNotNone(reply)
+                self.assertIn("链接", reply)
+
+    def test_video_analyzing_state_gets_fixed_wait_reply_for_all_intents(self):
+        for intent in ["casual_chat", *sorted(WANT_ANALYSIS_INTENTS)]:
+            with self.subTest(intent=intent):
+                reply = fixed_state_reply("video_analyzing", intent)
+                self.assertIsNotNone(reply)
+                self.assertIn("还在分析中", reply)
+
     def test_new_session_no_history(self):
         s = derive_state(has_user_history=False, has_terminal_video=False, video_failed=False, intent="casual_chat")
         self.assertEqual(s, "new")
@@ -229,6 +284,13 @@ class FixedStateReplyTests(unittest.TestCase):
 
 
 class ErrorReplyTests(unittest.TestCase):
+    def test_all_known_error_codes_have_actionable_reply(self):
+        for code in ["tool_timeout", "url_rejected", "tool_failed", "upload_too_large", "video_too_large"]:
+            with self.subTest(code=code):
+                reply = error_reply_for(code)
+                self.assertTrue(reply)
+                self.assertIn("视频", reply)
+
     def test_timeout_copy(self):
         self.assertIn("没有在限定时间内完成", error_reply_for("tool_timeout"))
 
@@ -246,14 +308,27 @@ class ErrorReplyTests(unittest.TestCase):
 
     def test_upload_too_large(self):
         reply = error_reply_for("upload_too_large")
-        self.assertIn("偏大", reply)
-        self.assertIn("50MB", reply)
+        self.assertIn("超过", reply)
+        self.assertIn("500MB", reply)
 
     def test_none_code_fallback(self):
         self.assertTrue(error_reply_for(None))
 
 
 class BranchPromptTests(unittest.TestCase):
+    def test_all_agent_coaching_intents_build_grounded_prompt(self):
+        for intent in ["casual_chat", *sorted(REWRITE_INTENTS)]:
+            with self.subTest(intent=intent):
+                prompt = build_branch_prompt(
+                    "请继续分析",
+                    state="follow_up",
+                    intent=intent,
+                    analysis_context="00:00-00:03 真实画面细节",
+                )
+                self.assertIn("严格基于它回答", prompt)
+                self.assertIn("00:00-00:03 真实画面细节", prompt)
+                self.assertIn("用户消息：请继续分析", prompt)
+
     def test_injects_analysis_summary(self):
         summary = "这条视频的开头用了悬念，但选题偏窄。"
         prompt = build_branch_prompt("开头怎么改", state="follow_up", intent="ask_rewrite_opening", analysis_summary=summary)
@@ -268,10 +343,21 @@ class BranchPromptTests(unittest.TestCase):
         self.assertIn("不要假装", prompt)
 
     def test_truncates_long_summary(self):
-        long_summary = "钩" * 5000
+        long_summary = "钩" * 15000
         prompt = build_branch_prompt("为什么不爆", state="follow_up", intent="ask_why_not_viral", analysis_summary=long_summary)
         self.assertIn("…", prompt)
-        self.assertLess(len(prompt), 4000)
+        self.assertLess(len(prompt), 14000)
+
+    def test_prefers_analysis_context_over_summary(self):
+        prompt = build_branch_prompt(
+            "为什么不爆",
+            state="follow_up",
+            intent="ask_why_not_viral",
+            analysis_context="逐段细节",
+            analysis_summary="短摘要",
+        )
+        self.assertIn("逐段细节", prompt)
+        self.assertNotIn("短摘要", prompt)
 
     def test_includes_persona(self):
         prompt = build_branch_prompt("复拍方案", state="follow_up", intent="ask_reshoot_plan", analysis_summary="x")
@@ -328,6 +414,12 @@ class PersonaInjectionTests(unittest.TestCase):
         self.assertIn("短视频", SYSTEM_PERSONA)
         self.assertIn("中文", SYSTEM_PERSONA)
         self.assertIn("抖音", SYSTEM_PERSONA)
+        self.assertIn("TikTok", SYSTEM_PERSONA)
+        self.assertIn("B 站", SYSTEM_PERSONA)
+        self.assertIn("500MB", SYSTEM_PERSONA)
+        self.assertIn("不允许", SYSTEM_PERSONA)
+        self.assertIn("video-analysis-worker", SYSTEM_PERSONA)
+        self.assertIn("Files API", SYSTEM_PERSONA)
 
     def test_greeting_is_chinese_and_actionable(self):
         self.assertIn("花火AI视频分析", NEW_SESSION_GREETING)

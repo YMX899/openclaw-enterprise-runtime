@@ -8,8 +8,6 @@ from .postgres_store import PostgresJobStore
 from .video_limits import (
     DEFAULT_MAX_DOWNLOAD_BYTES,
     DEFAULT_MAX_MODEL_VIDEO_BYTES,
-    DEFAULT_MAX_VIDEO_DURATION_SECONDS,
-    DEFAULT_MAX_VIDEO_FRAMES,
     DEFAULT_VIDEO_UNDERSTANDING_FPS,
     MAX_VIDEO_UNDERSTANDING_FPS,
     MIN_VIDEO_UNDERSTANDING_FPS,
@@ -33,8 +31,8 @@ def main() -> None:
     heartbeat_interval_seconds = int(os.environ.get("JOB_HEARTBEAT_SECONDS", "30"))
     max_download_bytes = int(os.environ.get("MAX_DOWNLOAD_BYTES", str(DEFAULT_MAX_DOWNLOAD_BYTES)))
     max_model_video_bytes = int(os.environ.get("MAX_MODEL_VIDEO_BYTES", str(DEFAULT_MAX_MODEL_VIDEO_BYTES)))
-    max_duration_seconds = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", str(DEFAULT_MAX_VIDEO_DURATION_SECONDS)))
-    max_frames = int(os.environ.get("MAX_VIDEO_FRAMES", str(DEFAULT_MAX_VIDEO_FRAMES)))
+    max_duration_seconds = int(os.environ.get("MAX_VIDEO_DURATION_SECONDS", "0"))
+    max_frames = int(os.environ.get("MAX_VIDEO_FRAMES", "0"))
     video_understanding_fps = float(os.environ.get("DOUYIN_CHONG_FPS", str(DEFAULT_VIDEO_UNDERSTANDING_FPS)))
     min_video_understanding_fps = float(os.environ.get("MIN_VIDEO_UNDERSTANDING_FPS", str(MIN_VIDEO_UNDERSTANDING_FPS)))
     max_video_understanding_fps = float(os.environ.get("MAX_VIDEO_UNDERSTANDING_FPS", str(MAX_VIDEO_UNDERSTANDING_FPS)))

@@ -12,11 +12,12 @@
       "additionalProperties": false,
       "properties": {
         "video_url_canonical": {"type": "string"},
-        "platform": {"enum": ["bilibili", "douyin", "tiktok", "upload"]},
+        "platform": {"enum": ["bilibili", "douyin", "tiktok", "xiaohongshu", "upload"]},
         "duration_seconds": {"type": ["number", "null"], "minimum": 0}
       }
     },
     "summary": {"type": "string"},
+    "analysis_detail": {"type": "string"},
     "signals": {
       "type": "object",
       "additionalProperties": false,

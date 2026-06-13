@@ -39,6 +39,12 @@ def _positive_int(value: int, name: str) -> int:
     return value
 
 
+def _nonnegative_int(value: int, name: str) -> int:
+    if value < 0:
+        raise DouyinWrapperError(f"{name} must be non-negative")
+    return value
+
+
 def _positive_float(value: float, name: str) -> float:
     if value <= 0:
         raise DouyinWrapperError(f"{name} must be positive")
@@ -52,6 +58,8 @@ def _raise_for_adapter_failure(prefix: str, completed: subprocess.CompletedProce
     lowered = detail.lower()
     if "input video" in lowered and "exceeds the limit" in lowered:
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because it exceeds the model input size limit")
+    if "视频超过500mb" in lowered or "video exceeds 500mb" in lowered:
+        raise VideoTooLargeForModelError(f"{prefix} rejected the video because it exceeds the 500MB size limit")
     if "compressed video still exceeds model size limit" in lowered:
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because compression did not fit the model limit")
     if "video model size exceeds limit at minimum fps" in lowered:
@@ -89,8 +97,8 @@ def run_douyin_chong(
         raise DouyinWrapperError("DOUYIN_CHONG_BIN is not configured")
     max_download_bytes = _positive_int(max_download_bytes, "max_download_bytes")
     max_model_video_bytes = _positive_int(max_model_video_bytes, "max_model_video_bytes")
-    max_duration_seconds = _positive_int(max_duration_seconds, "max_duration_seconds")
-    max_frames = _positive_int(max_frames, "max_frames")
+    max_duration_seconds = _nonnegative_int(max_duration_seconds, "max_duration_seconds")
+    max_frames = _nonnegative_int(max_frames, "max_frames")
     video_understanding_fps = _positive_float(video_understanding_fps, "video_understanding_fps")
     min_video_understanding_fps = _positive_float(min_video_understanding_fps, "min_video_understanding_fps")
     max_video_understanding_fps = _positive_float(max_video_understanding_fps, "max_video_understanding_fps")
@@ -155,11 +163,12 @@ def run_upload_video_analysis(
     timeout_seconds: int = 900,
     max_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
 ) -> DouyinAnalysisResult:
-    """Analyze a locally-uploaded video via the adapter's inline-base64 mode.
+    """Analyze a locally-uploaded video via the adapter's configured mode.
 
-    Uses the same fixed-argument, no-shell wrapper as run_douyin_chong but with
-    --input-file (the adapter reads the bytes, inlines them as a data: URL, and
-    lets Doubao analyze directly — no resolver, no public hosting).
+    The production mode is Files API: the adapter uploads the local mp4, waits
+    until it is active, and calls Responses with input_video + file_id. The
+    legacy inline/base64 path remains available only through
+    VIDEO_ANALYSIS_INPUT_MODE=inline_legacy.
     """
     executable = binary or os.environ.get("DOUYIN_CHONG_BIN")
     if not executable:

@@ -122,10 +122,10 @@ def _fps_status(*, size_bytes: int | None, config: VideoLinkProbeConfig) -> dict
 
 
 def _limit_status(*, duration: float | None, size_bytes: int | None, config: VideoLinkProbeConfig) -> dict[str, Any]:
-    duration_ok = duration is not None and duration <= config.max_duration_seconds
+    duration_ok = True
     download_size_ok = size_bytes is not None and size_bytes <= config.max_download_bytes
     fps_status = _fps_status(size_bytes=size_bytes, config=config)
-    size_ok = download_size_ok and fps_status["model_size_ok"]
+    size_ok = download_size_ok
     return {
         "max_duration_seconds": config.max_duration_seconds,
         "max_download_bytes": config.max_download_bytes,
@@ -141,7 +141,7 @@ def _limit_status(*, duration: float | None, size_bytes: int | None, config: Vid
         "size_ok": size_ok,
         "video_understanding_fps": fps_status["video_understanding_fps"],
         "fps_adjusted": fps_status["fps_adjusted"],
-        "eligible_for_model_analysis": duration_ok and size_ok,
+        "eligible_for_model_analysis": size_ok,
     }
 
 
@@ -176,7 +176,9 @@ def probe_video_link(
     share_url = str(getattr(video, "share_url", "") or "")
     video_id = str(getattr(video, "video_id", "") or "")
     limit_status = _limit_status(duration=duration, size_bytes=size, config=config)
-    status = "PASS" if candidate_count > 0 and limit_status["eligible_for_model_analysis"] else "WARN"
+    content_type = str(getattr(video, "content_type", "") or "").lower()
+    format_ok = not content_type or "mp4" in content_type
+    status = "PASS" if candidate_count > 0 and format_ok and limit_status["eligible_for_model_analysis"] else "WARN"
     return {
         "schema_version": "openclaw-video-link-read-check.v1",
         "status": status,
@@ -197,6 +199,7 @@ def probe_video_link(
         "playwm_host": playwm_host or None,
         "content_type_present": bool(getattr(video, "content_type", None)),
         "content_type": getattr(video, "content_type", None),
+        "format_ok": format_ok,
         "duration_seconds": duration,
         "size_bytes": size,
         "video_url_source": str(getattr(video, "video_url_source", "") or ""),
