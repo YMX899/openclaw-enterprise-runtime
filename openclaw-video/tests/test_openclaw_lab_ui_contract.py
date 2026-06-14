@@ -60,6 +60,7 @@ class OpenClawLabUiContractTests(unittest.TestCase):
         self.assertIn('id="devDrawer" class="cg-dev-hidden" hidden', self.index_html)
         self.assertNotIn("开发详情：脱敏响应", self.index_html)
         self.assertNotIn("验证工具", self.index_html)
+        self.assertNotIn("前 3 秒钩子", self.index_html)
         in_source = [
             "setPrimaryAction", "setPanelState", "showLanding", "showChatApp",
             "loadSessions", "renderSessions", "selectSession", "sendChat", "refreshMessages",
@@ -67,6 +68,7 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             "apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages'",
             "JOB_AUTO_POLL_ATTEMPTS", "hydrateCompletedJobMessages", "仍在分析中，可稍后刷新查看结果。",
             "video_too_large", "500MB", "上传至视频分析模型",
+            "xiaohongshu", "xhslink", "小红书",
         ]
         for required in in_source:
             with self.subTest(source=required):
@@ -77,23 +79,26 @@ class OpenClawLabUiContractTests(unittest.TestCase):
     def test_video_submission_status_copy_matches_files_api_flow(self):
         expected_status_copy = [
             "已收到视频文件，正在上传…",
-            "准备上传…",
-            "上传完成，正在分析视频…",
+            "1/4 准备上传视频文件…",
+            "1/4 上传视频文件…",
+            "2/4 上传完成，正在提交分析任务…",
+            "3/4 模型正在分析视频，请继续等待…",
+            "4/4 分析完成",
             "正在读取视频链接…",
-            "读取链接中…",
-            "正在提交分析，请稍等…",
+            "1/4 正在读取视频链接…",
+            "2/4 链接读取完成，正在提交分析任务…",
             "模型正在分析视频，请继续等待…",
             "正在下载/读取并上传至视频分析模型",
             "分析上限：500MB",
             "这个视频文件超过 500MB",
-            "500MB 以内的 mp4",
-            'accept="video/mp4"',
+            "500MB 以内的 mp4/avi/mov",
+            'accept=".mp4,.avi,.mov,video/mp4,video/avi,video/mov,video/quicktime,video/x-msvideo"',
         ]
         for required in expected_status_copy:
             with self.subTest(status_copy=required):
                 self.assertIn(required, self.source)
                 self.assertIn(required, self.built_js + self.index_html)
-        for forbidden in ["压缩后再上传", "视频理解 fps", "512MB", "video/quicktime", "video/webm"]:
+        for forbidden in ["压缩后再上传", "视频理解 fps", "512MB", "video/webm"]:
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, self.source)
                 self.assertNotIn(forbidden, self.built_js + self.index_html)

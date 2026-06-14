@@ -138,7 +138,7 @@ class GatewayClientTests(unittest.TestCase):
                 os.environ["OPENCLAW_GATEWAY_TOKEN_FILE"] = token_path
                 os.environ["OPENCLAW_GATEWAY_DEVICE_KEY_FILE"] = key_path
                 # default is generous (long coaching generations)
-                self.assertEqual(OpenClawGatewayWsClient.from_environment().timeout_seconds, 120.0)
+                self.assertEqual(OpenClawGatewayWsClient.from_environment().timeout_seconds, 240.0)
                 os.environ["OPENCLAW_GATEWAY_TIMEOUT_SECONDS"] = "180"
                 self.assertEqual(OpenClawGatewayWsClient.from_environment().timeout_seconds, 180.0)
         finally:

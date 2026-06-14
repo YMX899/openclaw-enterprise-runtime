@@ -16,6 +16,7 @@ from .url_guard import (
     UrlRejected,
     default_redirect_fetcher,
     default_resolver,
+    validate_video_url,
     validate_video_url_with_redirects,
 )
 from .video_limits import (
@@ -82,6 +83,24 @@ def _load_resolver_class():
 
 def _host(value: str) -> str:
     return (urlparse(value).hostname or "").lower()
+
+
+def _validate_for_probe(
+    video_url: str,
+    *,
+    resolver: Resolver,
+    redirect_fetcher: RedirectFetcher,
+):
+    host = _host(video_url)
+    if (host == "xiaohongshu.com" or host.endswith(".xiaohongshu.com")) and not (
+        host == "xhslink.com" or host.endswith(".xhslink.com")
+    ):
+        return validate_video_url(video_url, resolver=resolver)
+    return validate_video_url_with_redirects(
+        video_url,
+        resolver=resolver,
+        redirect_fetcher=redirect_fetcher,
+    )
 
 
 def _video_candidate_count(video: Any) -> int:
@@ -155,11 +174,7 @@ def probe_video_link(
 ) -> dict[str, Any]:
     started = time.monotonic()
     config = config or VideoLinkProbeConfig()
-    validated = validate_video_url_with_redirects(
-        video_url,
-        resolver=resolver,
-        redirect_fetcher=redirect_fetcher,
-    )
+    validated = _validate_for_probe(video_url, resolver=resolver, redirect_fetcher=redirect_fetcher)
     try:
         selected_resolver = legacy_resolver if legacy_resolver is not None else _load_resolver_class()()
         video = selected_resolver.resolve(validated.canonical)

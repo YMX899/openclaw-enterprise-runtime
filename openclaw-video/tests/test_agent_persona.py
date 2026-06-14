@@ -12,6 +12,7 @@ from openclaw_video.agent_persona import (
     SYSTEM_PERSONA,
     build_agent_message,
     build_branch_prompt,
+    build_continue_prompt,
     current_video_from_history,
     derive_state,
     detect_intent,
@@ -20,6 +21,8 @@ from openclaw_video.agent_persona import (
     guardrail_for_message,
     has_douyin_link,
     has_supported_video_link,
+    is_continue_request,
+    load_full_knowledge_context,
 )
 
 
@@ -56,6 +59,13 @@ class IntentDetectionTests(unittest.TestCase):
     def test_casual_chat(self):
         self.assertEqual(detect_intent("你好"), "casual_chat")
         self.assertEqual(detect_intent(""), "casual_chat")
+
+    def test_continue_request_detection(self):
+        for text in ["继续", "继续。", "接着说", "接着刚才", "往下说", "没说完继续"]:
+            with self.subTest(text=text):
+                self.assertTrue(is_continue_request(text))
+        self.assertFalse(is_continue_request("继续分析这条视频"))
+        self.assertFalse(is_continue_request("开头继续怎么改"))
 
 
 class GuardrailTests(unittest.TestCase):
@@ -384,6 +394,51 @@ class BranchPromptTests(unittest.TestCase):
         self.assertIn("短视频分析方法论", p)
         self.assertIn("信息密度", p)
 
+    def test_branch_prompt_uses_full_knowledge_context_when_available(self):
+        prompt = build_branch_prompt(
+            "开头怎么改",
+            state="follow_up",
+            intent="ask_rewrite_opening",
+            analysis_summary="视频细节",
+            knowledge_context="【知识库文件：爆款短视频制作与分析知识库.md】\n完整知识库原文标记",
+        )
+        self.assertIn("完整知识库原文标记", prompt)
+        self.assertIn("回答必须结合它", prompt)
+        self.assertIn("视频细节", prompt)
+
+    def test_load_full_knowledge_context_reads_prompt_ready_files(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "爆款短视频制作与分析知识库.md").write_text("爆款库正文", encoding="utf-8")
+            (root / "短视频画面设计方法论.md").write_text("画面库正文", encoding="utf-8")
+            (root / "爆火视屏回答模版.txt").write_text("回答模板正文", encoding="utf-8")
+            (root / "爆款视频制作流程.pdf").write_bytes(b"%PDF")
+
+            context = load_full_knowledge_context(root)
+
+        self.assertIn("爆款库正文", context)
+        self.assertIn("画面库正文", context)
+        self.assertIn("回答模板正文", context)
+        self.assertNotIn("%PDF", context)
+
+    def test_continue_prompt_injects_previous_answer_tail_and_grounding(self):
+        prompt = build_continue_prompt(
+            "继续",
+            previous_assistant="## 结尾 10-15 秒\n所以，",
+            analysis_context="00:00-00:03 真实画面细节",
+            knowledge_context="完整知识库原文",
+        )
+
+        self.assertIn("续写上一条", prompt)
+        self.assertIn("不要重新开题", prompt)
+        self.assertIn("## 结尾 10-15 秒\n所以，", prompt)
+        self.assertIn("00:00-00:03 真实画面细节", prompt)
+        self.assertIn("完整知识库原文", prompt)
+        self.assertIn("用户消息：继续", prompt)
+
 
 class PersonaInjectionTests(unittest.TestCase):
     def test_first_turn_gets_persona(self):
@@ -425,6 +480,7 @@ class PersonaInjectionTests(unittest.TestCase):
         self.assertIn("花火AI视频分析", NEW_SESSION_GREETING)
         self.assertIn("抖音", NEW_SESSION_GREETING)
         self.assertIn("上传", NEW_SESSION_GREETING)
+        self.assertNotIn("前 3 秒钩子", NEW_SESSION_GREETING)
 
 
 class DouyinLinkDetectorTests(unittest.TestCase):

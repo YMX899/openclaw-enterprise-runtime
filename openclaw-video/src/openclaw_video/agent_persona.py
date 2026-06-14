@@ -12,8 +12,10 @@ through tests.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 # --- persona ---------------------------------------------------------------
 
@@ -23,9 +25,9 @@ SYSTEM_PERSONA = (
     "不是泛聊天机器人，不是通用助手。\n\n"
     "硬性规则（不可违反）：\n"
     "1. 只用中文回答。\n"
-    "2. 只能分析通过本平台视频管线（抖音/TikTok/B 站/小红书单条视频链接或 mp4 视频文件上传）真实解析出来的视频。"
+    "2. 只能分析通过本平台视频管线（抖音/TikTok/B 站/小红书单条视频链接或 mp4/avi/mov 视频文件上传）真实解析出来的视频。"
     "不假装看过没成功解析的视频；不虚构画面、台词、产品功效、播放量、点赞数。\n"
-    "3. 当前支持抖音、TikTok、B 站、小红书单条视频链接和 500MB 以内 mp4 视频文件上传。其他平台（YouTube/微博/快手）"
+    "3. 当前支持抖音、TikTok、B 站、小红书单条视频链接和 500MB 以内 mp4/avi/mov 视频文件上传。其他平台（YouTube/微博/快手）"
     "明确说不支持，不要声称能转录字幕或读取这些平台的视频。\n"
     "4. 抖音主页链接不解析，提示发单条视频链接。\n"
     "5. 解析失败时明确告诉原因；可基于用户描述给方向建议，但要明示这是基于描述而非已解析视频。\n"
@@ -44,6 +46,7 @@ MARKDOWN_OUTPUT_RULES = (
     "- 使用 Markdown 输出，不要输出纯文本长段落。\n"
     "- 优先使用 `##` 小标题、短列表、**加粗关键词**，回答保持紧凑。\n"
     "- 每段尽量短；能用列表就不要写成大段说明。\n"
+    "- 对脚本、复拍分镜、逐段诊断这类长答案，要尽量一次完整输出；确实过长时在自然段落结束处停下，并明确提示用户回复“继续”。\n"
     "- 不要用代码块包住整段回复，除非用户明确要求代码。"
 )
 
@@ -55,7 +58,7 @@ NEW_SESSION_GREETING = (
     "1. 粘贴抖音/TikTok/B 站/小红书单条视频链接，我会读取并完整分析；\n"
     "2. 点击输入框左侧 ＋ 上传视频文件；\n"
     "3. 直接告诉我你的赛道、目标用户、视频目的，我也可以先给方向性建议。\n\n"
-    "不管哪种方式，我都会围绕选题、前 3 秒钩子、结构、画面和可执行的改法来回答。"
+    "不管哪种方式，我都会围绕选题、结构、画面和可执行的改法来回答。"
 )
 
 # --- intents ---------------------------------------------------------------
@@ -80,6 +83,28 @@ def detect_intent(text: str) -> str:
         if any(keyword in lowered for keyword in keywords):
             return intent
     return "casual_chat"
+
+
+_CONTINUE_REQUESTS = frozenset({
+    "继续",
+    "继续说",
+    "继续输出",
+    "接着说",
+    "接着上面",
+    "接着刚才",
+    "继续刚才",
+    "继续上面",
+    "没说完继续",
+    "还没说完",
+    "后面呢",
+    "往下说",
+})
+
+
+def is_continue_request(text: str) -> bool:
+    """Return true when the user is asking to continue the previous answer."""
+    normalized = re.sub(r"[\s，。！？!?、,.：:；;~…]+", "", (text or "").strip().lower())
+    return normalized in _CONTINUE_REQUESTS
 
 
 # --- conversation state ----------------------------------------------------
@@ -363,7 +388,7 @@ _ERROR_REPLIES: dict[str, str] = {
     ),
     "upload_too_large": (
         "这个视频超过 500MB，暂时无法分析。\n"
-        "请换一个更小的 mp4 视频文件，或裁剪/压缩到 500MB 以内后再上传。"
+        "请换一个更小的 mp4/avi/mov 视频文件，或裁剪/压缩到 500MB 以内后再上传。"
     ),
     "video_too_large": (
         "这个视频超过 500MB，暂时无法分析。\n"
@@ -427,6 +452,33 @@ def knowledge_for_intent(intent: str) -> str:
     return _INTENT_KNOWLEDGE.get(intent, ANALYSIS_FRAMEWORK)
 
 
+KNOWLEDGE_TEXT_FILENAMES = (
+    "爆款短视频制作与分析知识库.md",
+    "短视频画面设计方法论.md",
+    "爆火视屏回答模版.txt",
+)
+DEFAULT_KNOWLEDGE_BASE_DIR = "/knowledge/short-video"
+
+
+def load_full_knowledge_context(knowledge_base_dir: str | os.PathLike[str] | None = None) -> str:
+    """Load the full text knowledge base mounted for the bridge agent.
+
+    The binary PDF is intentionally not injected directly here; the mounted
+    markdown/txt files are the prompt-ready full knowledge text.
+    """
+    root = Path(knowledge_base_dir or os.environ.get("KNOWLEDGE_BASE_DIR", DEFAULT_KNOWLEDGE_BASE_DIR))
+    parts: list[str] = []
+    for filename in KNOWLEDGE_TEXT_FILENAMES:
+        path = root / filename
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if text:
+            parts.append(f"【知识库文件：{filename}】\n{text}")
+    return "\n\n".join(parts).strip()
+
+
 # --- agent coaching branch prompts (spec ch.10.11-10.13, ch.11) ------------
 # For feedback_given / follow_up we DO call the agent, but with a branch-specific
 # instruction AND the real analysis summary injected — because video analysis
@@ -464,6 +516,7 @@ def build_branch_prompt(
     intent: str,
     analysis_context: str | None = None,
     analysis_summary: str | None = None,
+    knowledge_context: str | None = None,
 ) -> str:
     """Build a coaching prompt for feedback_given / follow_up turns.
 
@@ -478,7 +531,14 @@ def build_branch_prompt(
     branch = _BRANCH_INSTRUCTIONS.get(intent)
     if branch:
         parts.append("本轮分支要求：" + branch)
-    parts.append(knowledge_for_intent(intent))
+    full_knowledge = (knowledge_context or "").strip()
+    if full_knowledge:
+        parts.append(
+            "以下是当前短视频方法论知识库的完整文本内容。回答必须结合它，"
+            "优先使用其中的方法、术语和回答结构：\n" + full_knowledge
+        )
+    else:
+        parts.append(knowledge_for_intent(intent))
     summary = (analysis_context or analysis_summary or "").strip()
     if summary:
         if len(summary) > 12000:
@@ -492,5 +552,49 @@ def build_branch_prompt(
             "（注意：当前没有可用的视频分析结果。不要假装看过视频；"
             "如有需要请引导用户重新提供可解析的抖音/TikTok/B 站单条视频链接。）"
         )
+    parts.append("用户消息：" + content)
+    return "\n\n".join(parts)
+
+
+def build_continue_prompt(
+    content: str,
+    *,
+    previous_assistant: str,
+    analysis_context: str | None = None,
+    knowledge_context: str | None = None,
+) -> str:
+    """Build a prompt that forces the agent to continue its previous answer.
+
+    This is used for user turns such as "继续". The prior assistant response is
+    injected explicitly because the Gateway session memory may treat a short
+    continuation request as a new question unless the Bridge supplies the exact
+    continuation target.
+    """
+    parts = [SYSTEM_PERSONA, MARKDOWN_OUTPUT_RULES, _STATE_HINTS["follow_up"]]
+    parts.append(
+        "本轮分支要求：用户是在要求你续写上一条没有完整输出的回答，"
+        "不是提出新问题。必须从上一条助手回复的最后一句之后自然接着写；"
+        "如果上一条停在半句话，就补完这句话；如果停在小标题下，就继续这个小标题。"
+        "不要重新开题，不要重复已经输出的内容，不要改变上一条回答的方案方向。"
+    )
+    full_knowledge = (knowledge_context or "").strip()
+    if full_knowledge:
+        parts.append(
+            "以下是当前短视频方法论知识库的完整文本内容。续写时仍然必须结合它：\n"
+            + full_knowledge
+        )
+    summary = (analysis_context or "").strip()
+    if summary:
+        if len(summary) > 12000:
+            summary = summary[:12000].rstrip() + "…"
+        parts.append(
+            "以下是当前这条视频已经完成的真实分析结果，请继续严格基于它回答，"
+            "不要脱离它另行虚构画面或台词：\n" + summary
+        )
+    previous = (previous_assistant or "").strip()
+    if previous:
+        if len(previous) > 8000:
+            previous = previous[-8000:].lstrip()
+        parts.append("以下是上一条助手回复，请从它的末尾继续，不要从头重写：\n" + previous)
     parts.append("用户消息：" + content)
     return "\n\n".join(parts)

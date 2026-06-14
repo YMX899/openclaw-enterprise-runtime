@@ -202,6 +202,36 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         methods = [call["method"] for call in FakeFilesClient.calls]
         self.assertEqual(methods, ["init", "upload", "wait", "retrieve", "responses"])
 
+    def test_files_api_input_file_uses_official_video_mime_types(self):
+        for filename, expected_mime in [("clip.mp4", "video/mp4"), ("clip.avi", "video/avi"), ("clip.mov", "video/mov")]:
+            with self.subTest(filename=filename):
+                FakeFilesClient.calls.clear()
+                with TemporaryDirectory() as tmp:
+                    env_file = Path(tmp) / "douyin.env"
+                    env_file.write_text("ARK_API_KEY=test\n", encoding="utf-8")
+                    video_file = Path(tmp) / filename
+                    video_file.write_bytes(b"fake-video-bytes")
+                    output_json = Path(tmp) / "result.json"
+
+                    payload = run_adapter(
+                        [
+                            "--input-file", str(video_file),
+                            "--source-label", "upload://abc/" + filename,
+                            "--output-json", str(output_json),
+                            "--max-bytes", "2000000",
+                            "--max-duration-seconds", "60",
+                            "--max-frames", "1200",
+                            "--env-file", str(env_file),
+                            "--no-shell",
+                            "--input-mode", FILES_API_MODE,
+                        ],
+                        component_loader=fake_components,
+                        files_client_factory=FakeFilesClient,
+                    )
+
+                self.assertEqual(payload["raw_tool_result"]["mime_type"], expected_mime)
+                self.assertEqual(FakeFilesClient.calls[1]["mime_type"], expected_mime)
+
     def test_files_api_url_downloads_with_ytdlp_before_upload(self):
         with TemporaryDirectory() as tmp:
             env_file = Path(tmp) / "douyin.env"
@@ -324,6 +354,23 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
             "https://www.douyin.com/video/7648317087237562266",
         )
 
+    def test_xiaohongshu_direct_link_does_not_follow_anti_abuse_redirect(self):
+        with (
+            patch("openclaw_video.douyin_legacy_adapter.validate_video_url") as validator,
+            patch("openclaw_video.douyin_legacy_adapter.validate_video_url_with_redirects") as redirects,
+        ):
+            validator.return_value = type(
+                "Validated",
+                (),
+                {"canonical": "https://www.xiaohongshu.com/explore/abc?x=1"},
+            )()
+            self.assertEqual(
+                _canonicalize_input_for_resolver("https://www.xiaohongshu.com/explore/abc?x=1"),
+                "https://www.xiaohongshu.com/explore/abc?x=1",
+            )
+        validator.assert_called_once()
+        redirects.assert_not_called()
+
     def test_platform_from_url_supports_vendor_resolver_platforms(self):
         self.assertEqual(_platform_from_url("https://www.douyin.com/video/1"), "douyin")
         self.assertEqual(_platform_from_url("https://www.tiktok.com/@demo/video/123"), "tiktok")
@@ -332,6 +379,17 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(_platform_from_url("https://b23.tv/abc"), "bilibili")
         self.assertEqual(_platform_from_url("https://www.xiaohongshu.com/explore/abc"), "xiaohongshu")
         self.assertEqual(_platform_from_url("https://xhslink.com/a/abc"), "xiaohongshu")
+
+    def test_xiaohongshu_download_prefers_resolved_media_url(self):
+        video = FakeVideo(
+            source_url="https://www.xiaohongshu.com/explore/abc",
+            video_url="https://sns-video.example/video.mp4",
+        )
+
+        self.assertEqual(
+            adapter_module._best_download_url_for_platform("https://www.xiaohongshu.com/explore/abc", video),
+            "https://sns-video.example/video.mp4",
+        )
 
     def test_files_api_analysis_fps_policy_uses_video_duration(self):
         cases = [

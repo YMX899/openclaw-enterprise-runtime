@@ -21,7 +21,8 @@ class UploadNotFound(FileNotFoundError):
     pass
 
 
-ALLOWED_VIDEO_EXTENSIONS = {".mp4"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov"}
+ALLOWED_VIDEO_EXTENSIONS_LABEL = "mp4、avi、mov"
 UPLOAD_URI_RE = re.compile(r"^upload://([0-9a-fA-F-]{36})/([^/]+)$")
 
 
@@ -45,7 +46,7 @@ def _safe_filename(filename: str) -> str:
     candidate = candidate.strip("._") or "video.mp4"
     suffix = Path(candidate).suffix.lower()
     if suffix not in ALLOWED_VIDEO_EXTENSIONS:
-        raise UploadStoreError("当前优先支持 mp4 视频，请转成 mp4 后再上传")
+        raise UploadStoreError(f"当前支持 {ALLOWED_VIDEO_EXTENSIONS_LABEL} 视频，请转换格式后再上传")
     return candidate[:120]
 
 

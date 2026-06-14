@@ -18,7 +18,7 @@ from urllib.request import Request, urlopen
 
 from .ark_files_client import DEFAULT_ARK_API_BASE, DEFAULT_ARK_RESPONSES_MODEL, ArkFilesClient
 from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
-from .url_guard import UrlRejected, validate_video_url_with_redirects
+from .url_guard import UrlRejected, validate_video_url, validate_video_url_with_redirects
 from .video_limits import (
     MAX_VIDEO_BYTES,
     DEFAULT_MAX_MODEL_VIDEO_BYTES,
@@ -146,6 +146,10 @@ def _size_bytes(video: Any) -> int | None:
 
 def _canonicalize_input_for_resolver(input_url: str) -> str:
     try:
+        if _platform_from_url(input_url) == "xiaohongshu" and "xhslink.com" not in (
+            urlparse(input_url).hostname or ""
+        ).lower():
+            return validate_video_url(input_url).canonical
         return validate_video_url_with_redirects(input_url).canonical
     except UrlRejected as exc:
         raise LegacyAdapterError("video URL failed redirect validation") from exc
@@ -180,7 +184,7 @@ def _referer_for_url(url: str) -> str:
 
 def _best_download_url_for_platform(input_url: str, video: Any) -> str:
     platform = _platform_from_url(input_url or str(getattr(video, "source_url", "") or ""))
-    if platform in {"bilibili", "xiaohongshu"}:
+    if platform == "bilibili":
         return input_url
     return str(getattr(video, "video_url", "") or "") or input_url
 
@@ -200,7 +204,13 @@ def _model_inline_target_bytes(limits: LegacyVideoLimits) -> int:
 
 
 def _cache_root() -> Path:
-    return Path(os.environ.get("OPENCLAW_VIDEO_CACHE_DIR", DEFAULT_VIDEO_CACHE_DIR))
+    root = Path(os.environ.get("OPENCLAW_VIDEO_CACHE_DIR", DEFAULT_VIDEO_CACHE_DIR))
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        root.chmod(0o770)
+    except OSError:
+        pass
+    return root
 
 
 def _cache_key_for_url(url: str) -> str:
@@ -813,9 +823,8 @@ def _build_payload(
 
 _UPLOAD_CONTENT_TYPES = {
     ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".m4v": "video/x-m4v",
-    ".webm": "video/webm",
+    ".avi": "video/avi",
+    ".mov": "video/mov",
 }
 
 
@@ -1054,9 +1063,10 @@ def _load_ark_files_config(env_file: Path) -> tuple[str, str, str]:
 
 def _mime_type_for_video(path: Path) -> str:
     suffix = path.suffix.lower()
-    if suffix != ".mp4":
-        raise LegacyAdapterError("当前优先支持 mp4 视频，请转成 mp4 后再上传")
-    return "video/mp4"
+    content_type = _UPLOAD_CONTENT_TYPES.get(suffix)
+    if not content_type:
+        raise LegacyAdapterError("当前支持 mp4、avi、mov 视频，请转换格式后再上传")
+    return content_type
 
 
 def _ensure_file_for_files_api(path: Path, *, max_bytes: int) -> int:

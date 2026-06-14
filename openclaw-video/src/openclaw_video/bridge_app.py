@@ -5,6 +5,7 @@ import base64
 import hmac
 import json
 import os
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -55,7 +56,7 @@ from .session_store import (
     SessionNotFound,
     SessionOwnershipError,
 )
-from .upload_store import UploadStoreError, delete_upload_uri, store_upload_fileobj
+from .upload_store import ALLOWED_VIDEO_EXTENSIONS_LABEL, UploadStoreError, delete_upload_uri, store_upload_fileobj
 from .url_guard import UrlRejected
 from .video_link_probe import VideoLinkProbeConfig, VideoLinkProbeError, probe_video_link
 from .video_limits import (
@@ -70,12 +71,15 @@ from .agent_persona import (
     NEW_SESSION_GREETING,
     build_agent_message,
     build_branch_prompt,
+    build_continue_prompt,
     current_video_from_history,
     derive_state,
     detect_intent,
     error_reply_for,
     fixed_state_reply,
     guardrail_for_message,
+    is_continue_request,
+    load_full_knowledge_context,
 )
 
 
@@ -129,13 +133,96 @@ def _serialize_result(result: Any) -> dict[str, Any]:
     }
 
 
-def _analysis_result_message(result: Any) -> str:
+VIDEO_URL_PATTERN = re.compile(
+    r"https?://(?:"
+    r"(?:[\w.-]*\.)?douyin\.com/(?!user/)\S+|"
+    r"v\.douyin\.com/\S+|"
+    r"www\.iesdouyin\.com/\S+|"
+    r"(?:[\w.-]*\.)?tiktok\.com/\S+|"
+    r"(?:www\.|m\.)?bilibili\.com/video/\S+|"
+    r"b23\.tv/\S+|"
+    r"(?:[\w.-]*\.)?xiaohongshu\.com/\S+|"
+    r"xhslink\.com/\S+"
+    r")",
+    re.IGNORECASE,
+)
+
+DEFAULT_VIDEO_PROMPTS = {
+    "analyze video",
+    "analyze this",
+    "analyze uploaded video",
+    "upload",
+    "请分析这个视频。",
+    "请分析这个视频",
+    "请分析上传的视频。",
+    "请分析上传的视频",
+    "请分析我上传的视频。",
+    "请分析我上传的视频",
+}
+
+
+def _strip_video_urls(text: str) -> str:
+    return VIDEO_URL_PATTERN.sub(" ", text or "")
+
+
+def _extract_video_question(content: str, *, video_url: str | None = None, is_upload: bool = False) -> str:
+    value = (content or "").strip()
+    if not value:
+        return ""
+    if is_upload:
+        without_urls = value
+    else:
+        matches = list(VIDEO_URL_PATTERN.finditer(value))
+        without_urls = value[matches[-1].end():] if matches else _strip_video_urls(value)
+        if video_url:
+            without_urls = without_urls.replace(video_url, " ")
+    normalized = re.sub(r"\s+", " ", without_urls).strip(" \n\r\t:：,，。")
+    if not normalized:
+        return ""
+    if normalized.lower() in DEFAULT_VIDEO_PROMPTS:
+        return ""
+    if normalized in DEFAULT_VIDEO_PROMPTS:
+        return ""
+    if not is_upload and len(normalized) > 80 and not any(mark in normalized for mark in ("?", "？", "怎么", "为什么", "哪里", "帮我", "请")):
+        return ""
+    return normalized
+
+
+def _analysis_summary_from_result(result: Any) -> str:
     payload = getattr(result, "result", None)
     if isinstance(payload, dict):
         summary = str(payload.get("summary") or "").strip()
         if summary:
             return summary
-    return "分析完成，结果已就绪。"
+    return ""
+
+
+def _analysis_detail_from_result(result: Any) -> str:
+    payload = getattr(result, "result", None)
+    if isinstance(payload, dict):
+        detail = str(payload.get("analysis_detail") or "").strip()
+        if detail:
+            return detail
+        return str(payload.get("summary") or "").strip()
+    return ""
+
+
+def _analysis_result_message(result: Any, answer: str | None = None, *, has_question: bool = False) -> str:
+    summary = _analysis_summary_from_result(result) or "分析完成，结果已就绪。"
+    parts = ["## 视频摘要", summary]
+    normalized_answer = str(answer or "").strip()
+    if has_question:
+        parts.append("## 针对你问题的回答")
+        parts.append(normalized_answer or "我已经完成视频分析，但暂时没有生成针对问题的补充回答。")
+    else:
+        parts.append("## 你可以继续这样问我")
+        parts.append(
+            "- 这条视频最值得保留的点是什么？\n"
+            "- 开头怎么改更抓人？\n"
+            "- 为什么它可能不爆？\n"
+            "- 如果我照着复拍，脚本和画面怎么改？"
+        )
+    return "\n\n".join(part for part in parts if part).strip()
 
 
 def _is_form_upload(value: Any) -> bool:
@@ -150,8 +237,17 @@ def _is_form_upload(value: Any) -> bool:
 
 def _validate_upload_mime_type(value: Any) -> None:
     content_type = str(getattr(value, "content_type", "") or "").lower().strip()
-    if content_type and content_type not in {"video/mp4", "application/mp4", "application/octet-stream"}:
-        raise UploadStoreError("当前优先支持 mp4 视频，请转成 mp4 后再上传")
+    allowed = {
+        "video/mp4",
+        "application/mp4",
+        "video/avi",
+        "video/x-msvideo",
+        "video/mov",
+        "video/quicktime",
+        "application/octet-stream",
+    }
+    if content_type and content_type not in allowed:
+        raise UploadStoreError(f"当前支持 {ALLOWED_VIDEO_EXTENSIONS_LABEL} 视频，请转换格式后再上传")
 
 
 def _sse_event(event: str, data: dict[str, Any]) -> str:
@@ -414,14 +510,48 @@ def create_app(
             return False
         return True
 
-    def ensure_job_assistant_message(principal: DifyPrincipal, job: VideoJob, content: str) -> None:
+    async def _answer_video_submission_question(
+        principal: DifyPrincipal,
+        job: VideoJob,
+        result: Any,
+        question: str,
+    ) -> str:
+        if isinstance(gateway, DisabledGatewayClient):
+            return ""
+        try:
+            session = session_store.get_session(job.bridge_session_id, principal.principal_id)
+            history = session_store.list_messages(job.bridge_session_id, principal.principal_id)
+        except (SessionNotFound, SessionOwnershipError):
+            return ""
+        agent_content = build_branch_prompt(
+            question,
+            state="follow_up",
+            intent=detect_intent(question),
+            analysis_context=_analysis_detail_from_result(result),
+            knowledge_context=load_full_knowledge_context(),
+        )
+        chat_request = GatewayChatRequest(
+            routing_user=session.openclaw_routing_user,
+            session_id=session.id,
+            message_id=f"{job.job_id}:initial-question",
+            content=agent_content,
+            history=tuple({"role": item.role, "content": item.content} for item in history),
+        )
+        try:
+            gateway_result = await gateway.chat(chat_request)
+        except (GatewayNotConfigured, GatewayError):
+            return ""
+        return str(gateway_result.content or "").strip()
+
+    async def ensure_job_assistant_message(principal: DifyPrincipal, job: VideoJob, content: str) -> str:
         normalized = str(content or "").strip()
         if not normalized:
-            return
+            return ""
         try:
             messages = session_store.list_messages(job.bridge_session_id, principal.principal_id)
-            if any(item.role == "assistant" and item.job_id == job.job_id for item in messages):
-                return
+            existing = next((item for item in messages if item.role == "assistant" and item.job_id == job.job_id), None)
+            if existing:
+                return existing.content
             session_store.add_message(
                 job.bridge_session_id,
                 principal.principal_id,
@@ -430,8 +560,33 @@ def create_app(
                 video_url=job.video_url_canonical,
                 job_id=job.job_id,
             )
+            return normalized
         except (SessionNotFound, SessionOwnershipError, MessageValidationError):
-            return
+            return ""
+
+    async def ensure_success_job_assistant_message(principal: DifyPrincipal, job: VideoJob, result: Any) -> str:
+        try:
+            messages = session_store.list_messages(job.bridge_session_id, principal.principal_id)
+        except (SessionNotFound, SessionOwnershipError):
+            return ""
+        existing = next((item for item in messages if item.role == "assistant" and item.job_id == job.job_id), None)
+        if existing:
+            return existing.content
+        user_message = next(
+            (item for item in reversed(messages) if item.role == "user" and item.job_id == job.job_id),
+            None,
+        )
+        question = _extract_video_question(
+            getattr(user_message, "content", "") if user_message else "",
+            video_url=job.video_url_canonical,
+            is_upload=str(job.video_url_canonical or "").startswith("upload://"),
+        )
+        answer = await _answer_video_submission_question(principal, job, result, question) if question else ""
+        return await ensure_job_assistant_message(
+            principal,
+            job,
+            _analysis_result_message(result, answer, has_question=bool(question)),
+        )
 
     def enforce_principal_allowed(tenant_hash: str, account_hash: str) -> None:
         if not principal_allowed(tenant_hash, account_hash):
@@ -972,7 +1127,7 @@ def create_app(
         except (JobNotFound, JobOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="job not found") from exc
         if job.status in {JobStatus.FAILED, JobStatus.TIMED_OUT, JobStatus.CANCELLED}:
-            ensure_job_assistant_message(principal, job, error_reply_for(job.error_code))
+            await ensure_job_assistant_message(principal, job, error_reply_for(job.error_code))
         return {"job": _serialize_job(job)}
 
     @app.get("/openclaw-api/jobs/{job_id}/result")
@@ -986,7 +1141,7 @@ def create_app(
             result = job_store.get_result(job_id, principal.principal_id)
         except (JobNotFound, JobOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="job result not found") from exc
-        ensure_job_assistant_message(principal, job, _analysis_result_message(result))
+        await ensure_success_job_assistant_message(principal, job, result)
         return {"result": _serialize_result(result)}
 
     @app.get("/openclaw-api/jobs/{job_id}/events")
@@ -1138,6 +1293,11 @@ def create_app(
         video_analyzing = latest_status in {"queued", "running"}
         current_video_job_id, _current_video_url = current_video_from_history(history, _job_status)
         has_current_video = current_video_job_id is not None
+        previous_assistant = next(
+            (msg.content for msg in reversed(history) if msg.role == "assistant" and msg.content.strip()),
+            "",
+        )
+        wants_continuation = bool(previous_assistant and is_continue_request(content))
 
         state = derive_state(
             has_user_history=not is_first_turn,
@@ -1150,7 +1310,7 @@ def create_app(
 
         # ── Branch A: deterministic Bridge reply (no agent call) ─────────
         fixed_reply = error_reply_for(latest_error_code) if video_failed else fixed_state_reply(state, intent)
-        if fixed_reply is not None:
+        if fixed_reply is not None and not wants_continuation:
             assistant_message = session_store.add_message(
                 session_id, principal.principal_id, "assistant", fixed_reply,
             )
@@ -1163,7 +1323,23 @@ def create_app(
             )
 
         # ── Branch B: agent-generated reply ─────────────────────────────
-        if state in {"feedback_given", "follow_up"} and current_video_job_id:
+        if wants_continuation:
+            analysis_summary: str | None = None
+            if current_video_job_id:
+                try:
+                    video_result = job_store.get_result(current_video_job_id, principal.principal_id)
+                    payload = getattr(video_result, "result", None)
+                    if isinstance(payload, dict):
+                        analysis_summary = str(payload.get("analysis_detail") or payload.get("summary") or "")
+                except (JobNotFound, JobOwnershipError):
+                    pass
+            agent_content = build_continue_prompt(
+                content,
+                previous_assistant=previous_assistant,
+                analysis_context=analysis_summary,
+                knowledge_context=load_full_knowledge_context(),
+            )
+        elif state in {"feedback_given", "follow_up"} and current_video_job_id:
             analysis_summary: str | None = None
             try:
                 video_result = job_store.get_result(current_video_job_id, principal.principal_id)
@@ -1173,7 +1349,11 @@ def create_app(
             except (JobNotFound, JobOwnershipError):
                 pass
             agent_content = build_branch_prompt(
-                content, state=state, intent=intent, analysis_context=analysis_summary,
+                content,
+                state=state,
+                intent=intent,
+                analysis_context=analysis_summary,
+                knowledge_context=load_full_knowledge_context(),
             )
         else:
             agent_content = build_agent_message(content, is_first_turn=is_first_turn, state=state)

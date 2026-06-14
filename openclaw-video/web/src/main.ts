@@ -81,7 +81,7 @@ const output = document.getElementById('output');
     const composerAttachmentName = document.getElementById('composerAttachmentName');
     const composerLinkHint = document.getElementById('composerLinkHint');
     const videoFileInput = document.getElementById('videoFile');
-    const VIDEO_LINK_RE = /(https?:\/\/(?:[\w.-]*\.)?douyin\.com\/(?!user\/)[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+|https?:\/\/(?:[\w.-]*\.)?tiktok\.com\/[^\s]+|https?:\/\/(?:www\.|m\.)?bilibili\.com\/video\/[^\s]+|https?:\/\/b23\.tv\/[^\s]+)/i;
+    const VIDEO_LINK_RE = /(https?:\/\/(?:[\w.-]*\.)?douyin\.com\/(?!user\/)[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+|https?:\/\/(?:[\w.-]*\.)?tiktok\.com\/[^\s]+|https?:\/\/(?:www\.|m\.)?bilibili\.com\/video\/[^\s]+|https?:\/\/b23\.tv\/[^\s]+|https?:\/\/(?:[\w.-]*\.)?xiaohongshu\.com\/[^\s]+|https?:\/\/xhslink\.com\/[^\s]+)/i;
     let currentJobId = '';
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
@@ -745,11 +745,11 @@ function addAttachmentChip(node, name) {
           const job = poll.body.job || null;
           if (!job) continue;
           if (job.status === 'succeeded') {
-            const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
-            if (!isActiveSession(sessionId)) return renderedResult;
-            renderJobResult(result);
-            renderedResult = true;
-            show({ job: poll, result });
+          const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
+          if (!isActiveSession(sessionId)) return renderedResult;
+          await refreshMessages({ quiet: true });
+          renderedResult = true;
+          show({ job: poll, result });
             setCurrentJob(jobId);
             setRunState('结果已就绪', 'ok');
             resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
@@ -1363,16 +1363,17 @@ function addAttachmentChip(node, name) {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', apiPrefix + '/uploads', true);
         xhr.withCredentials = true;
-        xhr.upload.onprogress = (e) => {
-          if (progress && e.lengthComputable) {
+      xhr.upload.onprogress = (e) => {
+        if (progress && e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
-            progress.set(pct, '上传中… ' + pct + '%');
-          }
-        };
-        xhr.onload = () => {
+            progress.set(pct, '1/4 上传视频文件… ' + pct + '%');
+        }
+      };
+      xhr.onload = () => {
+          if (progress && xhr.status >= 200 && xhr.status < 300) progress.set(100, '2/4 上传完成，正在提交分析任务…');
           let body; try { body = xhr.responseText ? JSON.parse(xhr.responseText) : {}; } catch { body = { text: xhr.responseText }; }
           resolve({ status: xhr.status, body });
-        };
+      };
         xhr.onerror = () => resolve({ status: 0, body: {} });
         xhr.send(form);
       });
@@ -1387,7 +1388,9 @@ function addAttachmentChip(node, name) {
         setRunState('需要输入', 'fail');
         return;
       }
-      const { status, body } = await uploadVideoWithProgress(file, sessionId, document.getElementById('prompt').value, null);
+      const assistantNode = pushMessage('assistant', '已收到视频文件，正在上传…');
+      const progress = attachProgress(assistantNode, '1/4 准备上传视频文件…');
+      const { status, body } = await uploadVideoWithProgress(file, sessionId, document.getElementById('prompt').value, progress);
       if (body.job && body.job.job_id) {
         linkReadable = false;
         setCurrentJob(body.job.job_id);
@@ -1395,8 +1398,11 @@ function addAttachmentChip(node, name) {
         sourceMetric.textContent = '上传已接收';
         resultMetric.textContent = '等待中';
         activateFlow(3);
+        progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
+        await autoPollCurrentJob(progress, assistantNode, sessionId);
       } else {
         setRunState('需要处理', 'fail');
+        progress.fail('上传失败，请重试');
       }
       show({ status, body });
       });
@@ -1483,7 +1489,7 @@ function addAttachmentChip(node, name) {
       if (job && job.status === 'succeeded') {
         const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
         if (!isActiveSession(sessionId) || currentJobId !== jobId) return result;
-        renderJobResult(result);
+        await refreshMessages({ quiet: true });
         show({ job: jobResult, result });
         setRunState('结果已就绪', 'ok');
         resultMetric.textContent = result.body.result && result.body.result.schema_version || '已就绪';
@@ -1524,8 +1530,9 @@ function addAttachmentChip(node, name) {
         if (job.status === 'succeeded') {
           const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
           if (sessionId && !isActiveSession(sessionId)) return;
-          if (progress) progress.done('分析完成');
-          renderJobResult(result, assistantNode);
+          if (progress) progress.done('4/4 分析完成');
+          const refreshed = await refreshMessages({ quiet: true });
+          if (!refreshed && assistantNode) renderJobResult(result, assistantNode);
           show({ job: poll, result });
           setRunState('结果已就绪', 'ok');
           resultMetric.textContent = (result.body.result && result.body.result.schema_version) || '已就绪';
@@ -1554,8 +1561,8 @@ function addAttachmentChip(node, name) {
       const map = {
         url_rejected: '这个链接没有通过安全校验或无法解析。请发抖音/TikTok/B站单条视频页链接，不要发主页或其他暂未支持的平台链接。',
         tool_timeout: '这条视频解析超时了。可以稍后重试，或换一条更小的单条视频链接。',
-        upload_too_large: '这个视频文件超过 500MB，暂时无法分析。请换一个 500MB 以内的 mp4 视频文件。',
-        video_too_large: '这条视频链接可以识别，但视频超过 500MB，暂时无法分析。请换一条 500MB 以内的 mp4 视频链接或文件。',
+        upload_too_large: '这个视频文件超过 500MB，暂时无法分析。请换一个 500MB 以内的 mp4/avi/mov 视频文件。',
+        video_too_large: '这条视频链接可以识别，但视频超过 500MB，暂时无法分析。请换一条 500MB 以内的视频链接或 mp4/avi/mov 文件。',
         tool_failed: '这条视频暂时没能成功解析，所以我不能假装看过它。可以确认视频未被删除/设为私密，或换完整视频页链接重试。'
       };
       return map[errorCode] || '分析任务未能完成。可以稍后重试，或换一条视频链接。';
@@ -1575,6 +1582,7 @@ function addAttachmentChip(node, name) {
     function platformLabelFromHost(host) {
       const value = String(host || '').toLowerCase();
       if (value.includes('bilibili') || value.includes('b23.tv')) return 'B 站';
+      if (value.includes('xiaohongshu') || value.includes('xhslink')) return '小红书';
       if (value.includes('tiktok')) return 'TikTok';
       if (value.includes('douyin') || value.includes('iesdouyin')) return '抖音';
       return '视频平台';
@@ -1607,7 +1615,7 @@ function addAttachmentChip(node, name) {
           '链接可以读取，但暂时不能进入模型分析。',
           '',
           ...reasons.map(reason => '- ' + reason),
-          '- 请换一个 500MB 以内的 mp4 视频链接或文件后再试。'
+          '- 请换一个 500MB 以内的视频链接或 mp4/avi/mov 文件后再试。'
         ].join('\n');
       }
       return buildJobErrorReply('url_rejected');
@@ -1624,7 +1632,7 @@ function addAttachmentChip(node, name) {
         cacheSessionPreview(sessionId, promptText || '请分析我上传的视频。');
         renderSessions(knownSessions);
         const assistantNode = pushMessage('assistant', '已收到视频文件，正在上传…');
-        const progress = attachProgress(assistantNode, '准备上传…');
+        const progress = attachProgress(assistantNode, '1/4 准备上传视频文件…');
         document.getElementById('prompt').value = '';
         updateComposerMode();
         const { body } = await uploadVideoWithProgress(attachedFile, sessionId, promptText || '请分析上传的视频。', progress);
@@ -1632,7 +1640,7 @@ function addAttachmentChip(node, name) {
         setAttachedFile(null);
         if (body.job && body.job.job_id) {
           setCurrentJob(body.job.job_id);
-          progress.indeterminate('上传完成，正在分析视频…');
+          progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
           activateFlow(3);
           await autoPollCurrentJob(progress, assistantNode, sessionId);
         } else {
@@ -1651,7 +1659,7 @@ function addAttachmentChip(node, name) {
         cacheSessionPreview(sessionId, userContent);
         renderSessions(knownSessions);
         const assistantNode = pushMessage('assistant', '正在读取视频链接…');
-        const progress = attachProgress(assistantNode, '读取链接中…');
+        const progress = attachProgress(assistantNode, '1/4 正在读取视频链接…');
         document.getElementById('prompt').value = '';
         const read = await api(apiPrefix + '/video-link/read-check', { method: 'POST', body: JSON.stringify({ video_url: link }) });
         if (!isActiveSession(sessionId)) return;
@@ -1660,13 +1668,13 @@ function addAttachmentChip(node, name) {
           linkReadable = true;
           const waitingReply = buildReadCheckPassReply(read.body);
           updateAssistantMessage(assistantNode, waitingReply);
-          progress.indeterminate('正在提交分析，请稍等…');
+          progress.indeterminate('2/4 链接读取完成，正在提交分析任务…');
           const jobRes = await api(apiPrefix + '/jobs', { method: 'POST', body: JSON.stringify({ session_id: sessionId, video_url: link, content: promptText || '请分析这个视频。' }) });
           if (!isActiveSession(sessionId)) return;
           if (jobRes.body.job && jobRes.body.job.job_id) {
             setCurrentJob(jobRes.body.job.job_id);
             activateFlow(3);
-            progress.indeterminate('模型正在分析视频，请继续等待…');
+            progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
             await autoPollCurrentJob(progress, assistantNode, sessionId);
           } else {
             progress.fail('提交分析失败，请重试');
@@ -1895,7 +1903,7 @@ function addAttachmentChip(node, name) {
     });
     document.getElementById('aboutBtn').addEventListener('click', () => {
       closePop();
-      openModal({ title: '关于产品', desc: '花火AI视频分析支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、前 3 秒钩子、内容结构、画面设计与转化引导给出可执行建议。', confirmText: '知道了' });
+      openModal({ title: '关于产品', desc: '花火AI视频分析支持抖音/TikTok/B站视频链接读取与本地视频文件上传的多模态分析，围绕选题、内容结构、画面设计与转化引导给出可执行建议。', confirmText: '知道了' });
     });
 
     // local session overrides (rename / delete). Session-scoped in-memory only —

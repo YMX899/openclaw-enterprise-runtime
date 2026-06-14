@@ -1,0 +1,171 @@
+{
+  "schema": "openclaw-xiaohongshu-fps-audit.v1",
+  "created_at": "2026-06-13T18:58:03.875452+00:00",
+  "base_url": "http://127.0.0.1:18181",
+  "raw_urls_recorded": false,
+  "secrets_recorded": false,
+  "links": [
+    {
+      "label": "xhs_discovery",
+      "url_sha256": "59f7b37527f754e740dac6abab455d3eb88c0820553a72137589ad315c0b15fa",
+      "read_check": {
+        "http_status": 200,
+        "status": "PASS",
+        "detail": null,
+        "canonical_host": "www.xiaohongshu.com",
+        "direct_video_candidate_count": 2,
+        "format_ok": true,
+        "duration_seconds": 52.434,
+        "size_bytes": 12607111,
+        "video_url_source": "yt-dlp",
+        "eligible_for_model_analysis": true,
+        "elapsed_ms": 467,
+        "raw_url_recorded": false,
+        "direct_video_url_recorded": false
+      },
+      "job": {
+        "submit_http_status": 202,
+        "submit_elapsed_ms": 84,
+        "job_id_sha256": "0ae12df57894cfd8167fb8a3d5798d3222c14b033f6f3622883d662a72225a50",
+        "initial_status": "queued",
+        "terminal_status": "succeeded",
+        "error_code": null,
+        "result_schema_version": "openclaw-video-result.v1",
+        "poll_elapsed_ms": 60651
+      },
+      "result": {
+        "http_status": 200,
+        "elapsed_ms": 79,
+        "schema_version": "openclaw-video-result.v1",
+        "platform": "xiaohongshu",
+        "duration_seconds": 52.434,
+        "analysis_fps": 2.0,
+        "mode": "files_api",
+        "tool": "ark-files-responses",
+        "download_tool": "cache",
+        "cache_hit": true,
+        "file_status": "active",
+        "upload_status": "processing",
+        "summary": {
+          "chars": 429,
+          "sha256": "f07ec00330b215d3a8113a2b3ae5320d1109325d1b46e69e54a50d8b14ab0755",
+          "has_markdown": false,
+          "mentions_video": true,
+          "preview": "这是一条针对Lisa2026世界杯推广曲《goals》引发全网争议的热点资讯评论视频，完整梳理了该事件的争议点、网友反馈与相关背景解读。视频主题围绕这首世界杯推广曲的内容、舞台表现和大众评价展开，混剪了世界杯开幕式演出现场、歌词展示界面、外网网友批评推文截图、往届经典世界杯主题曲演出片段、Lisa其他舞台素材，核心人物包括解说旁白、Lisa、多名伴舞、田柾国、夏奇拉，全程搭配高对比度黄色醒目字幕输出观点，整体节奏紧凑，属于观点明确的娱乐热点点评类内容。该视频选题瞄准当下高关注度的文娱争议事件，目标用户覆盖关注韩流、世界杯相关文娱内容的广大网友，前3秒直接放出Lisa开幕式演出画面+字幕点明“Lisa世界杯推广曲被韩国网友批评”快速抓住观众注意力，内容结构遵循“引出事件→拆解歌词问题→呈现网友负面反馈→分析舞台争"
+        },
+        "analysis_detail_chars": 1274
+      },
+      "followup": {
+        "http_status": 200,
+        "elapsed_ms": 23684,
+        "quality": {
+          "chars": 1841,
+          "sha256": "2a2a0a1b99646a7256ba9ee7257d1f1edc951cf895f3da2a5b7188b41194c4bc",
+          "has_markdown": true,
+          "mentions_video": true,
+          "preview": "## 结论：开头要更“先给停留理由”\n\n你现在的开头是：\n\n> **Lisa 世界杯推广曲被韩国网友批评，新歌《goals》在世界杯开幕式首演**\n\n问题不是信息不清楚，而是**前 3 秒没有足够强的停留理由**。\n\n观众一刷到，可能会觉得：\n\n- “又是明星争议？”\n- “和我有什么关系？”\n- “为什么她会被骂？”\n- “这件事到底离谱在哪？”\n\n所以开头要从“交代事件”改成**先抛出冲突/反差/结果**，让观众立刻知道：\n**这不是普通舞台翻车，而是世界杯歌曲定位错位引发的争议。**\n\n---\n\n## 版本一：痛点型开头\n\n**适合方向：抓住观众对“世界杯主题曲应该燃、团结、热血”的预期。**\n\n### 前 3 秒字幕/口播\n\n> **世界杯推广曲，最怕的不是难听。**\n> **而是听完让球迷觉得：这跟世"
+        }
+      },
+      "analyzing_branch": {
+        "http_status": 200,
+        "elapsed_ms": 127,
+        "quality": {
+          "chars": 65,
+          "sha256": "cc8db1ad3fe9df30d88961ea7d13f965aec24a800e9aa82042947863c6296324",
+          "has_markdown": false,
+          "mentions_video": true,
+          "preview": "这条视频还在分析中，我先不基于猜测给结论。\n等分析完成后，你可以直接问：开头怎么改、为什么不爆、脚本怎么改、画面怎么改或怎么复拍。"
+        }
+      }
+    },
+    {
+      "label": "xhs_explore",
+      "url_sha256": "32941be8edbfc2b4ff49ba20986a19b4ae3db3c1290ca98351d53af66a55ea2b",
+      "read_check": {
+        "http_status": 200,
+        "status": "PASS",
+        "detail": null,
+        "canonical_host": "www.xiaohongshu.com",
+        "direct_video_candidate_count": 2,
+        "format_ok": true,
+        "duration_seconds": 134.514,
+        "size_bytes": 18922278,
+        "video_url_source": "yt-dlp",
+        "eligible_for_model_analysis": true,
+        "elapsed_ms": 509,
+        "raw_url_recorded": false,
+        "direct_video_url_recorded": false
+      },
+      "job": {
+        "submit_http_status": 202,
+        "submit_elapsed_ms": 80,
+        "job_id_sha256": "48200f7916be609b7fd5bb05350a352e08d4933754f74b41df53110968a016cc",
+        "initial_status": "queued",
+        "terminal_status": "succeeded",
+        "error_code": null,
+        "result_schema_version": "openclaw-video-result.v1",
+        "poll_elapsed_ms": 66722
+      },
+      "result": {
+        "http_status": 200,
+        "elapsed_ms": 87,
+        "schema_version": "openclaw-video-result.v1",
+        "platform": "xiaohongshu",
+        "duration_seconds": 134.514,
+        "analysis_fps": 1.0,
+        "mode": "files_api",
+        "tool": "ark-files-responses",
+        "download_tool": "cache",
+        "cache_hit": true,
+        "file_status": "active",
+        "upload_status": "processing",
+        "summary": {
+          "chars": 423,
+          "sha256": "6291fc94e45a9e94dc165d03cdb380d26b35f8690baf08f1d65c67e495fd8c64",
+          "has_markdown": true,
+          "mentions_video": true,
+          "preview": "1. 直接结论：这条是综艺《哈哈哈哈哈》的搞笑盘点剪辑，核心讲述前足球运动员范志毅被陈赫忽悠从飞行嘉宾意外常驻，解锁超强反差综艺感，贡献大量爆笑名场面，笑点密集风格轻松。\n2. 整体概况：主题为盘点范志毅在五哈团的趣味综艺表现，覆盖车内出行、东北农家铁锅炖聚餐、室内魔性跳舞、正式媒体发布会、户外冰面互动多个场景，核心人物为范志毅、陈赫、邓超、鹿晗等五哈嘉宾，包含范志毅魔性跳野狼disco、发布会临场救场、全员唠嗑爆梗等核心动作，全程搭配趣味花字和旁白解说，整体是典型的综艺搞笑二次创作风格。\n3. 关键观察：选题瞄准综艺名场面反差感，目标用户为五哈粉丝和喜爱轻松搞笑内容的普通观众；前3秒直接抛出“如果不是陈赫忽悠范志毅本可体面的老去”的强反差钩子快速抓注意力；内容结构先铺垫背景，再依次展示跳舞、唠嗑、发布会救场三"
+        },
+        "analysis_detail_chars": 718
+      },
+      "followup": {
+        "http_status": 200,
+        "elapsed_ms": 18381,
+        "quality": {
+          "chars": 1616,
+          "sha256": "51f1ab323a8faaa1a7f460d1edff5a394e1adf854d8cdf6fec0bd60350f3ec69",
+          "has_markdown": true,
+          "mentions_video": true,
+          "preview": "## 结论：开头要把“铺垫”改成“先给停留理由”\n\n你现在的开头问题是：**先介绍范志毅怎么来的，再慢慢铺笑点**。  \n但小红书前 3 秒观众不会等解释，必须一上来就知道：\n\n- **这人为什么好笑？**\n- **这条视频有什么反差？**\n- **我继续看能获得什么爽点？**\n\n这条视频最强卖点不是“范志毅来五哈了”，而是：\n\n> **一个亚洲足球先生，综艺感竟然不输邓超陈赫，还把自己玩成了常驻。**\n\n所以开头要直接打这个反差。\n\n---\n\n## 版本一：痛点型开头\n\n### 适合文案\n\n**画面：直接上范志毅跳《野狼Disco》或全车笑崩片段**\n\n**字幕：**  \n**“有些嘉宾上综艺是来营业的，范志毅是来把自己玩疯的。”**\n\n**旁白：**  \n“你以为范志毅只是来五哈旅游，结果他直接把自己玩成了"
+        }
+      },
+      "analyzing_branch": {
+        "http_status": 200,
+        "elapsed_ms": 114,
+        "quality": {
+          "chars": 65,
+          "sha256": "cc8db1ad3fe9df30d88961ea7d13f965aec24a800e9aa82042947863c6296324",
+          "has_markdown": false,
+          "mentions_video": true,
+          "preview": "这条视频还在分析中，我先不基于猜测给结论。\n等分析完成后，你可以直接问：开头怎么改、为什么不爆、脚本怎么改、画面怎么改或怎么复拍。"
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "me_status": 200,
+    "authenticated": true,
+    "limits": {
+      "max_upload_bytes": 524288000,
+      "user_active_job_limit": 2,
+      "user_rate_limit_per_minute": 12,
+      "data_retention_days": 30
+    },
+    "versions": {
+      "result_schema_version": "openclaw-video-result.v1",
+      "knowledge_base_version": "artifact: knowledge-base-short-video\nversion: 2026.06.06\ncreated_at: 2026-06-06 Asia/Shanghai\nsource_workspace_commit: 0",
+      "bridge_version": "unknown",
+      "openclaw_version": "2026.3.13"
+    }
+  }
+}

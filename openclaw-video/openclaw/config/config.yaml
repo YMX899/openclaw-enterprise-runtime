@@ -15,6 +15,13 @@
       model: {
         primary: "volcengine-plan/ark-code-latest",
       },
+      models: {
+        "volcengine-plan/ark-code-latest": {
+          params: {
+            maxTokens: 32768,
+          },
+        },
+      },
     },
   },
 }

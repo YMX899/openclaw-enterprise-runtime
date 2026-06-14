@@ -197,11 +197,11 @@ class OpenClawGatewayWsClient:
         # over 30s; the WS client caps the total wait at timeout_seconds, so keep
         # it generous and env-tunable to avoid 502s on detailed answers.
         try:
-            timeout_seconds = float(os.environ.get("OPENCLAW_GATEWAY_TIMEOUT_SECONDS", "120"))
+            timeout_seconds = float(os.environ.get("OPENCLAW_GATEWAY_TIMEOUT_SECONDS", "240"))
         except ValueError:
-            timeout_seconds = 120.0
+            timeout_seconds = 240.0
         if timeout_seconds <= 0:
-            timeout_seconds = 120.0
+            timeout_seconds = 240.0
         return cls(
             url=url,
             token=token,

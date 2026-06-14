@@ -24,6 +24,7 @@ from .url_guard import (
     UrlRejected,
     default_redirect_fetcher,
     default_resolver,
+    validate_video_url,
     validate_video_url_with_redirects,
 )
 from .video_limits import (
@@ -45,6 +46,13 @@ class UploadTooLargeError(RuntimeError):
 
 
 Analyzer = Callable[[str, Path], DouyinAnalysisResult]
+
+
+def _host_is_direct_xiaohongshu(url: str) -> bool:
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    return host == "xiaohongshu.com" or host.endswith(".xiaohongshu.com")
 
 
 @dataclass(frozen=True)
@@ -150,7 +158,7 @@ class VideoAnalysisWorker:
             job.job_id,
             error_code,
             type(exc).__name__,
-            str(exc)[:500],
+            str(exc)[:2000],
         )
 
     def run_once(self) -> VideoJob | None:
@@ -162,11 +170,14 @@ class VideoAnalysisWorker:
             if is_upload_uri(job.video_url_canonical):
                 canonical = job.video_url_canonical
             else:
-                validated = validate_video_url_with_redirects(
-                    job.video_url_canonical,
-                    resolver=self.url_resolver,
-                    redirect_fetcher=self.redirect_fetcher,
-                )
+                if _host_is_direct_xiaohongshu(job.video_url_canonical):
+                    validated = validate_video_url(job.video_url_canonical, resolver=self.url_resolver)
+                else:
+                    validated = validate_video_url_with_redirects(
+                        job.video_url_canonical,
+                        resolver=self.url_resolver,
+                        redirect_fetcher=self.redirect_fetcher,
+                    )
                 canonical = validated.canonical
             with TemporaryDirectory(prefix="openclaw-video-") as tmp:
                 analysis = self.analyzer(canonical, Path(tmp))

@@ -1,0 +1,118 @@
+{
+  "schema": "openclaw-web-xhs-knowledge-context-audit.v1",
+  "created_at": "2026-06-13T19:25:42.335Z",
+  "target_url": "http://127.0.0.1:18181/openclaw-lab/",
+  "api_prefix": "/openclaw-api",
+  "raw_urls_recorded": false,
+  "secrets_recorded": false,
+  "video_url_sha256": "59f7b37527f754e740dac6abab455d3eb88c0820553a72137589ad315c0b15fa",
+  "principal_hash": "67c30a7cd539b917c6b0cc22545546ef1a3f0cf5973fe552cef22bca2e0dca23",
+  "steps": [
+    {
+      "name": "page_authenticated",
+      "ok": true,
+      "auth_status": "已登录"
+    },
+    {
+      "name": "ui_create_session",
+      "ok": true,
+      "session_id_sha256": "6856ea200b8da5315468e664dc52d58ec240c7dcf046204e2af6843a0be38318"
+    },
+    {
+      "name": "ui_detect_xhs_link",
+      "ok": true,
+      "videoUrlHost": "www.xiaohongshu.com",
+      "linkHintVisible": true
+    },
+    {
+      "name": "ui_submit_job",
+      "ok": true,
+      "job_metric": "6ee1701f..."
+    },
+    {
+      "name": "ui_analysis_result_ready",
+      "ok": true,
+      "run_state": "结果已就绪",
+      "result_metric": "openclaw-video-result.v1",
+      "conversation": {
+        "chars": 1192,
+        "sha256": "d7b95df568932e546b85a8dbd4b314900a6302ada02147860d0fe316f9ce9b64",
+        "has_markdown": false,
+        "preview": "你好，我是花火AI视频分析，专门帮短视频创作者拆问题、给改法。\n\n你可以这样开始：\n\n粘贴抖音/TikTok/B 站/小红书单条视频链接，我会读取并完整分析；\n点击输入框左侧 ＋ 上传视频文件；\n直接告诉我你的赛道、目标用户、视频目的，我也可以先给方向性建议。\n\n不管哪种方式，我都会围绕选题、前 3 秒钩子、结构、画面和可执行的改法来回答。\n\n复制\n重新生成\n删除\n今天 03:25\n请分析这个小红书视频：[REDACTED_VIDEO_URL]"
+      },
+      "audit_correction": "The first automation predicate required a literal '分析完成' phrase in conversation text; the actual page state and result metric both showed the UI terminal success state."
+    },
+    {
+      "name": "api_result_from_ui_session",
+      "ok": true,
+      "http_status": 200,
+      "job_id_sha256": "89b99eb57c70d1dcc0df93d7f060eead1a496f40bce06216988ecc1b8e16decd",
+      "platform": "xiaohongshu",
+      "duration_seconds": 52.434,
+      "analysis_fps": null,
+      "mode": null,
+      "tool": null,
+      "analysis_detail_chars": 1555
+    },
+    {
+      "name": "ui_followup_after_analysis",
+      "ok": true,
+      "response": {
+        "chars": 1450,
+        "sha256": "69bfc126e08fc6f8626c3cbedb82b2c56e6540c74b640507ee207f4f942d27b6",
+        "has_markdown": false,
+        "preview": "结论：开头要从“交代事件”改成“给观众停留理由”\n\n你现在的开头问题不是信息不清楚，而是太像新闻导语：\n\n“Lisa 世界杯推广曲”\n“被韩国网友批评”\n“新歌《goals》”\n“在世界杯开幕式首演”\n\n这些是在说明发生了什么，但没有立刻告诉观众：\n这件事为什么值得我继续看？争议到底大在哪？后面有什么反转？\n\n所以开头要改成：\n先抛冲突 / 先给反差 / 先把结果怼脸。\n\n版本一：痛点型开头\n\n适合抓住“世界杯主题曲应该有体育精神”的观"
+      }
+    }
+  ],
+  "database_message_check": {
+    "ok": true,
+    "job_status": "succeeded",
+    "result_schema_version": "openclaw-video-result.v1",
+    "messages_in_ui_session": [
+      {
+        "role": "assistant",
+        "chars": 179,
+        "has_job": false
+      },
+      {
+        "role": "user",
+        "chars": 189,
+        "has_job": true
+      },
+      {
+        "role": "assistant",
+        "chars": 406,
+        "has_job": true
+      },
+      {
+        "role": "user",
+        "chars": 17,
+        "has_job": false
+      },
+      {
+        "role": "assistant",
+        "chars": 1660,
+        "has_job": false
+      }
+    ]
+  },
+  "knowledge_context_check": {
+    "ok": true,
+    "container": "openclaw-video-openclaw-bridge-1",
+    "loader": "openclaw_video.agent_persona.load_full_knowledge_context",
+    "chars": 27793,
+    "files_present": [
+      "爆款短视频制作与分析知识库.md",
+      "短视频画面设计方法论.md",
+      "爆火视屏回答模版.txt"
+    ],
+    "raw_knowledge_recorded": false
+  },
+  "test_coverage": {
+    "targeted": "137 passed, 1 warning",
+    "full": "376 passed, 1 warning"
+  },
+  "console_errors": [],
+  "overall_status": "PASS"
+}

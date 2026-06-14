@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -62,8 +63,19 @@ class XiaohongshuVideoResolver:
                 "Referer": "https://www.xiaohongshu.com/",
             },
         }
-        with YoutubeDL(options) as ydl:
-            info = ydl.extract_info(url, download=False)
+        last_error: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                with YoutubeDL(options) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt >= 3:
+                    raise
+                time.sleep(1.5 * attempt)
+        else:
+            raise RuntimeError("yt-dlp returned no Xiaohongshu metadata.") from last_error
         if not isinstance(info, dict):
             raise RuntimeError("yt-dlp returned no Xiaohongshu metadata.")
         return info
