@@ -83,9 +83,10 @@ const output = document.getElementById('output');
     const videoFileInput = document.getElementById('videoFile');
     const VIDEO_LINK_RE = /(https?:\/\/(?:[\w.-]*\.)?douyin\.com\/(?!user\/)[^\s]*|https?:\/\/v\.douyin\.com\/[^\s]+|https?:\/\/www\.iesdouyin\.com\/[^\s]+|https?:\/\/(?:[\w.-]*\.)?tiktok\.com\/[^\s]+|https?:\/\/(?:www\.|m\.)?bilibili\.com\/video\/[^\s]+|https?:\/\/b23\.tv\/[^\s]+|https?:\/\/(?:[\w.-]*\.)?xiaohongshu\.com\/[^\s]+|https?:\/\/xhslink\.com\/[^\s]+)/i;
     let currentJobId = '';
+    const aiScopedPaths = ['/ai/openclaw-lab', '/ai/agent'];
     const apiPrefix = window.location.hostname === 'ai001.huahuoai.com'
       ? '/console/api/openclaw-api'
-      : (window.location.pathname.startsWith('/ai/openclaw-lab') ? '/api/openclaw-api' : '/openclaw-api');
+      : (aiScopedPaths.some(path => window.location.pathname.startsWith(path)) ? '/api/openclaw-api' : '/openclaw-api');
     const terminalStatuses = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
     let linkReadable = false;
     let knownSessions = [];
@@ -98,15 +99,19 @@ const output = document.getElementById('output');
         chatScrollNavigator.scheduleUpdate();
       }
     }
-    function scrollConversationToLatest(behavior = 'auto') {
-      requestAnimationFrame(() => {
+    function scrollConversationToLatest(behavior = 'auto', passes = 2) {
+      let remaining = Math.max(1, Number(passes) || 1);
+      const run = () => {
         try {
           conversation.scrollTo({ top: conversation.scrollHeight, behavior });
         } catch (e) {
           conversation.scrollTop = conversation.scrollHeight;
         }
         notifyConversationChanged();
-      });
+        remaining -= 1;
+        if (remaining > 0) requestAnimationFrame(run);
+      };
+      requestAnimationFrame(run);
     }
 
     function openLoginPanel() {
@@ -394,7 +399,7 @@ const output = document.getElementById('output');
       if (sameDay) return '今天 ' + hm;
       return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + hm;
     }
-    function pushMessage(role, text, ts, messageId) {
+    function pushMessage(role, text, ts, messageId, options = {}) {
       const node = document.createElement('div');
       node.className = 'message ' + role;
       node.setAttribute('data-role-label', role === 'user' ? '你' : ASSISTANT_LABEL);
@@ -418,7 +423,7 @@ const output = document.getElementById('output');
       timeEl.textContent = formatMsgTime(ts);
       node.appendChild(timeEl);
       conversation.appendChild(node);
-      scrollConversationToLatest();
+      if (options.scroll !== false) scrollConversationToLatest();
       return node;
     }
 function messageInner(node) {
@@ -427,7 +432,12 @@ function messageInner(node) {
 function updateAssistantMessage(node, text) {
   const inner = messageInner(node);
   if (!inner) return;
+  const preserved = Array.from(inner.querySelectorAll('.cg-progress, .cg-shots'))
+    .filter(child => child.parentElement === inner);
   renderMarkdownInto(inner, text);
+  preserved.forEach(child => inner.appendChild(child));
+  if (node) node._rawText = text;
+  notifyConversationChanged();
 }
 function addAttachmentChip(node, name) {
       const inner = messageInner(node);
@@ -562,8 +572,7 @@ function addAttachmentChip(node, name) {
         if (!raw) return node.classList.contains('user') ? '用户消息' : '分析助手回复';
         return raw.length > 40 ? raw.slice(0, 40) + '...' : raw;
       };
-      const candidateNodes = () => Array.from(scrollContainer.querySelectorAll('.message'))
-        .filter(node => node.classList.contains('user') || node.querySelector('.cg-progress'));
+      const candidateNodes = () => Array.from(scrollContainer.querySelectorAll('.message'));
       const showPanel = () => {
         if (hideTimer) clearTimeout(hideTimer);
         if (root.hidden) return;
@@ -607,7 +616,7 @@ function addAttachmentChip(node, name) {
       const render = () => {
         const nodes = candidateNodes();
         const overflow = scrollContainer.scrollHeight > scrollContainer.clientHeight + 80;
-        if (!overflow || nodes.length < 3) {
+        if (!overflow || nodes.length < 2) {
           items = [];
           root.hidden = true;
           hideNow();
@@ -912,7 +921,8 @@ function addAttachmentChip(node, name) {
     function renderMessages(messages) {
       conversation.innerHTML = '';
       if (!Array.isArray(messages) || messages.length === 0) {
-        pushMessage('assistant', '当前对话还没有消息。可以发送问题，或提交视频链接开始分析。');
+        pushMessage('assistant', '当前对话还没有消息。可以发送问题，或提交视频链接开始分析。', undefined, undefined, { scroll: false });
+        scrollConversationToLatest('auto', 3);
         notifyConversationChanged();
         return;
       }
@@ -922,10 +932,10 @@ function addAttachmentChip(node, name) {
         const text = role === 'user'
           ? messageTextWithVideoUrl(message.content || '', videoUrl)
           : (message.content || '');
-        const node = pushMessage(role, text, message.created_at, message.id || message.job_id || index);
+        const node = pushMessage(role, text, message.created_at, message.id || message.job_id || index, { scroll: false });
         if (role === 'user' && looksLikeUrl(videoUrl)) addAttachmentChip(node, videoUrl);
       });
-      scrollConversationToLatest();
+      scrollConversationToLatest('auto', 4);
       notifyConversationChanged();
     }
     async function hydrateCompletedJobMessages(messages, sessionId) {
@@ -1721,7 +1731,7 @@ function addAttachmentChip(node, name) {
       if (!currentJobId) return;
       if (sessionId && !isActiveSession(sessionId)) return;
       const jobId = currentJobId;
-      if (progress) progress.indeterminate('正在分析视频…');
+      if (progress) progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
       for (let attempt = 0; attempt < JOB_AUTO_POLL_ATTEMPTS; attempt += 1) {
         await delay(JOB_POLL_INTERVAL_MS);
         if (sessionId && !isActiveSession(sessionId)) return;

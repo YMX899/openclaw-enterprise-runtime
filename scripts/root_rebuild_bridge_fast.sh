@@ -48,6 +48,7 @@ FROM ${BASE_IMAGE}
 USER root
 WORKDIR /app
 COPY pyproject.toml /app/
+RUN rm -rf /app/src/openclaw_video/webdist
 COPY src /app/src
 COPY vendor/douyin_chong /app/vendor/douyin_chong
 RUN pip install --no-cache-dir --no-deps /app \
@@ -114,5 +115,6 @@ docker compose \
 
 curl -fsS http://127.0.0.1:18181/healthz >/dev/null
 curl -fsS http://127.0.0.1:18181/openclaw-lab/ >/dev/null
+curl -fsS http://127.0.0.1:18181/ai/agent/ >/dev/null
 
 echo "bridge_fast_rebuild=PASS"

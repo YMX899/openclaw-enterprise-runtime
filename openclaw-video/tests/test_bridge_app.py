@@ -353,6 +353,22 @@ class BridgeAppTests(unittest.TestCase):
         for forbidden in ["localStorage", "OPENCLAW_GATEWAY_TOKEN", "Authorization", "Cookie"]:
             self.assertNotIn(forbidden, shell.text)
             self.assertNotIn(forbidden, bundle)
+
+    def test_ai_agent_page_alias_is_served_with_assets(self):
+        shell = self.client.get("/ai/agent/")
+        self.assertEqual(shell.status_code, 200, shell.text)
+        self.assertIn("花火AI视频分析", shell.text)
+        import re as _re
+        m = _re.search(r'src="\./(assets/[^"]+\.js)"', shell.text)
+        self.assertIsNotNone(m, "built JS asset not referenced in /ai/agent shell")
+        bundle = self.client.get("/ai/agent/" + m.group(1))
+        self.assertEqual(bundle.status_code, 200, "agent bundle asset must be served")
+        self.assertIn("/api/openclaw-api", bundle.text)
+
+    def test_ai_agent_without_trailing_slash_redirects_to_slash(self):
+        response = self.client.get("/ai/agent")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("花火AI视频分析", response.text)
     def test_me_does_not_expose_raw_dify_ids(self):
         response = self.client.get("/openclaw-api/me", headers=self.auth())
         self.assertEqual(response.status_code, 200, response.text)

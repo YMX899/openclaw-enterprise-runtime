@@ -688,6 +688,7 @@ def create_app(
 
     @app.get("/openclaw-lab/", response_class=HTMLResponse)
     @app.get("/ai/openclaw-lab/", response_class=HTMLResponse)
+    @app.get("/ai/agent/", response_class=HTMLResponse)
     async def openclaw_lab() -> HTMLResponse:
         # Serve the built single-page app shell. Relative asset URLs ("./assets/..")
         # resolve under the trailing-slash page path; the no-slash routes redirect here.
@@ -702,11 +703,13 @@ def create_app(
 
     @app.get("/openclaw-lab")
     @app.get("/ai/openclaw-lab")
+    @app.get("/ai/agent")
     async def openclaw_lab_redirect(request: Request) -> RedirectResponse:
         return RedirectResponse(url=request.url.path + "/", status_code=308)
 
     @app.get("/openclaw-lab/assets/{asset_path:path}")
     @app.get("/ai/openclaw-lab/assets/{asset_path:path}")
+    @app.get("/ai/agent/assets/{asset_path:path}")
     async def openclaw_lab_assets(asset_path: str) -> FileResponse:
         assets_root = (WEBDIST_DIR / "assets").resolve()
         target = (assets_root / asset_path).resolve()

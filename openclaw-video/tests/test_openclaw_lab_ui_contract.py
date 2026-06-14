@@ -66,15 +66,32 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             "loadSessions", "renderSessions", "selectSession", "sendChat", "refreshMessages",
             "apiPrefix + '/chat'", "apiPrefix + '/sessions'",
             "apiPrefix + '/sessions/' + encodeURIComponent(sessionId) + '/messages'",
+            "'/ai/agent'",
             "JOB_AUTO_POLL_ATTEMPTS", "hydrateCompletedJobMessages", "仍在分析中，可稍后刷新查看结果。",
             "video_too_large", "500MB", "上传至视频分析模型",
             "xiaohongshu", "xhslink", "小红书",
             "createChatScrollNavigator", "chat-scroll-navigator", "data-message-index",
             "latestUserPreviewFromMessages", "scrollConversationToLatest",
+            "const candidateNodes = () => Array.from(scrollContainer.querySelectorAll('.message'));",
+            "nodes.length < 2",
         ]
         for required in in_source:
             with self.subTest(source=required):
                 self.assertIn(required, self.source)
+        in_built_js = [
+            "chat-scroll-navigator",
+            "chat-scroll-rail",
+            "chat-scroll-summary",
+            "data-message-index",
+            "scrollHeight",
+            "scrollTo",
+            'querySelectorAll(".message")',
+            "2/4 链接读取完成，正在提交分析任务…",
+            "3/4 模型正在分析视频，请继续等待…",
+        ]
+        for required in in_built_js:
+            with self.subTest(built_js=required):
+                self.assertIn(required, self.built_js)
         self.assertNotIn("分析超时，请稍后重试", self.built_js)
         self.assertNotIn("视频理解 fps", self.source)
 

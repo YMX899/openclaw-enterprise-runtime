@@ -22,7 +22,7 @@ async function loadChromium() {
 }
 
 const BASE_URL = process.env.OPENCLAW_BASE_URL || 'https://www.huahuoai.com';
-const LAB_PATH = process.env.OPENCLAW_LAB_PATH || '/ai/openclaw-lab/';
+const LAB_PATH = process.env.OPENCLAW_LAB_PATH || '/ai/agent/';
 const ACCOUNT = process.env.OPENCLAW_LAB_ACCOUNT || '';
 const PASSWORD = process.env.OPENCLAW_LAB_PASSWORD || '';
 const VIDEO_URL = process.env.OPENCLAW_TEST_VIDEO_URL || '';
@@ -30,7 +30,9 @@ const NOTE_URL = process.env.OPENCLAW_TEST_NOTE_URL || '';
 const OUTPUT = process.env.OPENCLAW_BRANCH_EVIDENCE || 'artifacts/evidence/phase4/openclaw-dialogue-branch-root-evidence-20260611.json';
 const HEADLESS = !['0', 'false', 'no'].includes(String(process.env.OPENCLAW_HEADLESS || '1').toLowerCase());
 const SLOW_MO = Number(process.env.OPENCLAW_SLOW_MO || '0');
-const API_PREFIX = LAB_PATH.startsWith('/ai/openclaw-lab') ? '/api/openclaw-api' : '/openclaw-api';
+const API_PREFIX = (LAB_PATH.startsWith('/ai/openclaw-lab') || LAB_PATH.startsWith('/ai/agent'))
+  ? '/api/openclaw-api'
+  : '/openclaw-api';
 
 if (!ACCOUNT || !PASSWORD) {
   console.error('OPENCLAW_LAB_ACCOUNT and OPENCLAW_LAB_PASSWORD are required.');
