@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from openclaw_video.douyin_wrapper import DouyinAnalysisResult, VideoTooLargeForModelError
+from openclaw_video.douyin_wrapper import DouyinAnalysisResult, ModelRateLimitError, VideoTooLargeForModelError
 from openclaw_video.douyin_wrapper import DouyinWrapperError
 from openclaw_video.job_state import JobStatus
 from openclaw_video.job_store import InMemoryJobStore
@@ -54,6 +54,50 @@ def video_too_large_analyzer(_video_url: str, _output_dir: Path) -> DouyinAnalys
 
 def tool_failed_analyzer(_video_url: str, _output_dir: Path) -> DouyinAnalysisResult:
     raise DouyinWrapperError("fixture tool detail")
+
+
+class BrokerJobStore(InMemoryJobStore):
+    def __init__(self):
+        super().__init__()
+        self.cooldowns = {}
+        self.selected = []
+        self.rate_limited = []
+        self.leases = []
+        self.released = []
+
+    def list_api_key_cooldowns(self, provider: str, key_hashes: list[str]) -> dict[str, dict]:
+        return {
+            key_hash: self.cooldowns.get((provider, key_hash), {})
+            for key_hash in key_hashes
+            if (provider, key_hash) in self.cooldowns
+        }
+
+    def mark_api_key_selected(self, provider: str, key_hash: str) -> None:
+        self.selected.append((provider, key_hash))
+
+    def mark_api_key_rate_limited(self, provider: str, key_hash: str, cooldown_seconds: int) -> None:
+        self.rate_limited.append((provider, key_hash, cooldown_seconds))
+
+    def acquire_lane_lease(
+        self,
+        lane: str,
+        *,
+        worker_id: str,
+        max_concurrent: int,
+        lease_seconds: int,
+    ) -> tuple[str, int] | None:
+        self.leases.append(
+            {
+                "lane": lane,
+                "worker_id": worker_id,
+                "max_concurrent": max_concurrent,
+                "lease_seconds": lease_seconds,
+            }
+        )
+        return ("lease-1", 0)
+
+    def release_lane_lease(self, lane: str, lease_id: str) -> None:
+        self.released.append((lane, lease_id))
 
 
 class WorkerServiceTests(unittest.TestCase):
@@ -237,6 +281,85 @@ class WorkerServiceTests(unittest.TestCase):
             self.assertEqual(completed.job_id, job.job_id)
             self.assertEqual(completed.status, JobStatus.FAILED)
             self.assertEqual(completed.error_code, "upload_too_large")
+
+    def test_upload_analysis_uses_bailian_key_pool_and_lane(self):
+        store = BrokerJobStore()
+        with TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {
+                "BRIDGE_UPLOAD_DIR": tmp,
+                "BAILIAN_API_KEYS": "key-one,key-two",
+                "BAILIAN_OPENAI_BASE_URL": "https://example.test/compatible-mode/v1",
+                "BAILIAN_MODEL": "model-1",
+            },
+        ):
+            stored = store_upload_bytes(b"video bytes", filename="sample.mp4", upload_dir=Path(tmp))
+            job = store.create_job("owner", "session", stored.uri)
+            captured = {}
+            fake_payload = {
+                "schema_version": RESULT_SCHEMA_VERSION,
+                "source": {"video_url_canonical": stored.uri, "platform": "upload", "duration_seconds": None},
+                "summary": "ok",
+                "signals": {
+                    "hook": None,
+                    "topic": None,
+                    "audience": None,
+                    "structure": None,
+                    "visual_notes": "ok",
+                    "risk_notes": None,
+                },
+                "raw_tool_result": {"tool": "openclaw-upload-analyzer", "mode": "files_api"},
+                "created_at": "2026-06-10T00:00:00Z",
+            }
+
+            def fake_run(**kwargs):
+                captured.update(kwargs)
+                return DouyinAnalysisResult(payload=fake_payload, stdout="", stderr="")
+
+            worker = VideoAnalysisWorker(store, config=WorkerConfig(heartbeat_interval_seconds=0))
+            with mock.patch("openclaw_video.worker_service.run_upload_video_analysis", side_effect=fake_run):
+                completed = worker.run_once()
+
+        self.assertEqual(completed.job_id, job.job_id)
+        self.assertEqual(completed.status, JobStatus.SUCCEEDED)
+        self.assertEqual(captured["env"]["BAILIAN_SELECTED_API_KEY"], "key-one")
+        self.assertEqual(captured["env"]["BAILIAN_OPENAI_BASE_URL"], "https://example.test/compatible-mode/v1")
+        self.assertEqual(captured["env"]["BAILIAN_MODEL"], "model-1")
+        self.assertEqual(store.leases[0]["lane"], "video_model_request")
+        self.assertEqual(store.leases[0]["max_concurrent"], 200)
+        self.assertEqual(store.released, [("video_model_request", "lease-1")])
+        self.assertEqual(len(store.selected), 1)
+        self.assertNotIn("key-one", str(store.selected))
+        self.assertNotIn("key-two", str(store.selected))
+
+    def test_rate_limit_marks_selected_key_cooldown(self):
+        store = BrokerJobStore()
+        with TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ,
+            {
+                "BRIDGE_UPLOAD_DIR": tmp,
+                "BAILIAN_API_KEYS": "key-one,key-two",
+                "BAILIAN_API_KEY_COOLDOWN_SECONDS": "123",
+            },
+        ):
+            stored = store_upload_bytes(b"video bytes", filename="sample.mp4", upload_dir=Path(tmp))
+            job = store.create_job("owner", "session", stored.uri)
+            worker = VideoAnalysisWorker(store, config=WorkerConfig(heartbeat_interval_seconds=0))
+            with mock.patch(
+                "openclaw_video.worker_service.run_upload_video_analysis",
+                side_effect=ModelRateLimitError("HTTP 429 rate_limit"),
+            ):
+                completed = worker.run_once()
+
+        self.assertEqual(completed.job_id, job.job_id)
+        self.assertEqual(completed.status, JobStatus.TIMED_OUT)
+        self.assertEqual(completed.error_code, "tool_timeout")
+        self.assertEqual(len(store.rate_limited), 1)
+        self.assertEqual(store.rate_limited[0][0], "bailian-openai-compatible")
+        self.assertEqual(store.rate_limited[0][2], 123)
+        self.assertEqual(store.selected[0][1], store.rate_limited[0][1])
+        self.assertNotIn("key-one", str(store.rate_limited))
+        self.assertNotIn("key-two", str(store.rate_limited))
 
 
 

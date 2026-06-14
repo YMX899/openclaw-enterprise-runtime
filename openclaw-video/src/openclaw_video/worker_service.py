@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import logging
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event, Thread
@@ -10,12 +11,23 @@ from typing import Callable
 
 from .douyin_wrapper import (
     DouyinAnalysisResult,
+    ModelRateLimitError,
     DouyinWrapperError,
     VideoTooLargeForModelError,
     run_douyin_chong,
     run_upload_video_analysis,
 )
 from .job_store import InMemoryJobStore, JobLeaseError, VideoJob
+from .model_broker import (
+    DEFAULT_VIDEO_MODEL_LANE,
+    DEFAULT_VIDEO_MODEL_LANE_LEASE_SECONDS,
+    DEFAULT_VIDEO_MODEL_MAX_CONCURRENT,
+    SelectedApiKey,
+    acquire_lane,
+    is_rate_limit_error,
+    load_bailian_config,
+    select_api_key,
+)
 from .result_schema import RESULT_SCHEMA_VERSION, ResultSchemaError, validate_result_payload
 from .upload_store import UploadNotFound, UploadStoreError, is_upload_uri, resolve_upload_uri
 from .url_guard import (
@@ -68,6 +80,10 @@ class WorkerConfig:
     min_video_understanding_fps: float = MIN_VIDEO_UNDERSTANDING_FPS
     max_video_understanding_fps: float = MAX_VIDEO_UNDERSTANDING_FPS
     max_inline_upload_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES
+    video_model_lane: str = DEFAULT_VIDEO_MODEL_LANE
+    video_model_max_concurrent: int = DEFAULT_VIDEO_MODEL_MAX_CONCURRENT
+    video_model_lane_lease_seconds: int = DEFAULT_VIDEO_MODEL_LANE_LEASE_SECONDS
+    video_model_lane_wait_seconds: int = 60
 
 
 class VideoAnalysisWorker:
@@ -85,21 +101,69 @@ class VideoAnalysisWorker:
         self.analyzer = analyzer or self._default_analyzer
         self.url_resolver = url_resolver
         self.redirect_fetcher = redirect_fetcher
+        self.provider_config = load_bailian_config()
+
+    def _select_model_key(self) -> SelectedApiKey | None:
+        config = self.provider_config
+        if not config:
+            return None
+        if not all(hasattr(self.store, name) for name in ("list_api_key_cooldowns", "mark_api_key_selected")):
+            return None
+        return select_api_key(config, self.store)  # type: ignore[arg-type]
+
+    def _mark_rate_limited(self, selected: SelectedApiKey | None) -> None:
+        if not selected or not hasattr(self.store, "mark_api_key_rate_limited"):
+            return
+        config = self.provider_config
+        cooldown_seconds = config.cooldown_seconds if config else 60
+        self.store.mark_api_key_rate_limited(selected.provider, selected.key_hash, cooldown_seconds)  # type: ignore[attr-defined]
+
+    def _env_for_selected_key(self, selected: SelectedApiKey | None) -> dict[str, str] | None:
+        if not selected:
+            return None
+        env = dict(os.environ)
+        env["BAILIAN_SELECTED_API_KEY"] = selected.api_key
+        env["BAILIAN_OPENAI_BASE_URL"] = selected.base_url
+        env["BAILIAN_MODEL"] = selected.model
+        env["BAILIAN_PROVIDER"] = selected.provider
+        return env
+
+    def _run_with_model_lane(self, operation: Callable[[SelectedApiKey | None], DouyinAnalysisResult]) -> DouyinAnalysisResult:
+        selected = self._select_model_key()
+        if not hasattr(self.store, "acquire_lane_lease"):
+            return operation(selected)
+        try:
+            with acquire_lane(
+                self.store,  # type: ignore[arg-type]
+                self.config.video_model_lane,
+                worker_id=self.config.worker_id,
+                max_concurrent=self.config.video_model_max_concurrent,
+                lease_seconds=self.config.video_model_lane_lease_seconds,
+                wait_timeout_seconds=self.config.video_model_lane_wait_seconds,
+            ):
+                return operation(selected)
+        except BaseException as exc:
+            if isinstance(exc, ModelRateLimitError) or is_rate_limit_error(exc):
+                self._mark_rate_limited(selected)
+            raise
 
     def _default_analyzer(self, video_url: str, output_dir: Path) -> DouyinAnalysisResult:
         if is_upload_uri(video_url):
             return self._analyze_uploaded_video(video_url, output_dir)
-        return run_douyin_chong(
-            video_url=video_url,
-            output_dir=output_dir,
-            timeout_seconds=self.config.timeout_seconds,
-            max_download_bytes=self.config.max_download_bytes,
-            max_model_video_bytes=self.config.max_model_video_bytes,
-            max_duration_seconds=self.config.max_duration_seconds,
-            max_frames=self.config.max_frames,
-            video_understanding_fps=self.config.video_understanding_fps,
-            min_video_understanding_fps=self.config.min_video_understanding_fps,
-            max_video_understanding_fps=self.config.max_video_understanding_fps,
+        return self._run_with_model_lane(
+            lambda selected: run_douyin_chong(
+                video_url=video_url,
+                output_dir=output_dir,
+                timeout_seconds=self.config.timeout_seconds,
+                max_download_bytes=self.config.max_download_bytes,
+                max_model_video_bytes=self.config.max_model_video_bytes,
+                max_duration_seconds=self.config.max_duration_seconds,
+                max_frames=self.config.max_frames,
+                video_understanding_fps=self.config.video_understanding_fps,
+                min_video_understanding_fps=self.config.min_video_understanding_fps,
+                max_video_understanding_fps=self.config.max_video_understanding_fps,
+                env=self._env_for_selected_key(selected),
+            )
         )
 
     def _analyze_uploaded_video(self, video_uri: str, output_dir: Path) -> DouyinAnalysisResult:
@@ -111,12 +175,15 @@ class VideoAnalysisWorker:
             raise UploadTooLargeError("uploaded video exceeds preprocessing size limit")
         # Let the adapter enforce the shared 500 MiB Files API boundary and
         # submit uploads through the same Responses video path as links.
-        return run_upload_video_analysis(
-            file_path=str(path),
-            output_dir=output_dir,
-            source_label=video_uri,
-            timeout_seconds=self.config.timeout_seconds,
-            max_bytes=self.config.max_inline_upload_bytes,
+        return self._run_with_model_lane(
+            lambda selected: run_upload_video_analysis(
+                file_path=str(path),
+                output_dir=output_dir,
+                source_label=video_uri,
+                timeout_seconds=self.config.timeout_seconds,
+                max_bytes=self.config.max_inline_upload_bytes,
+                env=self._env_for_selected_key(selected),
+            )
         )
 
     def _start_heartbeat(self, job: VideoJob) -> Callable[[], None]:
@@ -188,7 +255,7 @@ class VideoAnalysisWorker:
                 RESULT_SCHEMA_VERSION,
                 worker_id=self.config.worker_id,
             )
-        except TimeoutError as exc:
+        except (TimeoutError, ModelRateLimitError) as exc:
             self._log_failure(job, "tool_timeout", exc)
             return self._fail_job(job, "tool_timeout", timed_out=True)
         except UrlRejected as exc:

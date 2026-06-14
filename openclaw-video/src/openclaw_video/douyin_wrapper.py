@@ -26,6 +26,10 @@ class VideoTooLargeForModelError(DouyinWrapperError):
     pass
 
 
+class ModelRateLimitError(TimeoutError):
+    pass
+
+
 @dataclass(frozen=True)
 class DouyinAnalysisResult:
     payload: dict
@@ -64,8 +68,14 @@ def _raise_for_adapter_failure(prefix: str, completed: subprocess.CompletedProce
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because compression did not fit the model limit")
     if "video model size exceeds limit at minimum fps" in lowered:
         raise VideoTooLargeForModelError(f"{prefix} rejected the video because minimum fps still exceeds the model limit")
-    if "serveroverloaded" in lowered or "too many requests" in lowered or "status_code=429" in lowered:
-        raise TimeoutError(f"{prefix} model service is overloaded; retry later")
+    if (
+        "serveroverloaded" in lowered
+        or "too many requests" in lowered
+        or "status_code=429" in lowered
+        or "http 429" in lowered
+        or "rate_limit" in lowered
+    ):
+        raise ModelRateLimitError(f"{prefix} model service is rate-limited; retry later")
     safe_detail = " ".join(detail.split())
     if safe_detail:
         raise DouyinWrapperError(f"{prefix} failed with exit code {completed.returncode}: {safe_detail[:800]}")
@@ -85,6 +95,7 @@ def run_douyin_chong(
     video_understanding_fps: float = DEFAULT_VIDEO_UNDERSTANDING_FPS,
     min_video_understanding_fps: float = MIN_VIDEO_UNDERSTANDING_FPS,
     max_video_understanding_fps: float = MAX_VIDEO_UNDERSTANDING_FPS,
+    env: dict[str, str] | None = None,
 ) -> DouyinAnalysisResult:
     """Run douyin_chong through a fixed-argument, no-shell wrapper.
 
@@ -136,6 +147,7 @@ def run_douyin_chong(
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
+            env=env,
         )
     except subprocess.TimeoutExpired as exc:
         raise TimeoutError("douyin_chong timed out") from exc
@@ -162,6 +174,7 @@ def run_upload_video_analysis(
     env_file: str | None = None,
     timeout_seconds: int = 900,
     max_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
+    env: dict[str, str] | None = None,
 ) -> DouyinAnalysisResult:
     """Analyze a locally-uploaded video via the adapter's configured mode.
 
@@ -200,6 +213,7 @@ def run_upload_video_analysis(
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
+            env=env,
         )
     except subprocess.TimeoutExpired as exc:
         raise TimeoutError("upload analysis timed out") from exc

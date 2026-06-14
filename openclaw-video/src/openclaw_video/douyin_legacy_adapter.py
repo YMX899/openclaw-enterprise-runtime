@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .ark_files_client import DEFAULT_ARK_API_BASE, DEFAULT_ARK_RESPONSES_MODEL, ArkFilesClient
+from .model_broker import DEFAULT_BAILIAN_OPENAI_BASE_URL, DEFAULT_BAILIAN_MODEL
 from .result_schema import RESULT_SCHEMA_VERSION, validate_result_payload
 from .url_guard import UrlRejected, validate_video_url, validate_video_url_with_redirects
 from .video_limits import (
@@ -1044,7 +1045,13 @@ def _read_env_file_value(env_file: Path, key: str) -> str | None:
     return None
 
 
-def _load_ark_files_config(env_file: Path) -> tuple[str, str, str]:
+def _load_ark_files_config(env_file: Path) -> tuple[str, str, str, str]:
+    bailian_api_key = os.environ.get("BAILIAN_SELECTED_API_KEY", "").strip()
+    if bailian_api_key:
+        model = os.environ.get("BAILIAN_MODEL", "").strip() or DEFAULT_BAILIAN_MODEL
+        base_url = os.environ.get("BAILIAN_OPENAI_BASE_URL", "").strip() or DEFAULT_BAILIAN_OPENAI_BASE_URL
+        return bailian_api_key, model, base_url, "bailian-openai-compatible"
+
     api_key = _read_env_file_value(env_file, "ARK_API_KEY") or os.environ.get("ARK_API_KEY", "")
     model = (
         _read_env_file_value(env_file, "ARK_RESPONSES_MODEL")
@@ -1058,7 +1065,7 @@ def _load_ark_files_config(env_file: Path) -> tuple[str, str, str]:
     )
     if not api_key.strip():
         raise LegacyAdapterError(f"Missing ARK_API_KEY in {env_file}.")
-    return api_key.strip(), model.strip(), base_url.strip()
+    return api_key.strip(), model.strip(), base_url.strip(), "ark"
 
 
 def _mime_type_for_video(path: Path) -> str:
@@ -1094,7 +1101,7 @@ def _responses_completion_from_files_api(
 ) -> tuple[Any, dict[str, Any]]:
     size_bytes = _ensure_file_for_files_api(path, max_bytes=max_bytes)
     mime_type = _mime_type_for_video(path)
-    api_key, model, base_url = _load_ark_files_config(env_file)
+    api_key, model, base_url, provider = _load_ark_files_config(env_file)
     started = time.monotonic()
     client = client_factory(api_key=api_key, base_url=base_url, timeout_seconds=timeout_seconds)
     uploaded = client.upload_user_data_file(path, mime_type)
@@ -1130,6 +1137,7 @@ def _responses_completion_from_files_api(
         "size_bytes": size_bytes,
         "mime_type": mime_type,
         "model": model,
+        "provider": provider,
         "base_url": base_url,
         "upload_status": str(uploaded.get("status") or ""),
         "file_status": str(active_file.get("status") or ""),
@@ -1165,6 +1173,7 @@ def _build_files_payload(
         "file_status": files_metadata.get("file_status"),
         "upload_status": files_metadata.get("upload_status"),
         "model": files_metadata.get("model"),
+        "provider": files_metadata.get("provider"),
         "request_id": str(getattr(completion, "request_id", "") or ""),
         "usage": getattr(completion, "usage", None),
         "analysis_parse_status": parse_status,

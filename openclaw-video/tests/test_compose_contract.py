@@ -197,6 +197,10 @@ class ComposeContractTests(unittest.TestCase):
             "VIDEO_ANALYSIS_INPUT_MODE: files_api",
             "ARK_RESPONSES_BASE_URL: ${ARK_RESPONSES_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}",
             "ARK_RESPONSES_MODEL: ${ARK_RESPONSES_MODEL:-doubao-seed-2-0-lite-260428}",
+            "BAILIAN_API_KEYS: ${BAILIAN_API_KEYS:-}",
+            "BAILIAN_OPENAI_BASE_URL: ${BAILIAN_OPENAI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}",
+            "BAILIAN_MODEL: ${BAILIAN_MODEL:-qwen-vl-max-latest}",
+            "VIDEO_MODEL_MAX_CONCURRENT: ${VIDEO_MODEL_MAX_CONCURRENT:-200}",
             "FILES_API_TIMEOUT_SECONDS: ${FILES_API_TIMEOUT_SECONDS:-300}",
             "MAX_DOWNLOAD_BYTES: \"524288000\"",
             "MAX_VIDEO_DURATION_SECONDS: \"0\"",
@@ -245,6 +249,7 @@ class ComposeContractTests(unittest.TestCase):
         self.assertIn("DOUYIN_CHONG_ENV_FILE: /run/secrets/douyin_chong_env", compose)
         self.assertIn("./secrets/douyin_chong.env:/run/secrets/douyin_chong_env:ro", compose)
         self.assertNotIn("ARK_API_KEY:", compose)
+        self.assertNotIn("sk-ws-", compose)
         self.assertNotIn("MEDIAKIT_API_KEY:", compose)
 
     def test_worker_image_uses_adapter_and_vendor_source_slot(self):

@@ -25,6 +25,7 @@ def job_row(**overrides):
         "worker_id": None,
         "heartbeat_at": None,
         "lease_expires_at": None,
+        "job_spec": {},
     }
     row.update(overrides)
     return row
@@ -82,7 +83,7 @@ class PostgresJobStoreTests(unittest.TestCase):
         sql, params = fake.queries[0]
         self.assertIn("ON CONFLICT (owner_principal_id, bridge_session_id, idempotency_key)", sql)
         self.assertIn("DO UPDATE SET idempotency_key = video_jobs.idempotency_key", sql)
-        self.assertEqual(params, ("owner", "session", "https://v.douyin.com/changed", "same-request", "queued"))
+        self.assertEqual(params[:5], ("owner", "session", "https://v.douyin.com/changed", "same-request", "queued"))
         self.assertEqual(job.video_url_canonical, "https://v.douyin.com/abc")
         self.assertEqual(job.idempotency_key, "same-request")
 
@@ -104,6 +105,7 @@ class PostgresJobStoreTests(unittest.TestCase):
         job = store.claim_next("worker-a", 120)
         sql, params = fake.queries[0]
         self.assertIn("FOR UPDATE SKIP LOCKED", sql)
+        self.assertIn("active.bridge_session_id = video_jobs.bridge_session_id", sql)
         self.assertEqual(params, ("worker-a", 120))
         self.assertEqual(job.status, JobStatus.RUNNING)
         self.assertEqual(job.worker_id, "worker-a")
@@ -151,6 +153,31 @@ class PostgresJobStoreTests(unittest.TestCase):
         self.assertIn("status IN ('queued', 'running')", sql)
         self.assertEqual(params, ("owner",))
         self.assertEqual(active, 2)
+
+    def test_create_job_persists_job_spec_parameter(self):
+        fake = FakeConnection([job_row(job_spec={"provider": "bailian"})])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        job = store.create_job("owner", "session", "https://v.douyin.com/abc", job_spec={"provider": "bailian"})
+        sql, params = fake.queries[0]
+        self.assertIn("job_spec", sql)
+        self.assertEqual(params[0:4], ("owner", "session", "https://v.douyin.com/abc", "queued"))
+        self.assertEqual(job.job_spec["provider"], "bailian")
+
+    def test_api_key_cooldown_queries_use_hashes_only(self):
+        fake = FakeConnection([[{"provider": "bailian", "key_hash": "abc", "rate_limit_count": 1}]])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        rows = store.list_api_key_cooldowns("bailian", ["abc"])
+        sql, params = fake.queries[0]
+        self.assertIn("model_api_key_cooldowns", sql)
+        self.assertEqual(params, ("bailian", ["abc"]))
+        self.assertIn("abc", rows)
+
+    def test_lane_lease_acquire_uses_slots(self):
+        fake = FakeConnection([{"lease_id": "lease-1", "slot_index": 3}])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        lease = store.acquire_lane_lease("video_model_request", worker_id="worker-a", max_concurrent=200, lease_seconds=900)
+        self.assertEqual(lease, ("lease-1", 3))
+        self.assertIn("generate_series", fake.queries[1][0])
 
     def test_get_job_by_idempotency_uses_owner_session_and_key(self):
         fake = FakeConnection([job_row(idempotency_key="same-request")])

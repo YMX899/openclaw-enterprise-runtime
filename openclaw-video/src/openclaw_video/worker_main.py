@@ -37,6 +37,10 @@ def main() -> None:
     min_video_understanding_fps = float(os.environ.get("MIN_VIDEO_UNDERSTANDING_FPS", str(MIN_VIDEO_UNDERSTANDING_FPS)))
     max_video_understanding_fps = float(os.environ.get("MAX_VIDEO_UNDERSTANDING_FPS", str(MAX_VIDEO_UNDERSTANDING_FPS)))
     max_inline_upload_bytes = int(os.environ.get("MAX_INLINE_UPLOAD_BYTES", str(max_download_bytes)))
+    video_model_max_concurrent = int(os.environ.get("VIDEO_MODEL_MAX_CONCURRENT", "200"))
+    video_model_lane = os.environ.get("VIDEO_MODEL_LANE", "video_model_request")
+    video_model_lane_lease_seconds = int(os.environ.get("VIDEO_MODEL_LANE_LEASE_SECONDS", str(timeout_seconds)))
+    video_model_lane_wait_seconds = int(os.environ.get("VIDEO_MODEL_LANE_WAIT_SECONDS", "60"))
     store = PostgresJobStore(database_url)
     worker = VideoAnalysisWorker(
         store,
@@ -52,6 +56,10 @@ def main() -> None:
             min_video_understanding_fps=min_video_understanding_fps,
             max_video_understanding_fps=max_video_understanding_fps,
             max_inline_upload_bytes=max_inline_upload_bytes,
+            video_model_lane=video_model_lane,
+            video_model_max_concurrent=video_model_max_concurrent,
+            video_model_lane_lease_seconds=video_model_lane_lease_seconds,
+            video_model_lane_wait_seconds=video_model_lane_wait_seconds,
         ),
     )
     while True:

@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS model_lane_leases;
+DROP TABLE IF EXISTS model_api_key_cooldowns;
 DROP TABLE IF EXISTS tenant_gateway_mapping;
 DROP TABLE IF EXISTS user_memory;
 DROP TABLE IF EXISTS video_results;

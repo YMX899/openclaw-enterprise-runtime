@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from hashlib import sha256
 from typing import Any
+from uuid import uuid4
 
 from .job_state import JobStatus
 from .job_store import JobLeaseError, JobNotFound, JobOwnershipError, RetentionCleanupResult, VideoJob, VideoResult
@@ -76,6 +78,7 @@ def _row_to_job(row: dict[str, Any]) -> VideoJob:
         worker_id=row["worker_id"],
         heartbeat_at=row["heartbeat_at"],
         lease_expires_at=row["lease_expires_at"],
+        job_spec=row.get("job_spec") if isinstance(row.get("job_spec"), dict) else {},
     )
 
 
@@ -284,15 +287,18 @@ class PostgresJobStore(_BasePostgresStore):
         video_url_canonical: str,
         *,
         idempotency_key: str | None = None,
+        job_spec: dict[str, Any] | None = None,
     ) -> VideoJob:
+        spec_payload = job_spec if isinstance(job_spec, dict) else {}
+        spec_param = Jsonb(spec_payload) if Jsonb is not None else spec_payload
         with self._connect() as conn:
             with conn.cursor() as cur:
                 if idempotency_key:
                     cur.execute(
                         """
                         INSERT INTO video_jobs
-                          (owner_principal_id, bridge_session_id, video_url_canonical, idempotency_key, status)
-                        VALUES (%s, %s, %s, %s, %s)
+                          (owner_principal_id, bridge_session_id, video_url_canonical, idempotency_key, status, job_spec)
+                        VALUES (%s, %s, %s, %s, %s, %s)
                         ON CONFLICT (owner_principal_id, bridge_session_id, idempotency_key)
                         WHERE idempotency_key IS NOT NULL
                         DO UPDATE SET idempotency_key = video_jobs.idempotency_key
@@ -304,17 +310,24 @@ class PostgresJobStore(_BasePostgresStore):
                             video_url_canonical,
                             idempotency_key,
                             JobStatus.QUEUED.value,
+                            spec_param,
                         ),
                     )
                 else:
                     cur.execute(
                         """
                         INSERT INTO video_jobs
-                          (owner_principal_id, bridge_session_id, video_url_canonical, status)
-                        VALUES (%s, %s, %s, %s)
+                          (owner_principal_id, bridge_session_id, video_url_canonical, status, job_spec)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING *
                         """,
-                        (owner_principal_id, bridge_session_id, video_url_canonical, JobStatus.QUEUED.value),
+                        (
+                            owner_principal_id,
+                            bridge_session_id,
+                            video_url_canonical,
+                            JobStatus.QUEUED.value,
+                            spec_param,
+                        ),
                     )
                 return _row_to_job(cur.fetchone())
 
@@ -379,6 +392,12 @@ class PostgresJobStore(_BasePostgresStore):
                       SELECT job_id
                       FROM video_jobs
                       WHERE status = 'queued'
+                        AND NOT EXISTS (
+                          SELECT 1
+                          FROM video_jobs active
+                          WHERE active.bridge_session_id = video_jobs.bridge_session_id
+                            AND active.status = 'running'
+                        )
                       ORDER BY created_at ASC
                       FOR UPDATE SKIP LOCKED
                       LIMIT 1
@@ -398,6 +417,120 @@ class PostgresJobStore(_BasePostgresStore):
                 )
                 row = cur.fetchone()
         return _row_to_job(row) if row else None
+
+    @staticmethod
+    def hash_api_key(api_key: str) -> str:
+        return sha256(api_key.strip().encode("utf-8")).hexdigest()
+
+    def list_api_key_cooldowns(self, provider: str, key_hashes: list[str]) -> dict[str, dict[str, Any]]:
+        if not key_hashes:
+            return {}
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT provider, key_hash, cooldown_until, rate_limit_count, last_selected_at
+                    FROM model_api_key_cooldowns
+                    WHERE provider = %s
+                      AND key_hash = ANY(%s::text[])
+                    """,
+                    (provider, key_hashes),
+                )
+                rows = cur.fetchall()
+        return {row["key_hash"]: dict(row) for row in rows}
+
+    def mark_api_key_selected(self, provider: str, key_hash: str) -> None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO model_api_key_cooldowns
+                      (provider, key_hash, last_selected_at, updated_at)
+                    VALUES (%s, %s, now(), now())
+                    ON CONFLICT (provider, key_hash) DO UPDATE
+                    SET last_selected_at = now(), updated_at = now()
+                    """,
+                    (provider, key_hash),
+                )
+
+    def mark_api_key_rate_limited(self, provider: str, key_hash: str, cooldown_seconds: int) -> None:
+        cooldown_seconds = max(0, int(cooldown_seconds))
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO model_api_key_cooldowns
+                      (provider, key_hash, cooldown_until, rate_limit_count, updated_at)
+                    VALUES (%s, %s, now() + make_interval(secs => %s), 1, now())
+                    ON CONFLICT (provider, key_hash) DO UPDATE
+                    SET cooldown_until = now() + make_interval(secs => %s),
+                        rate_limit_count = model_api_key_cooldowns.rate_limit_count + 1,
+                        updated_at = now()
+                    """,
+                    (provider, key_hash, cooldown_seconds, cooldown_seconds),
+                )
+
+    def acquire_lane_lease(
+        self,
+        lane: str,
+        *,
+        worker_id: str,
+        max_concurrent: int,
+        lease_seconds: int,
+    ) -> tuple[str, int] | None:
+        max_concurrent = max(1, int(max_concurrent))
+        lease_seconds = max(1, int(lease_seconds))
+        lease_id = str(uuid4())
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM model_lane_leases
+                    WHERE lane = %s
+                      AND expires_at < now()
+                    """,
+                    (lane,),
+                )
+                cur.execute(
+                    """
+                    WITH slots AS (
+                      SELECT generate_series(0, %s - 1) AS slot_index
+                    ),
+                    available AS (
+                      SELECT slots.slot_index
+                      FROM slots
+                      LEFT JOIN model_lane_leases existing
+                        ON existing.lane = %s
+                       AND existing.slot_index = slots.slot_index
+                      WHERE existing.slot_index IS NULL
+                      ORDER BY slots.slot_index
+                      LIMIT 1
+                    )
+                    INSERT INTO model_lane_leases
+                      (lane, slot_index, lease_id, worker_id, expires_at)
+                    SELECT %s, slot_index, %s, %s, now() + make_interval(secs => %s)
+                    FROM available
+                    ON CONFLICT DO NOTHING
+                    RETURNING lease_id, slot_index
+                    """,
+                    (max_concurrent, lane, lane, lease_id, worker_id, lease_seconds),
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return str(row["lease_id"]), int(row["slot_index"])
+
+    def release_lane_lease(self, lane: str, lease_id: str) -> None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM model_lane_leases
+                    WHERE lane = %s
+                      AND lease_id = %s
+                    """,
+                    (lane, lease_id),
+                )
 
     def heartbeat_job(self, job_id: str, worker_id: str, lease_seconds: int = 900) -> VideoJob:
         with self._connect() as conn:

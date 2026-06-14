@@ -17,8 +17,11 @@ class PostgresContractTests(unittest.TestCase):
             "worker_id text",
             "heartbeat_at timestamptz",
             "lease_expires_at timestamptz",
+            "job_spec jsonb NOT NULL DEFAULT '{}'::jsonb",
             "video_jobs_lease_expiry_idx",
             "video_jobs_idempotency_idx",
+            "model_api_key_cooldowns",
+            "model_lane_leases",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, sql)
@@ -27,10 +30,13 @@ class PostgresContractTests(unittest.TestCase):
         source = ADAPTER.read_text(encoding="utf-8")
         for required in [
             "FOR UPDATE SKIP LOCKED",
+            "active.bridge_session_id = video_jobs.bridge_session_id",
             "lease_expires_at = now() + make_interval",
             "ON CONFLICT (owner_principal_id, bridge_session_id, idempotency_key)",
             "DO UPDATE SET idempotency_key = video_jobs.idempotency_key",
             "WHERE idempotency_key IS NOT NULL",
+            "model_api_key_cooldowns",
+            "model_lane_leases",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, source)
@@ -39,6 +45,8 @@ class PostgresContractTests(unittest.TestCase):
         rollback = ROLLBACK.read_text(encoding="utf-8")
         for table in [
             "tenant_gateway_mapping",
+            "model_lane_leases",
+            "model_api_key_cooldowns",
             "user_memory",
             "video_results",
             "video_jobs",
@@ -61,6 +69,7 @@ class PostgresContractTests(unittest.TestCase):
             "MAX_VIDEO_DURATION_SECONDS",
             "MAX_VIDEO_FRAMES",
             "VideoAnalysisWorker",
+            "VIDEO_MODEL_MAX_CONCURRENT",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, source)

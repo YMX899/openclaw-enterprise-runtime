@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from threading import Lock
 
 from .job_state import JobStatus, TERMINAL_STATUSES
@@ -42,6 +43,7 @@ class VideoJob:
     worker_id: str | None = None
     heartbeat_at: datetime | None = None
     lease_expires_at: datetime | None = None
+    job_spec: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -79,12 +81,14 @@ class InMemoryJobStore:
         video_url_canonical: str,
         *,
         idempotency_key: str | None = None,
+        job_spec: dict[str, Any] | None = None,
     ) -> VideoJob:
         job = VideoJob(
             owner_principal_id=owner_principal_id,
             bridge_session_id=bridge_session_id,
             video_url_canonical=video_url_canonical,
             idempotency_key=idempotency_key,
+            job_spec=dict(job_spec or {}),
         )
         with self._lock:
             if idempotency_key:

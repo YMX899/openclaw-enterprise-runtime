@@ -55,7 +55,15 @@ class FakeConfig:
         cls.env_snapshots.append(
             {
                 key: adapter_module.os.environ.get(key)
-                for key in ("ARK_API_KEY", "MEDIAKIT_API_KEY", "MODEL", "ARK_MODEL", "ARK_BASE_URL", "MEDIAKIT_BASE_URL")
+                for key in (
+                    "ARK_API_KEY",
+                    "MEDIAKIT_API_KEY",
+                    "MODEL",
+                    "ARK_MODEL",
+                    "ARK_BASE_URL",
+                    "MEDIAKIT_BASE_URL",
+                    "BAILIAN_SELECTED_API_KEY",
+                )
             }
         )
         return {"config": kwargs}
@@ -197,10 +205,48 @@ class DouyinLegacyAdapterTests(unittest.TestCase):
         self.assertEqual(payload["raw_tool_result"]["file_id"], "file-test")
         self.assertEqual(payload["raw_tool_result"]["mime_type"], "video/mp4")
         self.assertEqual(payload["raw_tool_result"]["model"], "doubao-seed-2-0-lite-260428")
+        self.assertEqual(payload["raw_tool_result"]["provider"], "ark")
         self.assertEqual(payload["raw_tool_result"]["analysis_fps"], 1.0)
         self.assertEqual(FakeFilesClient.calls[-1]["fps"], 1.0)
         methods = [call["method"] for call in FakeFilesClient.calls]
         self.assertEqual(methods, ["init", "upload", "wait", "retrieve", "responses"])
+
+    def test_files_api_uses_selected_bailian_openai_compatible_config(self):
+        with TemporaryDirectory() as tmp:
+            env_file = Path(tmp) / "douyin.env"
+            env_file.write_text("ARK_API_KEY=ark-fallback\n", encoding="utf-8")
+            video_file = Path(tmp) / "clip.mp4"
+            video_file.write_bytes(b"fake-video-bytes")
+            output_json = Path(tmp) / "result.json"
+
+            with patch.dict(
+                os.environ,
+                {
+                    "BAILIAN_SELECTED_API_KEY": "selected-key",
+                    "BAILIAN_OPENAI_BASE_URL": "https://example.test/compatible-mode/v1",
+                    "BAILIAN_MODEL": "qwen-test-video",
+                },
+            ):
+                payload = run_adapter(
+                    [
+                        "--input-file", str(video_file),
+                        "--source-label", "upload://abc/clip.mp4",
+                        "--output-json", str(output_json),
+                        "--max-bytes", "2000000",
+                        "--max-duration-seconds", "60",
+                        "--max-frames", "1200",
+                        "--env-file", str(env_file),
+                        "--no-shell",
+                        "--input-mode", FILES_API_MODE,
+                    ],
+                    component_loader=fake_components,
+                    files_client_factory=FakeFilesClient,
+                )
+
+        self.assertEqual(FakeFilesClient.calls[0]["api_key"], "selected-key")
+        self.assertEqual(FakeFilesClient.calls[0]["base_url"], "https://example.test/compatible-mode/v1")
+        self.assertEqual(payload["raw_tool_result"]["provider"], "bailian-openai-compatible")
+        self.assertEqual(payload["raw_tool_result"]["model"], "qwen-test-video")
 
     def test_files_api_input_file_uses_official_video_mime_types(self):
         for filename, expected_mime in [("clip.mp4", "video/mp4"), ("clip.avi", "video/avi"), ("clip.mov", "video/mov")]:

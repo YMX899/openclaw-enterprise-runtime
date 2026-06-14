@@ -278,6 +278,48 @@ def positive_float_from_env(name: str, default: float) -> float:
     return value
 
 
+def nonnegative_int_from_env(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a non-negative integer") from exc
+    if value < 0:
+        raise RuntimeError(f"{name} must be a non-negative integer")
+    return value
+
+
+def _build_video_job_spec(*, principal_id: str, session_id: str, video_uri: str) -> dict[str, Any]:
+    provider = (
+        os.environ.get("VIDEO_ANALYSIS_PROVIDER")
+        or ("bailian-openai-compatible" if os.environ.get("BAILIAN_MODEL") else "ark")
+    ).strip()
+    model = (
+        os.environ.get("BAILIAN_MODEL")
+        if provider == "bailian-openai-compatible"
+        else os.environ.get("ARK_RESPONSES_MODEL")
+    ) or "configured-default"
+    return {
+        "schema_version": "openclaw-video-job-spec.v1",
+        "owner_principal_id": principal_id,
+        "bridge_session_id": session_id,
+        "video_source_kind": "upload" if str(video_uri).startswith("upload://") else "url",
+        "provider": provider,
+        "model": model,
+        "base_url_kind": "openai-compatible" if provider == "bailian-openai-compatible" else "ark",
+        "limits": {
+            "max_upload_bytes": positive_int_from_env("MAX_UPLOAD_BYTES", DEFAULT_MAX_DOWNLOAD_BYTES),
+            "max_download_bytes": positive_int_from_env("MAX_DOWNLOAD_BYTES", DEFAULT_MAX_DOWNLOAD_BYTES),
+            "max_video_duration_seconds": nonnegative_int_from_env("MAX_VIDEO_DURATION_SECONDS", 0),
+        },
+        "prompt_version": "openclaw-video-analysis.v1",
+        "knowledge_version": os.environ.get("KNOWLEDGE_BASE_VERSION", "configured"),
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+
+
 def _test_identity_headers_allowed(request: Request, enabled: bool, secret: str) -> bool:
     if not enabled or not secret:
         return False
@@ -1026,6 +1068,11 @@ def create_app(
             session_id,
             video_url,
             idempotency_key=normalized_idempotency_key,
+            job_spec=_build_video_job_spec(
+                principal_id=principal.principal_id,
+                session_id=session_id,
+                video_uri=video_url,
+            ),
         )
         session_store.add_message(
             session_id,
@@ -1095,7 +1142,16 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         finally:
             await file.close()
-        job = job_store.create_job(principal.principal_id, session_id, stored.uri)
+        job = job_store.create_job(
+            principal.principal_id,
+            session_id,
+            stored.uri,
+            job_spec=_build_video_job_spec(
+                principal_id=principal.principal_id,
+                session_id=session_id,
+                video_uri=stored.uri,
+            ),
+        )
         session_store.add_message(
             session_id,
             principal.principal_id,
