@@ -69,6 +69,8 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             "JOB_AUTO_POLL_ATTEMPTS", "hydrateCompletedJobMessages", "仍在分析中，可稍后刷新查看结果。",
             "video_too_large", "500MB", "上传至视频分析模型",
             "xiaohongshu", "xhslink", "小红书",
+            "createChatScrollNavigator", "chat-scroll-navigator", "data-message-index",
+            "latestUserPreviewFromMessages", "scrollConversationToLatest",
         ]
         for required in in_source:
             with self.subTest(source=required):
@@ -87,6 +89,8 @@ class OpenClawLabUiContractTests(unittest.TestCase):
             "正在读取视频链接…",
             "1/4 正在读取视频链接…",
             "2/4 链接读取完成，正在提交分析任务…",
+            "3/4 任务排队中，等待视频分析资源…",
+            "当前状态：",
             "模型正在分析视频，请继续等待…",
             "正在下载/读取并上传至视频分析模型",
             "分析上限：500MB",

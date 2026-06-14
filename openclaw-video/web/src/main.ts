@@ -92,6 +92,22 @@ const output = document.getElementById('output');
     const sessionPreviewCache = new Map();
     const sessionPreviewLoading = new Set();
     const SESSION_PREVIEW_LIMIT = 28;
+    let chatScrollNavigator = null;
+    function notifyConversationChanged() {
+      if (chatScrollNavigator && chatScrollNavigator.scheduleUpdate) {
+        chatScrollNavigator.scheduleUpdate();
+      }
+    }
+    function scrollConversationToLatest(behavior = 'auto') {
+      requestAnimationFrame(() => {
+        try {
+          conversation.scrollTo({ top: conversation.scrollHeight, behavior });
+        } catch (e) {
+          conversation.scrollTop = conversation.scrollHeight;
+        }
+        notifyConversationChanged();
+      });
+    }
 
     function openLoginPanel() {
       // Login fields are inline on the first screen; focus the account input.
@@ -291,6 +307,15 @@ const output = document.getElementById('output');
       jobMetric.textContent = currentJobId ? currentJobId.slice(0, 8) + '...' : '无任务';
       syncActionAvailability();
     }
+    function updateVideoAnalysisStatus(progress, text, tone = 'busy', pct = null) {
+      setRunState(text, tone);
+      analysisMetric.textContent = text;
+      resultMetric.textContent = tone === 'ok' ? '已就绪' : (tone === 'fail' ? '未完成' : '等待中');
+      if (progress) {
+        if (typeof pct === 'number') progress.stage(text, pct);
+        else progress.indeterminate(text);
+      }
+    }
     function summarizeOutput(value) {
       if (typeof value === 'string') {
         return { tone: 'warn', text: value || '暂无输出文本。' };
@@ -369,10 +394,15 @@ const output = document.getElementById('output');
       if (sameDay) return '今天 ' + hm;
       return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) + ' ' + hm;
     }
-    function pushMessage(role, text, ts) {
+    function pushMessage(role, text, ts, messageId) {
       const node = document.createElement('div');
       node.className = 'message ' + role;
       node.setAttribute('data-role-label', role === 'user' ? '你' : ASSISTANT_LABEL);
+      const index = conversation.querySelectorAll('.message').length;
+      const stableId = messageId ? String(messageId) : (role + '-' + index + '-' + Date.now());
+      node.setAttribute('data-message-index', String(index));
+      node.setAttribute('data-message-id', stableId);
+      node.id = 'message-' + stableId.replace(/[^a-zA-Z0-9_-]/g, '-');
       node._rawText = text;
       const inner = document.createElement('div');
       inner.className = 'cg-msg-inner';
@@ -388,7 +418,7 @@ const output = document.getElementById('output');
       timeEl.textContent = formatMsgTime(ts);
       node.appendChild(timeEl);
       conversation.appendChild(node);
-      conversation.scrollTop = conversation.scrollHeight;
+      scrollConversationToLatest();
       return node;
     }
 function messageInner(node) {
@@ -420,7 +450,7 @@ function addAttachmentChip(node, name) {
         chip.textContent = name;
       }
       inner.appendChild(chip);
-      conversation.scrollTop = conversation.scrollHeight;
+      scrollConversationToLatest();
     }
     function attachProgress(node, label) {
       const inner = messageInner(node);
@@ -438,16 +468,27 @@ function addAttachmentChip(node, name) {
       wrap.appendChild(bar);
       wrap.appendChild(lab);
       inner.appendChild(wrap);
-      conversation.scrollTop = conversation.scrollHeight;
+      scrollConversationToLatest();
       return {
+        stage(text, pct) {
+          fill.classList.remove('indeterminate');
+          fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+          lab.textContent = text;
+          wrap.dataset.status = text;
+          notifyConversationChanged();
+        },
         set(pct, text) {
           fill.classList.remove('indeterminate');
           fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
           if (text) lab.textContent = text;
+          if (text) wrap.dataset.status = text;
+          notifyConversationChanged();
         },
         indeterminate(text) {
           fill.classList.add('indeterminate');
           if (text) lab.textContent = text;
+          if (text) wrap.dataset.status = text;
+          notifyConversationChanged();
         },
         done(text) {
           // Remove the progress bar entirely and show a clean done line,
@@ -456,16 +497,18 @@ function addAttachmentChip(node, name) {
           bar.remove();
           lab.textContent = (text ? ('✓ ' + text) : '✓ 已完成');
           lab.classList.add('cg-progress-label-done');
-          conversation.scrollTop = conversation.scrollHeight;
+          wrap.dataset.status = text || '已完成';
+          scrollConversationToLatest();
         },
         fail(text) {
           wrap.classList.add('cg-progress-failed');
           bar.remove();
           lab.textContent = (text ? ('✕ ' + text) : '✕ 未完成');
           lab.classList.add('cg-progress-label-failed');
-          conversation.scrollTop = conversation.scrollHeight;
+          wrap.dataset.status = text || '未完成';
+          scrollConversationToLatest();
         },
-        remove() { wrap.remove(); }
+        remove() { wrap.remove(); notifyConversationChanged(); }
       };
     }
     function addScreenshots(node, urls) {
@@ -481,7 +524,158 @@ function addAttachmentChip(node, name) {
         grid.appendChild(img);
       });
       inner.appendChild(grid);
-      conversation.scrollTop = conversation.scrollHeight;
+      scrollConversationToLatest();
+    }
+    function createChatScrollNavigator(scrollContainer) {
+      const root = document.createElement('aside');
+      root.className = 'chat-scroll-navigator';
+      root.hidden = true;
+      root.setAttribute('aria-label', '对话时间轴');
+      const rail = document.createElement('button');
+      rail.type = 'button';
+      rail.className = 'chat-scroll-rail';
+      rail.setAttribute('aria-label', '打开对话时间轴');
+      const ticks = document.createElement('div');
+      ticks.className = 'chat-scroll-ticks';
+      rail.appendChild(ticks);
+      const panel = document.createElement('div');
+      panel.className = 'chat-scroll-panel';
+      panel.hidden = true;
+      panel.setAttribute('role', 'listbox');
+      panel.setAttribute('aria-label', '消息摘要');
+      const list = document.createElement('div');
+      list.className = 'chat-scroll-list';
+      panel.appendChild(list);
+      root.appendChild(rail);
+      root.appendChild(panel);
+      scrollContainer.parentElement.appendChild(root);
+
+      let items = [];
+      let activeIndex = 0;
+      let hideTimer = null;
+      let raf = 0;
+      const isCoarse = () => window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+      const summaryText = node => {
+        const raw = String(node._rawText || (messageInner(node) ? messageInner(node).textContent : '') || '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (!raw) return node.classList.contains('user') ? '用户消息' : '分析助手回复';
+        return raw.length > 40 ? raw.slice(0, 40) + '...' : raw;
+      };
+      const candidateNodes = () => Array.from(scrollContainer.querySelectorAll('.message'))
+        .filter(node => node.classList.contains('user') || node.querySelector('.cg-progress'));
+      const showPanel = () => {
+        if (hideTimer) clearTimeout(hideTimer);
+        if (root.hidden) return;
+        panel.hidden = false;
+        root.classList.add('open');
+      };
+      const scheduleHide = () => {
+        if (isCoarse()) return;
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          panel.hidden = true;
+          root.classList.remove('open');
+        }, 300);
+      };
+      const hideNow = () => {
+        panel.hidden = true;
+        root.classList.remove('open');
+      };
+      const setActive = index => {
+        activeIndex = Math.max(0, Math.min(items.length - 1, index));
+        root.querySelectorAll('[data-nav-index]').forEach(el => {
+          el.classList.toggle('active', Number(el.dataset.navIndex) === activeIndex);
+        });
+      };
+      const updateActiveFromScroll = () => {
+        if (!items.length) return;
+        const anchor = scrollContainer.scrollTop + Math.max(80, scrollContainer.clientHeight * 0.28);
+        let next = 0;
+        items.forEach((item, index) => {
+          if (item.node.offsetTop <= anchor) next = index;
+        });
+        setActive(next);
+      };
+      const jumpTo = index => {
+        const item = items[index];
+        if (!item) return;
+        item.node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setActive(index);
+        if (isCoarse()) hideNow();
+      };
+      const render = () => {
+        const nodes = candidateNodes();
+        const overflow = scrollContainer.scrollHeight > scrollContainer.clientHeight + 80;
+        if (!overflow || nodes.length < 3) {
+          items = [];
+          root.hidden = true;
+          hideNow();
+          return;
+        }
+        items = nodes.map((node, index) => ({ node, index, text: summaryText(node) }));
+        root.hidden = false;
+        ticks.innerHTML = '';
+        list.innerHTML = '';
+        const maxTop = Math.max(1, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        items.forEach(item => {
+          const top = Math.max(6, Math.min(94, (item.node.offsetTop / maxTop) * 100));
+          const tick = document.createElement('button');
+          tick.type = 'button';
+          tick.className = 'chat-scroll-tick';
+          tick.dataset.navIndex = String(item.index);
+          tick.style.top = top + '%';
+          tick.setAttribute('aria-label', item.text);
+          tick.addEventListener('click', event => {
+            event.stopPropagation();
+            jumpTo(item.index);
+          });
+          ticks.appendChild(tick);
+
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'chat-scroll-summary';
+          row.dataset.navIndex = String(item.index);
+          row.textContent = item.text;
+          row.addEventListener('click', event => {
+            event.stopPropagation();
+            jumpTo(item.index);
+          });
+          list.appendChild(row);
+        });
+        updateActiveFromScroll();
+      };
+      const scheduleUpdate = () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          render();
+        });
+      };
+      scrollContainer.addEventListener('scroll', () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          updateActiveFromScroll();
+        });
+      }, { passive: true });
+      root.addEventListener('mouseenter', showPanel);
+      root.addEventListener('mouseleave', scheduleHide);
+      panel.addEventListener('mouseenter', showPanel);
+      panel.addEventListener('mouseleave', scheduleHide);
+      rail.addEventListener('click', event => {
+        event.stopPropagation();
+        if (panel.hidden) showPanel();
+        else hideNow();
+      });
+      document.addEventListener('click', event => {
+        if (!root.contains(event.target)) hideNow();
+      });
+      window.addEventListener('resize', scheduleUpdate);
+      const observer = new MutationObserver(scheduleUpdate);
+      observer.observe(scrollContainer, { childList: true, subtree: true, characterData: true });
+      scheduleUpdate();
+      return { scheduleUpdate, hide: hideNow };
     }
     function resultSummary(result) {
       return result && result.body && result.body.result && result.body.result.result
@@ -522,11 +716,15 @@ function addAttachmentChip(node, name) {
       if (!value) return '';
       return value.length > 20 ? value.slice(0, 20) + '...' : value;
     }
-    function firstUserPreviewFromMessages(messages) {
-      const first = (Array.isArray(messages) ? messages : [])
-        .find(message => message && message.role === 'user' && String(message.content || '').trim());
-      if (!first) return '';
-      return compactSessionPreview(messageTextWithVideoUrl(first.content || '', first.video_url || ''));
+    function latestUserPreviewFromMessages(messages) {
+      const list = Array.isArray(messages) ? messages : [];
+      for (let index = list.length - 1; index >= 0; index -= 1) {
+        const message = list[index];
+        if (message && message.role === 'user' && String(message.content || '').trim()) {
+          return compactSessionPreview(messageTextWithVideoUrl(message.content || '', message.video_url || ''));
+        }
+      }
+      return '';
     }
     function cacheSessionPreview(sessionId, preview) {
       const value = compactSessionPreview(preview);
@@ -551,7 +749,7 @@ function addAttachmentChip(node, name) {
         try {
           const result = await api(apiPrefix + '/sessions/' + encodeURIComponent(session.id) + '/messages');
           if (result.status === 200) {
-            const preview = firstUserPreviewFromMessages(result.body.messages || []) || '视频分析对话';
+            const preview = latestUserPreviewFromMessages(result.body.messages || []) || '视频分析对话';
             changed = cacheSessionPreview(session.id, preview) || changed;
           }
         } catch (e) {
@@ -715,17 +913,20 @@ function addAttachmentChip(node, name) {
       conversation.innerHTML = '';
       if (!Array.isArray(messages) || messages.length === 0) {
         pushMessage('assistant', '当前对话还没有消息。可以发送问题，或提交视频链接开始分析。');
+        notifyConversationChanged();
         return;
       }
-      messages.forEach(message => {
+      messages.forEach((message, index) => {
         const role = message.role === 'user' ? 'user' : 'assistant';
         const videoUrl = message.video_url || '';
         const text = role === 'user'
           ? messageTextWithVideoUrl(message.content || '', videoUrl)
           : (message.content || '');
-        const node = pushMessage(role, text, message.created_at);
+        const node = pushMessage(role, text, message.created_at, message.id || message.job_id || index);
         if (role === 'user' && looksLikeUrl(videoUrl)) addAttachmentChip(node, videoUrl);
       });
+      scrollConversationToLatest();
+      notifyConversationChanged();
     }
     async function hydrateCompletedJobMessages(messages, sessionId) {
       let renderedResult = false;
@@ -845,7 +1046,7 @@ function addAttachmentChip(node, name) {
       if (!isActiveSession(sessionId)) return result;
       if (result.status === 200) {
         const messages = result.body.messages || [];
-        if (cacheSessionPreview(sessionId, firstUserPreviewFromMessages(messages))) {
+        if (cacheSessionPreview(sessionId, latestUserPreviewFromMessages(messages))) {
           renderSessions(knownSessions);
           const active = knownSessions.find(session => session.id === sessionId);
           if (active) setConversationTitle(sessionHeaderTitle(active));
@@ -1317,14 +1518,17 @@ function addAttachmentChip(node, name) {
       if (result.body.job && result.body.job.job_id) {
         linkReadable = false;
         setCurrentJob(result.body.job.job_id);
-        setRunState('任务已提交', 'ok');
         sourceMetric.textContent = '链接已提交';
         resultMetric.textContent = '等待中';
         activateFlow(3);
-        pushMessage('user', '已提交视频链接进行分析。');
+        const userNode = pushMessage('user', promptText + '\n' + videoUrl);
+        if (looksLikeUrl(videoUrl)) addAttachmentChip(userNode, videoUrl);
         cacheSessionPreview(document.getElementById('sessionId').value, promptText + '\n' + videoUrl);
         renderSessions(knownSessions);
-        pushMessage('assistant', '任务已提交。稍后刷新状态查看分析进度。');
+        const assistantNode = pushMessage('assistant', '视频链接已提交，正在进入分析流程…');
+        const progress = attachProgress(assistantNode, '2/4 分析任务已提交，等待模型资源…');
+        updateVideoAnalysisStatus(progress, '2/4 分析任务已提交，等待模型资源…', 'busy', 45);
+        await autoPollCurrentJob(progress, assistantNode, document.getElementById('sessionId').value);
       } else {
         setRunState('需要处理', 'fail');
       }
@@ -1390,15 +1594,15 @@ function addAttachmentChip(node, name) {
       }
       const assistantNode = pushMessage('assistant', '已收到视频文件，正在上传…');
       const progress = attachProgress(assistantNode, '1/4 准备上传视频文件…');
+      updateVideoAnalysisStatus(progress, '1/4 准备上传视频文件…', 'busy', 4);
       const { status, body } = await uploadVideoWithProgress(file, sessionId, document.getElementById('prompt').value, progress);
       if (body.job && body.job.job_id) {
         linkReadable = false;
         setCurrentJob(body.job.job_id);
-        setRunState('上传已提交', 'ok');
         sourceMetric.textContent = '上传已接收';
         resultMetric.textContent = '等待中';
         activateFlow(3);
-        progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
+        updateVideoAnalysisStatus(progress, '3/4 模型正在分析视频，请继续等待…', 'busy', 55);
         await autoPollCurrentJob(progress, assistantNode, sessionId);
       } else {
         setRunState('需要处理', 'fail');
@@ -1527,6 +1731,13 @@ function addAttachmentChip(node, name) {
         catch { continue; }
         const job = poll.body.job || null;
         if (!job) continue;
+        const pct = Math.min(92, 55 + Math.floor((attempt / Math.max(1, JOB_AUTO_POLL_ATTEMPTS - 1)) * 35));
+        const statusCopy = job.status === 'queued'
+          ? '3/4 任务排队中，等待视频分析资源…'
+          : '3/4 模型正在分析视频，当前状态：' + (job.status || 'running');
+        if (!terminalStatuses.has(job.status)) {
+          updateVideoAnalysisStatus(progress, statusCopy, 'busy', pct);
+        }
         if (job.status === 'succeeded') {
           const result = await api(apiPrefix + '/jobs/' + encodeURIComponent(jobId) + '/result');
           if (sessionId && !isActiveSession(sessionId)) return;
@@ -1633,6 +1844,7 @@ function addAttachmentChip(node, name) {
         renderSessions(knownSessions);
         const assistantNode = pushMessage('assistant', '已收到视频文件，正在上传…');
         const progress = attachProgress(assistantNode, '1/4 准备上传视频文件…');
+        updateVideoAnalysisStatus(progress, '1/4 准备上传视频文件…', 'busy', 4);
         document.getElementById('prompt').value = '';
         updateComposerMode();
         const { body } = await uploadVideoWithProgress(attachedFile, sessionId, promptText || '请分析上传的视频。', progress);
@@ -1640,7 +1852,7 @@ function addAttachmentChip(node, name) {
         setAttachedFile(null);
         if (body.job && body.job.job_id) {
           setCurrentJob(body.job.job_id);
-          progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
+          updateVideoAnalysisStatus(progress, '3/4 模型正在分析视频，请继续等待…', 'busy', 55);
           activateFlow(3);
           await autoPollCurrentJob(progress, assistantNode, sessionId);
         } else {
@@ -1660,6 +1872,7 @@ function addAttachmentChip(node, name) {
         renderSessions(knownSessions);
         const assistantNode = pushMessage('assistant', '正在读取视频链接…');
         const progress = attachProgress(assistantNode, '1/4 正在读取视频链接…');
+        updateVideoAnalysisStatus(progress, '1/4 正在读取视频链接…', 'busy', 8);
         document.getElementById('prompt').value = '';
         const read = await api(apiPrefix + '/video-link/read-check', { method: 'POST', body: JSON.stringify({ video_url: link }) });
         if (!isActiveSession(sessionId)) return;
@@ -1668,13 +1881,13 @@ function addAttachmentChip(node, name) {
           linkReadable = true;
           const waitingReply = buildReadCheckPassReply(read.body);
           updateAssistantMessage(assistantNode, waitingReply);
-          progress.indeterminate('2/4 链接读取完成，正在提交分析任务…');
+          updateVideoAnalysisStatus(progress, '2/4 链接读取完成，正在提交分析任务…', 'busy', 35);
           const jobRes = await api(apiPrefix + '/jobs', { method: 'POST', body: JSON.stringify({ session_id: sessionId, video_url: link, content: promptText || '请分析这个视频。' }) });
           if (!isActiveSession(sessionId)) return;
           if (jobRes.body.job && jobRes.body.job.job_id) {
             setCurrentJob(jobRes.body.job.job_id);
             activateFlow(3);
-            progress.indeterminate('3/4 模型正在分析视频，请继续等待…');
+            updateVideoAnalysisStatus(progress, '3/4 模型正在分析视频，请继续等待…', 'busy', 55);
             await autoPollCurrentJob(progress, assistantNode, sessionId);
           } else {
             progress.fail('提交分析失败，请重试');
@@ -1735,6 +1948,7 @@ function addAttachmentChip(node, name) {
       if (isAuthenticated()) setAuthenticatedView();
       syncActionAvailability();
     });
+    chatScrollNavigator = createChatScrollNavigator(conversation);
 
     /* ===== M-UI overhaul: theme, menus, modal, toast, search, mobile ===== */
     // theme (light / dark / system). Session-scoped only: the page intentionally

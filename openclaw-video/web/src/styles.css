@@ -682,6 +682,7 @@ textarea:focus-visible {
 
 /* Main chat */
 .cg-main {
+  position: relative;
   min-width: 0;
   min-height: 100vh;
   max-height: 100vh;
@@ -889,6 +890,115 @@ textarea:focus-visible {
 .cg-progress-label { margin: var(--space-2) 0 0; color: var(--text-muted); font-size: 12px; }
 .cg-progress-label-done { color: var(--success); }
 .cg-progress-label-failed { color: var(--danger); }
+
+.chat-scroll-navigator {
+  position: absolute;
+  top: 72px;
+  right: 10px;
+  bottom: 150px;
+  z-index: 12;
+  width: 32px;
+  pointer-events: none;
+}
+
+.chat-scroll-rail {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 32px;
+  min-width: 32px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.chat-scroll-rail:hover,
+.chat-scroll-navigator.open .chat-scroll-rail {
+  background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
+}
+
+.chat-scroll-ticks {
+  position: absolute;
+  inset: 8px 5px;
+}
+
+.chat-scroll-tick {
+  position: absolute;
+  right: 2px;
+  width: 12px;
+  min-width: 12px;
+  height: 2px;
+  min-height: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 42%, transparent);
+  box-shadow: none;
+  transform: translateY(-50%);
+  transition: width .16s ease, background .16s ease, opacity .16s ease;
+  opacity: .7;
+}
+
+.chat-scroll-tick:hover,
+.chat-scroll-tick.active {
+  width: 22px;
+  background: var(--brand);
+  opacity: 1;
+}
+
+.chat-scroll-panel {
+  position: absolute;
+  top: 0;
+  right: 36px;
+  width: min(360px, calc(100vw - 56px));
+  max-height: min(520px, 72vh);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  border-radius: 16px;
+  background: rgba(17, 24, 39, .88);
+  color: #f8fafc;
+  box-shadow: var(--shadow-popover);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+}
+
+:root[data-theme="light"] .chat-scroll-panel {
+  background: rgba(15, 23, 42, .86);
+}
+
+.chat-scroll-list {
+  max-height: inherit;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.chat-scroll-summary {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(248, 250, 252, .78);
+  box-shadow: none;
+  text-align: left;
+  font-size: 13px;
+  line-height: 38px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-scroll-summary:hover,
+.chat-scroll-summary.active {
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+}
 
 .cg-shots {
   display: grid;
@@ -1294,7 +1404,25 @@ pre,
   .cg-sidebar.drawer-open { transform: none; }
   .cg-main { max-height: none; min-height: 100vh; }
   .cg-conversation {
-    padding: var(--space-4) var(--space-4) 170px;
+    padding: var(--space-4) calc(var(--space-4) + 18px) 170px var(--space-4);
+  }
+  .chat-scroll-navigator {
+    top: 64px;
+    right: 2px;
+    bottom: 132px;
+    width: 28px;
+  }
+  .chat-scroll-rail {
+    width: 28px;
+    min-width: 28px;
+  }
+  .chat-scroll-panel {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: calc(94px + env(safe-area-inset-bottom));
+    width: calc(100vw - 48px);
+    max-height: 46vh;
   }
   .message { margin-bottom: var(--space-4); }
   .message > .cg-msg-inner { max-width: 88%; font-size: 15px; }
