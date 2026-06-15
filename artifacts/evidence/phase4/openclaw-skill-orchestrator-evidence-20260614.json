@@ -1,0 +1,95 @@
+{
+  "schema_version": "openclaw-skill-orchestrator-evidence.v1",
+  "created_at": "2026-06-14T23:18:00+08:00",
+  "scope": {
+    "plan": "openclaw-video-skill-orchestrator-modification-plan.md",
+    "primary_files": [
+      "openclaw-video/src/openclaw_video/orchestrator_skill.py",
+      "openclaw-video/src/openclaw_video/bridge_app.py",
+      "openclaw-video/openclaw/agents/main/AGENT.md",
+      "openclaw-video/tests/test_orchestrator_skill.py",
+      "openclaw-video/tests/test_bridge_app.py"
+    ]
+  },
+  "implemented": {
+    "python_skill_orchestrator": true,
+    "bridge_chat_uses_orchestrator": true,
+    "video_link_submission_uses_orchestrator": true,
+    "upload_submission_uses_orchestrator": true,
+    "initial_video_question_uses_orchestrator": true,
+    "analysis_detail_marker_written_once_per_session": true,
+    "internal_marker_filtered_from_messages_api_and_gateway_history": true,
+    "default_follow_up_uses_compact_knowledge": true,
+    "explicit_full_methodology_triggers_full_kb": true,
+    "legacy_env_flag": "OPENCLAW_ORCHESTRATOR_SKILL_ENABLED=0"
+  },
+  "covered_routes": [
+    "fixed_guardrail",
+    "fixed_waiting_for_video",
+    "fixed_video_analyzing",
+    "fixed_error_recovering",
+    "create_video_job",
+    "answer_initial_video_question",
+    "follow_up_opening",
+    "follow_up_script",
+    "follow_up_picture",
+    "follow_up_reshoot",
+    "follow_up_why_not_viral",
+    "follow_up_general",
+    "continue_previous",
+    "general_chat"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_orchestrator_skill.py tests/test_bridge_app.py",
+      "cwd": "openclaw-video",
+      "result": "78 passed, 1 warning"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q",
+      "cwd": "openclaw-video",
+      "result": "410 passed, 1 warning"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "openclaw-video/web",
+      "result": "passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "openclaw-video/web",
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q",
+      "cwd": "openclaw-video",
+      "result": "2026-06-15 rerun: 413 passed, 1 warning"
+    },
+    {
+      "command": "npm run typecheck && npm run build",
+      "cwd": "openclaw-video/web",
+      "result": "2026-06-15 rerun: passed"
+    },
+    {
+      "command": "OPENCLAW_VIDEO_ROOT=/app/bin/openclaw-video/current/openclaw-video bash scripts/root_rebuild_bridge_fast.sh",
+      "cwd": "Dify",
+      "result": "2026-06-15 rerun: bridge_fast_rebuild=PASS; openclaw-bridge image=openclaw-video-openclaw-bridge:fast"
+    },
+    {
+      "command": "docker exec openclaw-video-openclaw-bridge-1 python -c \"import openclaw_video.orchestrator_skill as s; print(s.SkillOrchestrator.__name__, s.CONTEXT_MARKER_PREFIX)\"",
+      "cwd": "Dify",
+      "result": "SkillOrchestrator __openclaw_context_marker__"
+    },
+    {
+      "command": "curl -fsS http://127.0.0.1:18181/healthz && curl -fsS http://127.0.0.1:18181/ai/agent/",
+      "cwd": "Dify",
+      "result": "2026-06-15 rerun: health ok; /ai/agent/ served built assets"
+    }
+  ],
+  "notes": [
+    "普通追问不再默认注入完整知识库，只注入 intent/keyword 相关短视频方法论。",
+    "完整知识库仅在用户明确要求完整知识库、完整方法论、系统性、全链路或深度完整诊断时注入，并受 OPENCLAW_FULL_KB_MAX_CHARS 限制。",
+    "analysis_detail 首次追问 detail_once 注入后写入 system marker；/messages 和 Gateway history 均过滤该 marker。",
+    "OPENCLAW_ORCHESTRATOR_SKILL_ENABLED=0 可回退到 legacy Bridge prompt 行为。"
+  ]
+}

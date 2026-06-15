@@ -159,6 +159,23 @@ class FakeGateway:
         return GatewayChatResult(content=content, raw={"content": content})
 
 
+class SpyOrchestrator:
+    def __init__(self, inner=None):
+        from openclaw_video.orchestrator_skill import SkillOrchestrator
+
+        self.inner = inner or SkillOrchestrator()
+        self.decide_calls = []
+        self.initial_question_calls = []
+
+    def decide(self, payload):
+        self.decide_calls.append(payload)
+        return self.inner.decide(payload)
+
+    def decide_initial_video_question(self, payload):
+        self.initial_question_calls.append(payload)
+        return self.inner.decide_initial_video_question(payload)
+
+
 def video_link_read_check_fixture():
     return {
         "schema_version": "openclaw-video-link-read-check.v1",
@@ -981,6 +998,42 @@ class BridgeAppTests(unittest.TestCase):
         self.assertEqual(messages.status_code, 200, messages.text)
         self.assertEqual(messages.json()["messages"][0]["video_url"], job["video_url_canonical"])
 
+    def test_job_and_upload_submission_paths_call_orchestrator_skill(self):
+        from openclaw_video.bridge_app import create_app
+
+        sessions = InMemorySessionStore()
+        jobs = InMemoryJobStore()
+        spy = SpyOrchestrator()
+        client = TestClient(
+            create_app(
+                dify=FakeDifyClient(),
+                session_store=sessions,
+                job_store=jobs,
+                gateway=FakeGateway(),
+                orchestrator=spy,
+                identity_secret="test-secret",
+            )
+        )
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        link_response = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        )
+        with TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BRIDGE_UPLOAD_DIR": tmp, "MAX_UPLOAD_BYTES": "64"}):
+            upload_response = client.post(
+                "/openclaw-api/uploads",
+                data={"session_id": session["id"], "content": "upload"},
+                files={"video": ("sample.mp4", b"video", "video/mp4")},
+                headers=self.auth("account-a"),
+            )
+
+        self.assertEqual(link_response.status_code, 202, link_response.text)
+        self.assertEqual(upload_response.status_code, 202, upload_response.text)
+        self.assertEqual(len(spy.decide_calls), 2)
+        self.assertTrue(spy.decide_calls[0].is_video_submission)
+        self.assertTrue(spy.decide_calls[1].is_upload_submission)
+
     def test_upload_job_requires_login_and_supported_extension(self):
         session = self.create_session("account-a")
         with TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"BRIDGE_UPLOAD_DIR": tmp}):
@@ -1411,8 +1464,9 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("reply to 开头怎么改", content)
         sent = gateway.requests[-1].content
         self.assertIn("00:00-00:03 详细画面", sent)
-        self.assertIn("完整知识库原文", sent)
-        self.assertIn("完整回答模板", sent)
+        self.assertIn("前 3 秒钩子要点", sent)
+        self.assertNotIn("完整知识库原文", sent)
+        self.assertNotIn("完整回答模板", sent)
         self.assertIn("用户消息：开头怎么改", sent)
 
     def test_xiaohongshu_share_title_before_link_does_not_trigger_initial_question_answer(self):
@@ -1717,7 +1771,61 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("00:00-00:03 详细画面和声音", sent)
         self.assertNotIn("短摘要\n\n用户消息", sent)
 
-    def test_chat_follow_up_injects_full_mounted_knowledge_context(self):
+    def test_chat_first_follow_up_writes_marker_and_messages_filter_it(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        payload = self._analysis_result("短摘要")
+        payload["analysis_detail"] = "00:00-00:03 首次完整 detail"
+        self.jobs.complete_job(job["job_id"], payload, "openclaw-video-result.v1")
+
+        first = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "开头怎么改"},
+            headers=self.auth("account-a"),
+        )
+        second = client.post(
+            "/openclaw-api/chat",
+            json={"session_id": session["id"], "content": "脚本怎么改"},
+            headers=self.auth("account-a"),
+        )
+        visible = client.get(f"/openclaw-api/sessions/{session['id']}/messages", headers=self.auth("account-a"))
+
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        owner = self.sessions.get_session(session["id"]).owner_principal_id
+        raw_messages = self.sessions.list_messages(session["id"], owner)
+        markers = [item for item in raw_messages if item.role == "system" and item.content.startswith("__openclaw_context_marker__")]
+        self.assertEqual(len(markers), 1)
+        self.assertEqual([item["role"] for item in visible.json()["messages"]].count("system"), 0)
+        self.assertTrue(all(not item["content"].startswith("__openclaw_context_marker__") for item in visible.json()["messages"]))
+        self.assertIn("00:00-00:03 首次完整 detail", gateway.requests[0].content)
+        self.assertIn("00:00-00:03 首次完整 detail", gateway.requests[1].content)
+
+    def test_gateway_history_filters_internal_marker(self):
+        gateway = FakeGateway()
+        client = self._chat_client(gateway)
+        session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+        job = client.post(
+            "/openclaw-api/jobs",
+            json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+            headers=self.auth("account-a"),
+        ).json()["job"]
+        payload = self._analysis_result("短摘要")
+        payload["analysis_detail"] = "详细分析"
+        self.jobs.complete_job(job["job_id"], payload, "openclaw-video-result.v1")
+        client.post("/openclaw-api/chat", json={"session_id": session["id"], "content": "开头怎么改"}, headers=self.auth("account-a"))
+        client.post("/openclaw-api/chat", json={"session_id": session["id"], "content": "为什么不爆"}, headers=self.auth("account-a"))
+
+        history_contents = [item["content"] for item in gateway.requests[-1].history]
+        self.assertTrue(all(not content.startswith("__openclaw_context_marker__") for content in history_contents))
+
+    def test_chat_follow_up_uses_compact_knowledge_by_default(self):
         gateway = FakeGateway()
         with TemporaryDirectory() as tmp:
             knowledge_root = Path(tmp)
@@ -1743,10 +1851,81 @@ class BridgeAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200, response.text)
         sent = gateway.requests[-1].content
+        self.assertNotIn("完整爆款知识库原文", sent)
+        self.assertNotIn("完整画面方法论原文", sent)
+        self.assertNotIn("完整回答模板原文", sent)
+        self.assertIn("前 3 秒钩子要点", sent)
+        self.assertIn("00:00-00:03 真实视频详细分析", sent)
+
+    def test_chat_follow_up_injects_full_mounted_knowledge_only_when_requested(self):
+        gateway = FakeGateway()
+        with TemporaryDirectory() as tmp:
+            knowledge_root = Path(tmp)
+            (knowledge_root / "爆款短视频制作与分析知识库.md").write_text("完整爆款知识库原文", encoding="utf-8")
+            (knowledge_root / "短视频画面设计方法论.md").write_text("完整画面方法论原文", encoding="utf-8")
+            (knowledge_root / "爆火视屏回答模版.txt").write_text("完整回答模板原文", encoding="utf-8")
+            with mock.patch.dict(os.environ, {"KNOWLEDGE_BASE_DIR": str(knowledge_root)}):
+                client = self._chat_client(gateway)
+                session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+                job = client.post(
+                    "/openclaw-api/jobs",
+                    json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+                    headers=self.auth("account-a"),
+                ).json()["job"]
+                payload = self._analysis_result("短摘要")
+                payload["analysis_detail"] = "00:00-00:03 真实视频详细分析"
+                self.jobs.complete_job(job["job_id"], payload, "openclaw-video-result.v1")
+                response = client.post(
+                    "/openclaw-api/chat",
+                    json={"session_id": session["id"], "content": "按完整方法论完整诊断"},
+                    headers=self.auth("account-a"),
+                )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        sent = gateway.requests[-1].content
         self.assertIn("完整爆款知识库原文", sent)
         self.assertIn("完整画面方法论原文", sent)
         self.assertIn("完整回答模板原文", sent)
-        self.assertIn("00:00-00:03 真实视频详细分析", sent)
+
+    def test_orchestrator_skill_can_be_disabled_for_legacy_full_kb_behavior(self):
+        from openclaw_video.bridge_app import create_app
+
+        gateway = FakeGateway()
+        sessions = InMemorySessionStore()
+        jobs = InMemoryJobStore()
+        with TemporaryDirectory() as tmp:
+            knowledge_root = Path(tmp)
+            (knowledge_root / "爆款短视频制作与分析知识库.md").write_text("legacy 完整知识库", encoding="utf-8")
+            (knowledge_root / "短视频画面设计方法论.md").write_text("", encoding="utf-8")
+            (knowledge_root / "爆火视屏回答模版.txt").write_text("", encoding="utf-8")
+            with mock.patch.dict(
+                os.environ,
+                {"KNOWLEDGE_BASE_DIR": str(knowledge_root), "OPENCLAW_ORCHESTRATOR_SKILL_ENABLED": "0"},
+            ):
+                client = TestClient(
+                    create_app(
+                        dify=FakeDifyClient(),
+                        session_store=sessions,
+                        job_store=jobs,
+                        gateway=gateway,
+                        identity_secret="test-secret",
+                    )
+                )
+                session = client.post("/openclaw-api/sessions", json={"title": "c"}, headers=self.auth("account-a")).json()["session"]
+                job = client.post(
+                    "/openclaw-api/jobs",
+                    json={"session_id": session["id"], "video_url": "https://v.douyin.com/abc"},
+                    headers=self.auth("account-a"),
+                ).json()["job"]
+                jobs.complete_job(job["job_id"], self._analysis_result("短摘要"), "openclaw-video-result.v1")
+                response = client.post(
+                    "/openclaw-api/chat",
+                    json={"session_id": session["id"], "content": "开头怎么改"},
+                    headers=self.auth("account-a"),
+                )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("legacy 完整知识库", gateway.requests[-1].content)
 
     def test_chat_continue_uses_previous_assistant_tail_analysis_and_knowledge(self):
         gateway = FakeGateway()
@@ -1786,8 +1965,8 @@ class BridgeAppTests(unittest.TestCase):
         self.assertIn("不要重新开题", sent)
         self.assertIn("## 结尾 10-15 秒\n所以，", sent)
         self.assertIn("00:00-00:03 真实视频详细分析", sent)
-        self.assertIn("完整爆款知识库原文", sent)
-        self.assertIn("完整回答模板原文", sent)
+        self.assertNotIn("完整爆款知识库原文", sent)
+        self.assertNotIn("完整回答模板原文", sent)
         self.assertIn("用户消息：继续", sent)
 
     def test_simulated_user_chat_paths_cover_state_machine_branches(self):

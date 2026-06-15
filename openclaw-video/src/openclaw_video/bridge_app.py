@@ -69,17 +69,14 @@ from .video_limits import (
 )
 from .agent_persona import (
     NEW_SESSION_GREETING,
-    build_agent_message,
-    build_branch_prompt,
-    build_continue_prompt,
-    current_video_from_history,
-    derive_state,
-    detect_intent,
     error_reply_for,
-    fixed_state_reply,
-    guardrail_for_message,
-    is_continue_request,
-    load_full_knowledge_context,
+)
+from .orchestrator_skill import (
+    ContextMarker,
+    LegacyBridgeOrchestrator,
+    OrchestratorInput,
+    SkillOrchestrator,
+    is_internal_context_marker,
 )
 
 
@@ -106,6 +103,10 @@ def _serialize_message(message: BridgeMessage) -> dict[str, Any]:
         "job_id": message.job_id,
         "created_at": _serialize_dt(message.created_at),
     }
+
+
+def _visible_messages(messages: list[BridgeMessage] | tuple[BridgeMessage, ...]) -> list[BridgeMessage]:
+    return [message for message in messages if not is_internal_context_marker(message)]
 
 
 def _serialize_job(job: VideoJob) -> dict[str, Any]:
@@ -472,6 +473,7 @@ def create_app(
     session_store: Any | None = None,
     job_store: Any | None = None,
     gateway: Any | None = None,
+    orchestrator: Any | None = None,
     openclaw_authenticator: Any | None = None,
     identity_secret: str | None = None,
     inject_session_greeting: bool | None = None,
@@ -487,6 +489,9 @@ def create_app(
     session_store = session_store or _default_session_store()
     job_store = job_store or _default_job_store()
     gateway = gateway or OpenClawGatewayWsClient.from_environment()
+    if orchestrator is None:
+        skill_enabled = os.environ.get("OPENCLAW_ORCHESTRATOR_SKILL_ENABLED", "1").lower() in {"1", "true", "yes"}
+        orchestrator = SkillOrchestrator() if skill_enabled else LegacyBridgeOrchestrator()
     openclaw_authenticator = openclaw_authenticator or default_openclaw_authenticator()
     identity_secret = identity_secret if identity_secret is not None else os.environ.get("BRIDGE_IDENTITY_SECRET", "")
     if inject_session_greeting is None:
@@ -552,6 +557,87 @@ def create_app(
             return False
         return True
 
+    def _latest_video_context(
+        principal: DifyPrincipal,
+        history: list[BridgeMessage] | tuple[BridgeMessage, ...],
+    ) -> tuple[str | None, str | None, str | None, dict[str, Any] | None]:
+        for message in reversed(tuple(history)):
+            job_id = getattr(message, "job_id", None)
+            if not job_id:
+                continue
+            try:
+                job = job_store.get_job(job_id, principal.principal_id)
+            except (JobNotFound, JobOwnershipError):
+                continue
+            status = getattr(job.status, "value", str(job.status))
+            result_payload: dict[str, Any] | None = None
+            if status in {"succeeded", "completed"}:
+                try:
+                    video_result = job_store.get_result(job_id, principal.principal_id)
+                    payload = getattr(video_result, "result", None)
+                    if isinstance(payload, dict):
+                        result_payload = payload
+                except (JobNotFound, JobOwnershipError):
+                    result_payload = None
+            return job_id, status, getattr(job, "error_code", None), result_payload
+        return None, None, None, None
+
+    def _orchestrator_input(
+        *,
+        principal: DifyPrincipal,
+        session_id: str,
+        history: list[BridgeMessage] | tuple[BridgeMessage, ...],
+        content: str,
+        is_video_submission: bool = False,
+        is_upload_submission: bool = False,
+        current_video_result: dict[str, Any] | None = None,
+        current_video_job_id: str | None = None,
+        current_video_status: str | None = None,
+        current_video_error_code: str | None = None,
+    ) -> OrchestratorInput:
+        latest_job_id, latest_status, latest_error, latest_result = _latest_video_context(principal, history)
+        previous_assistant = next(
+            (item.content for item in reversed(tuple(history)) if item.role == "assistant" and item.content.strip()),
+            "",
+        )
+        return OrchestratorInput(
+            principal_id=principal.principal_id,
+            session_id=session_id,
+            history=tuple(history),
+            user_content=content,
+            current_video_job_id=current_video_job_id or latest_job_id,
+            current_video_status=current_video_status or latest_status,
+            current_video_error_code=current_video_error_code or latest_error,
+            current_video_result=current_video_result if current_video_result is not None else latest_result,
+            has_uploaded_or_link_video=is_video_submission or is_upload_submission,
+            is_video_submission=is_video_submission,
+            is_upload_submission=is_upload_submission,
+            previous_assistant=previous_assistant,
+        )
+
+    def _gateway_history(history: list[BridgeMessage] | tuple[BridgeMessage, ...]) -> tuple[dict[str, str], ...]:
+        return tuple({"role": item.role, "content": item.content} for item in _visible_messages(tuple(history)))
+
+    def _write_analysis_context_marker(
+        principal: DifyPrincipal,
+        *,
+        session_id: str,
+        history: list[BridgeMessage] | tuple[BridgeMessage, ...],
+        job_id: str | None,
+    ) -> None:
+        if any(is_internal_context_marker(item) for item in history):
+            return
+        try:
+            session_store.add_message(
+                session_id,
+                principal.principal_id,
+                "system",
+                ContextMarker.content(session_id=session_id, job_id=job_id),
+                job_id=job_id,
+            )
+        except (SessionNotFound, SessionOwnershipError, MessageValidationError):
+            return
+
     async def _answer_video_submission_question(
         principal: DifyPrincipal,
         job: VideoJob,
@@ -565,24 +651,37 @@ def create_app(
             history = session_store.list_messages(job.bridge_session_id, principal.principal_id)
         except (SessionNotFound, SessionOwnershipError):
             return ""
-        agent_content = build_branch_prompt(
-            question,
-            state="follow_up",
-            intent=detect_intent(question),
-            analysis_context=_analysis_detail_from_result(result),
-            knowledge_context=load_full_knowledge_context(),
+        payload = getattr(result, "result", None)
+        decision = orchestrator.decide_initial_video_question(
+            _orchestrator_input(
+                principal=principal,
+                session_id=job.bridge_session_id,
+                history=history,
+                content=question,
+                current_video_job_id=job.job_id,
+                current_video_status=getattr(job.status, "value", str(job.status)),
+                current_video_error_code=getattr(job, "error_code", None),
+                current_video_result=payload if isinstance(payload, dict) else None,
+            )
         )
         chat_request = GatewayChatRequest(
             routing_user=session.openclaw_routing_user,
             session_id=session.id,
             message_id=f"{job.job_id}:initial-question",
-            content=agent_content,
-            history=tuple({"role": item.role, "content": item.content} for item in history),
+            content=decision.prompt,
+            history=_gateway_history(history),
         )
         try:
             gateway_result = await gateway.chat(chat_request)
         except (GatewayNotConfigured, GatewayError):
             return ""
+        if decision.analysis_context_injected:
+            _write_analysis_context_marker(
+                principal,
+                session_id=job.bridge_session_id,
+                history=history,
+                job_id=job.job_id,
+            )
         return str(gateway_result.content or "").strip()
 
     async def ensure_job_assistant_message(principal: DifyPrincipal, job: VideoJob, content: str) -> str:
@@ -1004,7 +1103,7 @@ def create_app(
             messages = session_store.list_messages(session_id, principal.principal_id)
         except (SessionNotFound, SessionOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="session not found") from exc
-        return {"messages": [_serialize_message(item) for item in messages]}
+        return {"messages": [_serialize_message(item) for item in _visible_messages(messages)]}
 
     @app.post("/openclaw-api/sessions/{session_id}/messages")
     @app.post("/ai/openclaw-api/sessions/{session_id}/messages")
@@ -1051,8 +1150,20 @@ def create_app(
             raise HTTPException(status_code=400, detail="session_id and video_url are required")
         try:
             session_store.get_session(session_id, principal.principal_id)
+            history = session_store.list_messages(session_id, principal.principal_id)
         except (SessionNotFound, SessionOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="session not found") from exc
+        decision = orchestrator.decide(
+            _orchestrator_input(
+                principal=principal,
+                session_id=session_id,
+                history=history,
+                content=str(payload.get("content") or "Analyze video"),
+                is_video_submission=True,
+            )
+        )
+        if not decision.should_create_video_job:
+            raise HTTPException(status_code=400, detail="video job route was not accepted")
         idempotency_key = payload.get("idempotency_key")
         normalized_idempotency_key = str(idempotency_key) if idempotency_key else None
         if normalized_idempotency_key and hasattr(job_store, "get_job_by_idempotency"):
@@ -1130,6 +1241,7 @@ def create_app(
             raise HTTPException(status_code=400, detail="session_id and video file are required")
         try:
             session_store.get_session(session_id, principal.principal_id)
+            history = session_store.list_messages(session_id, principal.principal_id)
             enforce_job_submission_controls(principal)
             max_upload_bytes = positive_int_from_env("MAX_UPLOAD_BYTES", phase4_config.max_upload_bytes)
             _validate_upload_mime_type(file)
@@ -1145,6 +1257,17 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         finally:
             await file.close()
+        decision = orchestrator.decide(
+            _orchestrator_input(
+                principal=principal,
+                session_id=session_id,
+                history=history,
+                content=content,
+                is_upload_submission=True,
+            )
+        )
+        if not decision.should_create_video_job:
+            raise HTTPException(status_code=400, detail="upload job route was not accepted")
         job = job_store.create_job(
             principal.principal_id,
             session_id,
@@ -1289,141 +1412,53 @@ def create_app(
         content = str(payload.get("content") or "").strip()
         if not session_id or not content:
             raise HTTPException(status_code=400, detail="session_id and content are required")
-        if isinstance(gateway, DisabledGatewayClient):
-            raise HTTPException(status_code=501, detail="offline draft has no Gateway chat adapter")
         try:
             session = session_store.get_session(session_id, principal.principal_id)
             history = session_store.list_messages(session_id, principal.principal_id)
-            user_message = session_store.add_message(session_id, principal.principal_id, "user", content)
         except (SessionNotFound, SessionOwnershipError) as exc:
             raise HTTPException(status_code=404, detail="session not found") from exc
+
+        decision = orchestrator.decide(
+            _orchestrator_input(
+                principal=principal,
+                session_id=session_id,
+                history=history,
+                content=content,
+            )
+        )
+
+        if decision.fixed_reply is not None:
+            try:
+                session_store.add_message(session_id, principal.principal_id, "user", content)
+                assistant_message = session_store.add_message(
+                    session_id, principal.principal_id, "assistant", decision.fixed_reply,
+                )
+            except MessageValidationError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "message": _serialize_message(assistant_message),
+                    "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
+                },
+            )
+
+        if not decision.should_call_gateway:
+            raise HTTPException(status_code=400, detail="unsupported chat route")
+        if isinstance(gateway, DisabledGatewayClient):
+            raise HTTPException(status_code=501, detail="offline draft has no Gateway chat adapter")
+        try:
+            user_message = session_store.add_message(session_id, principal.principal_id, "user", content)
         except MessageValidationError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-        # ── Bridge-side guardrails (M2) ──────────────────────────────────
-        # Rule 1: non-douyin URL or profile link → fixed reply, skip agent.
-        guardrail = guardrail_for_message(content)
-        if guardrail is not None:
-            assistant_message = session_store.add_message(
-                session_id, principal.principal_id, "assistant", guardrail.content,
-            )
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "message": _serialize_message(assistant_message),
-                    "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
-                },
-            )
-
-        # Rule 2: detect intent + derive conversation state. State is derived
-        # from persisted message + job history (no DB stage column). Deterministic
-        # guidance/error branches are answered with fixed Bridge copy; coaching
-        # branches (feedback_given / follow_up) call the agent with the real
-        # analysis summary injected.
-        intent = detect_intent(content)
-        is_first_turn = not any(msg.role == "user" for msg in history)
-        has_terminal_video = any(getattr(msg, "job_id", None) for msg in history)
-
-        def _job_status(job_id: str) -> str | None:
-            try:
-                job = job_store.get_job(job_id, principal.principal_id)
-            except (JobNotFound, JobOwnershipError):
-                return None
-            return getattr(job.status, "value", str(job.status))
-
-        # Latest video job (newest message with a job_id) → analyzing/failed signal.
-        latest_status: str | None = None
-        latest_error_code: str | None = None
-        try:
-            for msg in reversed(history):
-                jid = getattr(msg, "job_id", None)
-                if not jid:
-                    continue
-                try:
-                    job = job_store.get_job(jid, principal.principal_id)
-                except (JobNotFound, JobOwnershipError):
-                    continue
-                latest_status = getattr(job.status, "value", str(job.status))
-                latest_error_code = getattr(job, "error_code", None)
-                break
-        except Exception:
-            pass
-        video_failed = latest_status in {"failed", "timed_out", "cancelled"}
-        video_analyzing = latest_status in {"queued", "running"}
-        current_video_job_id, _current_video_url = current_video_from_history(history, _job_status)
-        has_current_video = current_video_job_id is not None
-        previous_assistant = next(
-            (msg.content for msg in reversed(history) if msg.role == "assistant" and msg.content.strip()),
-            "",
-        )
-        wants_continuation = bool(previous_assistant and is_continue_request(content))
-
-        state = derive_state(
-            has_user_history=not is_first_turn,
-            has_terminal_video=has_terminal_video,
-            video_failed=video_failed,
-            intent=intent,
-            has_current_video=has_current_video,
-            video_analyzing=video_analyzing,
-        )
-
-        # ── Branch A: deterministic Bridge reply (no agent call) ─────────
-        fixed_reply = error_reply_for(latest_error_code) if video_failed else fixed_state_reply(state, intent)
-        if fixed_reply is not None and not wants_continuation:
-            assistant_message = session_store.add_message(
-                session_id, principal.principal_id, "assistant", fixed_reply,
-            )
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "message": _serialize_message(assistant_message),
-                    "session": _serialize_session(session_store.get_session(session_id, principal.principal_id)),
-                },
-            )
-
-        # ── Branch B: agent-generated reply ─────────────────────────────
-        if wants_continuation:
-            analysis_summary: str | None = None
-            if current_video_job_id:
-                try:
-                    video_result = job_store.get_result(current_video_job_id, principal.principal_id)
-                    payload = getattr(video_result, "result", None)
-                    if isinstance(payload, dict):
-                        analysis_summary = str(payload.get("analysis_detail") or payload.get("summary") or "")
-                except (JobNotFound, JobOwnershipError):
-                    pass
-            agent_content = build_continue_prompt(
-                content,
-                previous_assistant=previous_assistant,
-                analysis_context=analysis_summary,
-                knowledge_context=load_full_knowledge_context(),
-            )
-        elif state in {"feedback_given", "follow_up"} and current_video_job_id:
-            analysis_summary: str | None = None
-            try:
-                video_result = job_store.get_result(current_video_job_id, principal.principal_id)
-                payload = getattr(video_result, "result", None)
-                if isinstance(payload, dict):
-                    analysis_summary = str(payload.get("analysis_detail") or payload.get("summary") or "")
-            except (JobNotFound, JobOwnershipError):
-                pass
-            agent_content = build_branch_prompt(
-                content,
-                state=state,
-                intent=intent,
-                analysis_context=analysis_summary,
-                knowledge_context=load_full_knowledge_context(),
-            )
-        else:
-            agent_content = build_agent_message(content, is_first_turn=is_first_turn, state=state)
 
         # ── OpenClaw Gateway agent call ──────────────────────────────────
         chat_request = GatewayChatRequest(
             routing_user=session.openclaw_routing_user,
             session_id=session.id,
             message_id=user_message.id,
-            content=agent_content,
-            history=tuple({"role": item.role, "content": item.content} for item in history),
+            content=decision.prompt,
+            history=_gateway_history(history),
         )
         try:
             result = await gateway.chat(chat_request)
@@ -1437,6 +1472,13 @@ def create_app(
             "assistant",
             result.content,
         )
+        if decision.analysis_context_injected:
+            _write_analysis_context_marker(
+                principal,
+                session_id=session_id,
+                history=history,
+                job_id=decision.debug.get("job_id") or _latest_video_context(principal, history)[0],
+            )
         return JSONResponse(
             status_code=200,
             content={
