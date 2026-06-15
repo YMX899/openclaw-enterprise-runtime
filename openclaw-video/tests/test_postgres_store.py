@@ -91,6 +91,7 @@ class PostgresJobStoreTests(unittest.TestCase):
         now = datetime(2026, 6, 6, tzinfo=UTC)
         fake = FakeConnection(
             [
+                {"state": "idle"},
                 job_row(
                     status="running",
                     started_at=now,
@@ -103,7 +104,7 @@ class PostgresJobStoreTests(unittest.TestCase):
         )
         store = PostgresJobStore(connection_factory=lambda: fake)
         job = store.claim_next("worker-a", 120)
-        sql, params = fake.queries[0]
+        sql, params = fake.queries[1]
         self.assertIn("FOR UPDATE SKIP LOCKED", sql)
         self.assertIn("active.bridge_session_id = video_jobs.bridge_session_id", sql)
         self.assertEqual(params, ("worker-a", 120))
@@ -178,6 +179,39 @@ class PostgresJobStoreTests(unittest.TestCase):
         lease = store.acquire_lane_lease("video_model_request", worker_id="worker-a", max_concurrent=200, lease_seconds=900)
         self.assertEqual(lease, ("lease-1", 3))
         self.assertIn("generate_series", fake.queries[1][0])
+
+    def test_worker_heartbeat_preserves_draining_state(self):
+        fake = FakeConnection([])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        store.heartbeat_worker("worker-a", state="idle")
+        sql, params = fake.queries[0]
+        self.assertIn("video_worker_registry", sql)
+        self.assertIn("WHEN video_worker_registry.state = 'draining'", sql)
+        self.assertEqual(params, ("worker-a", "idle", None))
+
+    def test_claim_next_skips_draining_worker(self):
+        fake = FakeConnection([{"state": "draining"}])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        job = store.claim_next("worker-a", 120)
+        self.assertIsNone(job)
+        self.assertIn("SELECT state FROM video_worker_registry", fake.queries[0][0])
+        self.assertIn("video_worker_registry", fake.queries[1][0])
+        self.assertNotIn("WITH next_job", "\n".join(sql for sql, _params in fake.queries))
+
+    def test_request_worker_drain_sets_draining(self):
+        fake = FakeConnection([])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        store.request_worker_drain("worker-a")
+        sql, params = fake.queries[0]
+        self.assertIn("state = 'draining'", sql)
+        self.assertEqual(params, ("worker-a",))
+
+    def test_count_video_jobs_by_status_returns_active_counts(self):
+        fake = FakeConnection([[{"status": "queued", "count": 2}, {"status": "running", "count": 3}]])
+        store = PostgresJobStore(connection_factory=lambda: fake)
+        counts = store.count_video_jobs_by_status()
+        self.assertEqual(counts, {"queued": 2, "running": 3})
+        self.assertIn("status IN ('queued', 'running')", fake.queries[0][0])
 
     def test_get_job_by_idempotency_uses_owner_session_and_key(self):
         fake = FakeConnection([job_row(idempotency_key="same-request")])

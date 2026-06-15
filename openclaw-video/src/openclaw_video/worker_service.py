@@ -232,6 +232,8 @@ class VideoAnalysisWorker:
         job = self.store.claim_next(self.config.worker_id, self.config.timeout_seconds)
         if not job:
             return None
+        if hasattr(self.store, "heartbeat_worker"):
+            self.store.heartbeat_worker(self.config.worker_id, state="running", current_job_id=job.job_id)  # type: ignore[attr-defined]
         stop_heartbeat = self._start_heartbeat(job)
         try:
             if is_upload_uri(job.video_url_canonical):
@@ -274,3 +276,7 @@ class VideoAnalysisWorker:
             return self.store.get_job(job.job_id)
         finally:
             stop_heartbeat()
+            if hasattr(self.store, "is_worker_draining") and self.store.is_worker_draining(self.config.worker_id):  # type: ignore[attr-defined]
+                self.store.heartbeat_worker(self.config.worker_id, state="draining")  # type: ignore[attr-defined]
+            elif hasattr(self.store, "heartbeat_worker"):
+                self.store.heartbeat_worker(self.config.worker_id, state="idle")  # type: ignore[attr-defined]

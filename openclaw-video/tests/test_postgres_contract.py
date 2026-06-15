@@ -4,7 +4,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "database" / "migrations" / "001_init.sql"
+WORKER_REGISTRY_MIGRATION = ROOT / "database" / "migrations" / "004_worker_registry.sql"
 ROLLBACK = ROOT / "database" / "rollback" / "001_init_down.sql"
+WORKER_REGISTRY_ROLLBACK = ROOT / "database" / "rollback" / "004_worker_registry_down.sql"
 ADAPTER = ROOT / "src" / "openclaw_video" / "postgres_store.py"
 WORKER_MAIN = ROOT / "src" / "openclaw_video" / "worker_main.py"
 
@@ -22,6 +24,8 @@ class PostgresContractTests(unittest.TestCase):
             "video_jobs_idempotency_idx",
             "model_api_key_cooldowns",
             "model_lane_leases",
+            "video_worker_registry",
+            "video_worker_registry_seen_idx",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, sql)
@@ -37,9 +41,18 @@ class PostgresContractTests(unittest.TestCase):
             "WHERE idempotency_key IS NOT NULL",
             "model_api_key_cooldowns",
             "model_lane_leases",
+            "video_worker_registry",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, source)
+
+    def test_worker_registry_incremental_migration_and_rollback_exist(self):
+        migration = WORKER_REGISTRY_MIGRATION.read_text(encoding="utf-8")
+        rollback = WORKER_REGISTRY_ROLLBACK.read_text(encoding="utf-8")
+        self.assertIn("CREATE TABLE IF NOT EXISTS video_worker_registry", migration)
+        self.assertIn("state text NOT NULL", migration)
+        self.assertIn("video_worker_registry_seen_idx", migration)
+        self.assertIn("DROP TABLE IF EXISTS video_worker_registry;", rollback)
 
     def test_rollback_script_drops_bridge_objects_only(self):
         rollback = ROLLBACK.read_text(encoding="utf-8")
@@ -47,6 +60,7 @@ class PostgresContractTests(unittest.TestCase):
             "tenant_gateway_mapping",
             "model_lane_leases",
             "model_api_key_cooldowns",
+            "video_worker_registry",
             "user_memory",
             "video_results",
             "video_jobs",
@@ -70,6 +84,8 @@ class PostgresContractTests(unittest.TestCase):
             "MAX_VIDEO_FRAMES",
             "VideoAnalysisWorker",
             "VIDEO_MODEL_MAX_CONCURRENT",
+            "heartbeat_worker",
+            "mark_worker_stopped",
         ]:
             with self.subTest(required=required):
                 self.assertIn(required, source)

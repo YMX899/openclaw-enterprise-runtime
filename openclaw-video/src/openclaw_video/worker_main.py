@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import signal
 import socket
 import time
 
@@ -16,6 +17,10 @@ from .video_limits import (
 from .worker_service import VideoAnalysisWorker, WorkerConfig
 
 
+class WorkerShutdownRequested(Exception):
+    pass
+
+
 def resolve_worker_id() -> str:
     configured = os.environ.get("WORKER_ID", "").strip()
     if configured:
@@ -28,6 +33,13 @@ def main() -> None:
     """Worker entrypoint for the V1 low-concurrency durable queue."""
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+    def _request_shutdown(signum: int, _frame: object) -> None:
+        raise WorkerShutdownRequested(f"worker shutdown requested by signal {signum}")
+
+    signal.signal(signal.SIGTERM, _request_shutdown)
+    signal.signal(signal.SIGINT, _request_shutdown)
+
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         raise RuntimeError("DATABASE_URL is required for video-analysis-worker")
@@ -71,11 +83,19 @@ def main() -> None:
             video_model_lane_wait_seconds=video_model_lane_wait_seconds,
         ),
     )
-    while True:
-        store.recover_expired_leases()
-        job = worker.run_once()
-        if job is None:
-            time.sleep(interval)
+    try:
+        try:
+            while True:
+                state = "draining" if store.is_worker_draining(worker_id) else "idle"
+                store.heartbeat_worker(worker_id, state=state)
+                store.recover_expired_leases()
+                job = worker.run_once()
+                if job is None:
+                    time.sleep(interval)
+        except WorkerShutdownRequested:
+            logging.info("video-analysis-worker shutdown requested", extra={"worker_id": worker_id})
+    finally:
+        store.mark_worker_stopped(worker_id)
 
 
 if __name__ == "__main__":

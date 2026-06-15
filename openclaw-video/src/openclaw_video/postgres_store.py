@@ -280,6 +280,115 @@ class PostgresSessionStore(_BasePostgresStore):
 
 
 class PostgresJobStore(_BasePostgresStore):
+    def heartbeat_worker(self, worker_id: str, *, state: str = "idle", current_job_id: str | None = None) -> None:
+        if state not in {"idle", "running", "draining", "stopped"}:
+            raise ValueError("unsupported worker state")
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO video_worker_registry
+                      (worker_id, state, current_job_id, last_seen_at, updated_at)
+                    VALUES (%s, %s, %s, now(), now())
+                    ON CONFLICT (worker_id) DO UPDATE
+                    SET state = CASE
+                          WHEN video_worker_registry.state = 'draining' AND EXCLUDED.state <> 'stopped'
+                            THEN 'draining'
+                          ELSE EXCLUDED.state
+                        END,
+                        current_job_id = EXCLUDED.current_job_id,
+                        last_seen_at = now(),
+                        updated_at = now()
+                    """,
+                    (worker_id, state, current_job_id),
+                )
+
+    def mark_worker_stopped(self, worker_id: str) -> None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO video_worker_registry
+                      (worker_id, state, current_job_id, last_seen_at, updated_at)
+                    VALUES (%s, 'stopped', NULL, now(), now())
+                    ON CONFLICT (worker_id) DO UPDATE
+                    SET state = 'stopped',
+                        current_job_id = NULL,
+                        last_seen_at = now(),
+                        updated_at = now()
+                    """,
+                    (worker_id,),
+                )
+
+    def is_worker_draining(self, worker_id: str) -> bool:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT state FROM video_worker_registry WHERE worker_id = %s",
+                    (worker_id,),
+                )
+                row = cur.fetchone()
+        return bool(row and row.get("state") == "draining")
+
+    def request_worker_drain(self, worker_id: str) -> None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO video_worker_registry
+                      (worker_id, state, last_seen_at, drain_requested_at, updated_at)
+                    VALUES (%s, 'draining', now(), now(), now())
+                    ON CONFLICT (worker_id) DO UPDATE
+                    SET state = 'draining',
+                        drain_requested_at = COALESCE(video_worker_registry.drain_requested_at, now()),
+                        updated_at = now()
+                    """,
+                    (worker_id,),
+                )
+
+    def clear_worker_drain(self, worker_id: str) -> None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE video_worker_registry
+                    SET state = CASE WHEN current_job_id IS NULL THEN 'idle' ELSE 'running' END,
+                        drain_requested_at = NULL,
+                        updated_at = now()
+                    WHERE worker_id = %s
+                    """,
+                    (worker_id,),
+                )
+
+    def list_workers(self, *, seen_within_seconds: int = 300) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT worker_id, state, current_job_id, last_seen_at, drain_requested_at, updated_at
+                    FROM video_worker_registry
+                    WHERE last_seen_at >= now() - make_interval(secs => %s)
+                      AND state <> 'stopped'
+                    ORDER BY worker_id ASC
+                    """,
+                    (max(1, int(seen_within_seconds)),),
+                )
+                return [dict(row) for row in cur.fetchall()]
+
+    def count_video_jobs_by_status(self) -> dict[str, int]:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT status, count(*) AS count
+                    FROM video_jobs
+                    WHERE status IN ('queued', 'running')
+                    GROUP BY status
+                    """
+                )
+                rows = cur.fetchall()
+        return {str(row["status"]): int(row["count"]) for row in rows}
+
     def create_job(
         self,
         owner_principal_id: str,
@@ -384,6 +493,9 @@ class PostgresJobStore(_BasePostgresStore):
         return int(row["active_count"])
 
     def claim_next(self, worker_id: str = "worker", lease_seconds: int = 900) -> VideoJob | None:
+        if self.is_worker_draining(worker_id):
+            self.heartbeat_worker(worker_id, state="draining")
+            return None
         with self._connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(

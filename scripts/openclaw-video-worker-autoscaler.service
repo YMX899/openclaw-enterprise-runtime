@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenClaw Video Worker Autoscaler
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/project/Dify
+ExecStart=/project/Dify/scripts/start_openclaw_video_worker_autoscaler.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/openclaw-video/worker-autoscaler.log
+StandardError=append:/var/log/openclaw-video/worker-autoscaler.log
+
+[Install]
+WantedBy=multi-user.target

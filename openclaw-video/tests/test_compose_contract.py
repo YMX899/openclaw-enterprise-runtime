@@ -16,6 +16,7 @@ WORKER_ENTRYPOINT = ROOT / "docker" / "worker" / "entrypoint.sh"
 DOCKERIGNORE = ROOT / ".dockerignore"
 VENDOR_GITIGNORE = ROOT / "vendor" / "douyin_chong" / ".gitignore"
 VENDOR_HASHES = ROOT / "vendor" / "douyin_chong" / "SOURCE_SHA256SUMS"
+AUTOSCALER = ROOT.parents[0] / "scripts" / "openclaw_video_worker_autoscaler.py"
 
 
 class ComposeContractTests(unittest.TestCase):
@@ -251,6 +252,17 @@ class ComposeContractTests(unittest.TestCase):
         self.assertNotIn("ARK_API_KEY:", compose)
         self.assertNotIn("sk-ws-", compose)
         self.assertNotIn("MEDIAKIT_API_KEY:", compose)
+
+    def test_worker_autoscaler_runs_on_host_not_with_docker_socket_mount(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        script = AUTOSCALER.read_text(encoding="utf-8")
+        self.assertNotIn("/var/run/docker.sock", compose)
+        self.assertIn("VIDEO_WORKER_MIN_REPLICAS", script)
+        self.assertIn("VIDEO_WORKER_MAX_REPLICAS", script)
+        self.assertIn("VIDEO_WORKER_TARGET_IDLE", script)
+        self.assertIn("request drain", script)
+        self.assertIn("docker", script)
+        self.assertIn("compose", script)
 
     def test_worker_image_uses_adapter_and_vendor_source_slot(self):
         dockerfile = WORKER_DOCKERFILE.read_text(encoding="utf-8")
