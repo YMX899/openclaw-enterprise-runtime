@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import socket
 import time
 
 from .postgres_store import PostgresJobStore
@@ -13,6 +14,14 @@ from .video_limits import (
     MIN_VIDEO_UNDERSTANDING_FPS,
 )
 from .worker_service import VideoAnalysisWorker, WorkerConfig
+
+
+def resolve_worker_id() -> str:
+    configured = os.environ.get("WORKER_ID", "").strip()
+    if configured:
+        return configured
+    hostname = os.environ.get("HOSTNAME", "").strip() or socket.gethostname().strip()
+    return hostname or "video-analysis-worker"
 
 
 def main() -> None:
@@ -27,7 +36,7 @@ def main() -> None:
         raise RuntimeError("V1 requires WORKER_CONCURRENCY=1 until load tests prove Dify safety")
     interval = int(os.environ.get("WORKER_IDLE_SECONDS", "5"))
     timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", "900"))
-    worker_id = os.environ.get("WORKER_ID", "video-analysis-worker-1")
+    worker_id = resolve_worker_id()
     heartbeat_interval_seconds = int(os.environ.get("JOB_HEARTBEAT_SECONDS", "30"))
     max_download_bytes = int(os.environ.get("MAX_DOWNLOAD_BYTES", str(DEFAULT_MAX_DOWNLOAD_BYTES)))
     max_model_video_bytes = int(os.environ.get("MAX_MODEL_VIDEO_BYTES", str(DEFAULT_MAX_MODEL_VIDEO_BYTES)))
