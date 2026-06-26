@@ -6,7 +6,7 @@ PROJECT="${OPENCLAW_COMPOSE_PROJECT:-openclaw-video}"
 ENV_FILE="${OPENCLAW_ENV_FILE:-/app/bin/openclaw-video/shared/openclaw-video.env}"
 BASE_IMAGE="${OPENCLAW_BRIDGE_BASE_IMAGE:-openclaw-video-openclaw-bridge}"
 FAST_IMAGE="${OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast}"
-TMP_DOCKERFILE="${ROOT}/.bridge-fast.Dockerfile"
+FAST_DOCKERFILE="${OPENCLAW_BRIDGE_FAST_DOCKERFILE:-docker/bridge/Fast.Dockerfile}"
 TEST_IDENTITY_HEADERS="${BRIDGE_ENABLE_TEST_IDENTITY_HEADERS:-0}"
 TEST_IDENTITY_SECRET="${BRIDGE_TEST_IDENTITY_SECRET:-}"
 SHARED_SECRETS_DIR="${OPENCLAW_SHARED_SECRETS_DIR:-/app/bin/openclaw-video/shared/secrets}"
@@ -42,35 +42,14 @@ if [ ! -e secrets ]; then
   ln -s "$SHARED_SECRETS_DIR" secrets
 fi
 
-cat > "$TMP_DOCKERFILE" <<'EOF'
-ARG BASE_IMAGE=openclaw-video-openclaw-bridge
-FROM ${BASE_IMAGE}
-USER root
-WORKDIR /app
-COPY pyproject.toml /app/
-RUN rm -rf /app/src/openclaw_video/webdist
-COPY src /app/src
-COPY vendor/douyin_chong /app/vendor/douyin_chong
-RUN pip install --no-cache-dir --no-deps /app \
-    && python - <<'PY'
-from pathlib import Path
-import shutil
-import openclaw_video
-
-source = Path("/app/src/openclaw_video/webdist")
-target = Path(openclaw_video.__file__).resolve().parent / "webdist"
-if source.is_dir():
-    if target.exists():
-        shutil.rmtree(target)
-    shutil.copytree(source, target)
-PY
-EOF
-
-trap 'rm -f "$TMP_DOCKERFILE"' EXIT
+if [ ! -f "$FAST_DOCKERFILE" ]; then
+  echo "fast bridge Dockerfile not found: $ROOT/$FAST_DOCKERFILE" >&2
+  exit 1
+fi
 
 docker build \
   --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
-  -f "$TMP_DOCKERFILE" \
+  -f "$FAST_DOCKERFILE" \
   -t "$FAST_IMAGE" \
   .
 

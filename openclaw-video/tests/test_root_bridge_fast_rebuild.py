@@ -4,17 +4,23 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "root_rebuild_bridge_fast.sh"
+WORKER_SCRIPT = REPO_ROOT / "scripts" / "root_rebuild_worker_fast.sh"
+UNIFY_SCRIPT = REPO_ROOT / "scripts" / "unify_openclaw_video_deploy_source.sh"
 COMPOSE = REPO_ROOT / "openclaw-video" / "docker-compose.openclaw-video.yaml"
+BRIDGE_FAST_DOCKERFILE = REPO_ROOT / "openclaw-video" / "docker" / "bridge" / "Fast.Dockerfile"
+WORKER_FAST_DOCKERFILE = REPO_ROOT / "openclaw-video" / "docker" / "worker" / "Fast.Dockerfile"
 
 
 class RootBridgeFastRebuildTests(unittest.TestCase):
     def test_fast_rebuild_reuses_existing_bridge_image_and_skips_dependency_resolution(self):
         text = SCRIPT.read_text(encoding="utf-8")
+        dockerfile = BRIDGE_FAST_DOCKERFILE.read_text(encoding="utf-8")
 
         self.assertIn("OPENCLAW_BRIDGE_BASE_IMAGE:-openclaw-video-openclaw-bridge", text)
         self.assertIn("OPENCLAW_BRIDGE_FAST_IMAGE:-openclaw-video-openclaw-bridge:fast", text)
-        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", text)
-        self.assertIn("pip install --no-cache-dir --no-deps /app", text)
+        self.assertIn("OPENCLAW_BRIDGE_FAST_DOCKERFILE:-docker/bridge/Fast.Dockerfile", text)
+        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
+        self.assertIn("pip install --no-cache-dir --no-deps /app", dockerfile)
         self.assertIn("BRIDGE_ENABLE_TEST_IDENTITY_HEADERS", text)
         self.assertIn("BRIDGE_TEST_IDENTITY_SECRET", text)
         self.assertIn("DIFY_API_CONTAINER", text)
@@ -32,6 +38,31 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("bridge_fast_rebuild=PASS", text)
         self.assertNotIn("video-analysis-worker", text)
         self.assertNotIn("docker compose -p docker", text)
+
+    def test_worker_fast_rebuild_uses_versioned_template_and_scales_worker_only(self):
+        text = WORKER_SCRIPT.read_text(encoding="utf-8")
+        dockerfile = WORKER_FAST_DOCKERFILE.read_text(encoding="utf-8")
+
+        self.assertIn("OPENCLAW_WORKER_BASE_IMAGE:-openclaw-video-video-analysis-worker", text)
+        self.assertIn("OPENCLAW_WORKER_FAST_DOCKERFILE:-docker/worker/Fast.Dockerfile", text)
+        self.assertIn("COPY vendor/douyin_chong /app/vendor/douyin_chong", dockerfile)
+        self.assertIn("pip install --no-cache-dir --no-deps /app", dockerfile)
+        self.assertIn("--scale \"video-analysis-worker=${WORKER_REPLICAS}\" video-analysis-worker", text)
+        self.assertIn("worker_fast_rebuild=PASS", text)
+        self.assertNotIn("openclaw-bridge", text.split("docker compose", 1)[-1])
+
+    def test_unified_deploy_uses_project_git_commit_as_only_source(self):
+        text = UNIFY_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("SOURCE_ROOT=\"${OPENCLAW_SOURCE_ROOT:-/project/Dify}\"", text)
+        self.assertIn("git status --short", text)
+        self.assertIn("COMMIT=\"$(git rev-parse HEAD)\"", text)
+        self.assertIn("git archive --format=tar \"$COMMIT\"", text)
+        self.assertIn("ln -sfn \"$RELEASE_DIR\" \"$CURRENT_LINK\"", text)
+        self.assertIn("root_rebuild_bridge_fast.sh", text)
+        self.assertIn("root_rebuild_worker_fast.sh", text)
+        self.assertIn("systemctl restart openclaw-video-worker-autoscaler.service", text)
+        self.assertNotIn("/tmp/openclaw-video-deploy", text)
 
     def test_compose_bridge_image_can_be_overridden_for_fast_rebuild(self):
         text = COMPOSE.read_text(encoding="utf-8")
