@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ENV_FILE="${OPENCLAW_VIDEO_ENV_FILE:-/app/bin/openclaw-video/shared/openclaw-video.env}"
-WORKDIR="${OPENCLAW_VIDEO_WORKDIR:-/tmp/openclaw-video-deploy-995df1c}"
+WORKDIR="${OPENCLAW_VIDEO_WORKDIR:-/app/bin/openclaw-video/current/openclaw-video}"
 COMPOSE_FILE="${OPENCLAW_VIDEO_COMPOSE_FILE:-docker-compose.openclaw-video.yaml}"
 PYTHON_BIN="${OPENCLAW_VIDEO_AUTOSCALER_PYTHON:-/project/Dify/openclaw-video/.venv/bin/python}"
 AUTOSCALER="${OPENCLAW_VIDEO_AUTOSCALER_SCRIPT:-/project/Dify/scripts/openclaw_video_worker_autoscaler.py}"

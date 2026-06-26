@@ -64,6 +64,15 @@ class RootBridgeFastRebuildTests(unittest.TestCase):
         self.assertIn("systemctl restart openclaw-video-worker-autoscaler.service", text)
         self.assertNotIn("/tmp/openclaw-video-deploy", text)
 
+    def test_autoscaler_start_script_defaults_to_current_release(self):
+        text = (REPO_ROOT / "scripts" / "start_openclaw_video_worker_autoscaler.sh").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'WORKDIR="${OPENCLAW_VIDEO_WORKDIR:-/app/bin/openclaw-video/current/openclaw-video}"',
+            text,
+        )
+        self.assertNotIn("/tmp/openclaw-video-deploy", text)
+
     def test_compose_bridge_image_can_be_overridden_for_fast_rebuild(self):
         text = COMPOSE.read_text(encoding="utf-8")
 
