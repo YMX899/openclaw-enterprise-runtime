@@ -3,6 +3,8 @@ import type { SpawnedRunMetadata } from "../../agents/spawned-context.js";
 import type { PromptMode } from "../../agents/system-prompt.types.js";
 import type { SourceReplyDeliveryMode } from "../../auto-reply/get-reply-options.types.js";
 import type { ChannelOutboundTargetMode } from "../../channels/plugins/types.public.js";
+import type { OpenClawConfig } from "../../config/types.openclaw.js";
+import type { RuntimeRunContext, WorkspaceBoundary } from "../../enterprise-runtime/types.js";
 import type { PromptImageOrderEntry } from "../../media/prompt-image-order.js";
 import type { InputProvenance } from "../../sessions/input-provenance.js";
 import type { ExecElevatedDefaults } from "../bash-tools.exec-types.js";
@@ -90,6 +92,17 @@ export type AgentCommandOpts = {
   allowModelOverride?: boolean;
   /** Optional runtime tool allow-list; when set, only these tools are exposed for this run. */
   toolsAllow?: string[];
+  /** Explicit session-store namespace for runtimes that do not use agent-id state partitioning. */
+  sessionStoreNamespace?: string;
+  /** Enterprise runtime context for single-run workspace/session/config isolation. */
+  enterpriseRuntime?: {
+    runContext: RuntimeRunContext;
+    sessionStoreNamespace: string;
+    resolvedConfigSnapshotId: string;
+    suppressWorkspaceFallback: true;
+    workspaceBoundary?: WorkspaceBoundary;
+    config?: OpenClawConfig;
+  };
   /** Group/spawn metadata for subagent policy inheritance and routing context. */
   groupId?: SpawnedRunMetadata["groupId"];
   groupChannel?: SpawnedRunMetadata["groupChannel"];

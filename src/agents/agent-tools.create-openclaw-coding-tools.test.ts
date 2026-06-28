@@ -187,6 +187,50 @@ describe("createOpenClawCodingTools", () => {
     expect(names.has("tool_call")).toBe(false);
   });
 
+  it("uses enterprise workspace boundary to remove shell tools without a sandbox", async () => {
+    const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-enterprise-tools-"));
+    const tools = createOpenClawCodingTools({
+      workspaceDir,
+      cwd: workspaceDir,
+      enterpriseWorkspaceBoundary: {
+        root: workspaceDir,
+        accessMode: "write",
+      },
+    });
+    const names = new Set(tools.map((tool) => normalizeToolName(tool.name)));
+
+    expect(names.has("read")).toBe(true);
+    expect(names.has("write")).toBe(true);
+    expect(names.has("edit")).toBe(true);
+    expect(names.has("apply_patch")).toBe(false);
+    expect(names.has("exec")).toBe(false);
+    expect(names.has("process")).toBe(false);
+    expect(names.has("bash")).toBe(false);
+  });
+
+  it("uses enterprise read mode to expose only non-mutating workspace tools", async () => {
+    const workspaceDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "openclaw-enterprise-read-tools-"),
+    );
+    const tools = createOpenClawCodingTools({
+      workspaceDir,
+      cwd: workspaceDir,
+      enterpriseWorkspaceBoundary: {
+        root: workspaceDir,
+        accessMode: "read",
+      },
+    });
+    const names = new Set(tools.map((tool) => normalizeToolName(tool.name)));
+
+    expect(names.has("read")).toBe(true);
+    expect(names.has("write")).toBe(false);
+    expect(names.has("edit")).toBe(false);
+    expect(names.has("apply_patch")).toBe(false);
+    expect(names.has("exec")).toBe(false);
+    expect(names.has("process")).toBe(false);
+    expect(names.has("bash")).toBe(false);
+  });
+
   it("passes explicit hook channel ids to wrapped tool hooks", async () => {
     const beforeToolCall = vi.fn();
     initializeGlobalHookRunner(

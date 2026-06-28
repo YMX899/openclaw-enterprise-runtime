@@ -283,13 +283,28 @@ export function resolveSessionFilePath(
 
 export function resolveStorePath(
   store?: string,
-  opts?: { agentId?: string; env?: NodeJS.ProcessEnv },
+  opts?: { agentId?: string; sessionStoreNamespace?: string; env?: NodeJS.ProcessEnv },
 ) {
-  const agentId = normalizeAgentId(opts?.agentId ?? DEFAULT_AGENT_ID);
+  const agentId = normalizeAgentId(
+    opts?.sessionStoreNamespace ?? opts?.agentId ?? DEFAULT_AGENT_ID,
+  );
   const env = opts?.env ?? process.env;
   const homedir = () => resolveRequiredHomeDir(env, os.homedir);
   if (!store) {
     return path.join(resolveAgentSessionsDir(agentId, env, homedir), "sessions.json");
+  }
+  if (store.includes("{sessionStoreNamespace}")) {
+    const expanded = store.replaceAll("{sessionStoreNamespace}", agentId);
+    if (expanded.startsWith("~")) {
+      return path.resolve(
+        expandHomePrefix(expanded, {
+          home: resolveRequiredHomeDir(env, homedir),
+          env,
+          homedir,
+        }),
+      );
+    }
+    return path.resolve(expanded);
   }
   if (store.includes("{agentId}")) {
     const expanded = store.replaceAll("{agentId}", agentId);

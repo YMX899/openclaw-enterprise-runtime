@@ -184,6 +184,7 @@ type SingleEntryPersistencePatch = {
 
 type SessionEntryWorkflowOptions = {
   agentId?: string;
+  sessionStoreNamespace?: string;
   env?: NodeJS.ProcessEnv;
   hydrateSkillPromptRefs?: boolean;
   storePath?: string;
@@ -202,6 +203,7 @@ function resolveSessionWorkflowStorePath(
   const agentId = options.agentId ?? resolveAgentIdFromSessionKey(options.sessionKey);
   return resolveStorePath(getRuntimeConfig().session?.store, {
     agentId,
+    sessionStoreNamespace: options.sessionStoreNamespace,
     env: options.env,
   });
 }

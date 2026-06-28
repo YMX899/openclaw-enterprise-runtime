@@ -298,6 +298,10 @@ import {
   type PresenceEntry,
   PresenceEntrySchema,
   ProtocolSchemas,
+  type RuntimeRunSpec,
+  RuntimeRunSpecSchema,
+  type RuntimeRunResult,
+  RuntimeRunResultSchema,
   type RequestFrame,
   RequestFrameSchema,
   type ResponseFrame,
@@ -528,6 +532,8 @@ export const validateMessageActionParams =
 export const validateSendParams = lazyCompile(SendParamsSchema);
 export const validatePollParams = lazyCompile<PollParams>(PollParamsSchema);
 export const validateAgentParams = lazyCompile(AgentParamsSchema);
+export const validateRuntimeRunSpec = lazyCompile<RuntimeRunSpec>(RuntimeRunSpecSchema);
+export const validateRuntimeRunResult = lazyCompile<RuntimeRunResult>(RuntimeRunResultSchema);
 export const validateAgentIdentityParams =
   lazyCompile<AgentIdentityParams>(AgentIdentityParamsSchema);
 export const validateAgentWaitParams = lazyCompile<AgentWaitParams>(AgentWaitParamsSchema);
@@ -969,6 +975,8 @@ export {
   SendParamsSchema,
   PollParamsSchema,
   AgentParamsSchema,
+  RuntimeRunSpecSchema,
+  RuntimeRunResultSchema,
   AgentIdentityParamsSchema,
   AgentIdentityResultSchema,
   WakeParamsSchema,
@@ -1356,6 +1364,8 @@ export type {
   UpdateStatusParams,
   UpdateRunParams,
   ChatInjectParams,
+  RuntimeRunSpec,
+  RuntimeRunResult,
 };
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];

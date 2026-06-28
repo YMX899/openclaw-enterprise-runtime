@@ -13,6 +13,7 @@ export * from "./schema/commands.js";
 export * from "./schema/config.js";
 export * from "./schema/cron.js";
 export * from "./schema/error-codes.js";
+export * from "./schema/enterprise-runtime.js";
 export * from "./schema/environments.js";
 export * from "./schema/exec-approvals.js";
 export * from "./schema/devices.js";

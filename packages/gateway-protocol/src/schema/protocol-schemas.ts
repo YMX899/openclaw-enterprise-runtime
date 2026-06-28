@@ -164,6 +164,13 @@ import {
   DeviceTokenRotateParamsSchema,
 } from "./devices.js";
 import {
+  RuntimeAttachmentSchema,
+  RuntimeModelOverrideSchema,
+  RuntimeQueueStateSchema,
+  RuntimeRunResultSchema,
+  RuntimeRunSpecSchema,
+} from "./enterprise-runtime.js";
+import {
   EnvironmentSummarySchema,
   EnvironmentsListParamsSchema,
   EnvironmentsListResultSchema,
@@ -331,6 +338,11 @@ export const ProtocolSchemas = {
   AgentIdentityResult: AgentIdentityResultSchema,
   AgentWaitParams: AgentWaitParamsSchema,
   WakeParams: WakeParamsSchema,
+  RuntimeAttachment: RuntimeAttachmentSchema,
+  RuntimeModelOverride: RuntimeModelOverrideSchema,
+  RuntimeQueueState: RuntimeQueueStateSchema,
+  RuntimeRunSpec: RuntimeRunSpecSchema,
+  RuntimeRunResult: RuntimeRunResultSchema,
 
   // Node pairing, invocation, presence, and pending-queue payloads.
   NodePairRequestParams: NodePairRequestParamsSchema,

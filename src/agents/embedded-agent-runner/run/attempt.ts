@@ -1217,6 +1217,7 @@ export async function runEmbeddedAttempt(
                   }),
             config: params.config,
             abortSignal: runAbortController.signal,
+            enterpriseWorkspaceBoundary: params.enterpriseWorkspaceBoundary,
             modelProvider: params.provider,
             modelId: params.modelId,
             modelCompat: extractModelCompat(params.model),

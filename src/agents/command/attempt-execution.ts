@@ -692,6 +692,7 @@ export function runAgentAttempt(params: {
     bootstrapContextMode: params.opts.bootstrapContextMode,
     bootstrapContextRunKind: params.opts.bootstrapContextRunKind,
     toolsAllow: params.opts.toolsAllow,
+    enterpriseWorkspaceBoundary: params.opts.enterpriseRuntime?.runContext.boundary,
     internalEvents: params.opts.internalEvents,
     inputProvenance: params.opts.inputProvenance,
     sourceReplyDeliveryMode: params.opts.sourceReplyDeliveryMode,

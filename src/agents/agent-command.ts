@@ -584,6 +584,7 @@ function resolveExplicitAgentCommandSessionKey(params: {
 }
 
 async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: RuntimeEnv) {
+  const enterpriseRuntime = opts.enterpriseRuntime;
   const isRawModelRun = opts.modelRun === true || opts.promptMode === "none";
   const message = opts.message ?? "";
   if (!message.trim()) {
@@ -596,9 +597,13 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
     );
   }
 
-  const { cfg } = await resolveAgentRuntimeConfig(runtime, {
-    runtimeTargetsChannelSecrets: opts.deliver === true,
-  });
+  const cfg =
+    enterpriseRuntime?.config ??
+    (
+      await resolveAgentRuntimeConfig(runtime, {
+        runtimeTargetsChannelSecrets: opts.deliver === true,
+      })
+    ).cfg;
   const normalizedSpawned = normalizeSpawnedRunMetadata({
     spawnedBy: opts.spawnedBy,
     groupId: opts.groupId,
@@ -617,17 +622,20 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
     }
   }
   const shouldScopeDefaultAgentKey = Boolean(
+    !enterpriseRuntime &&
     rawExplicitSessionKey &&
     !agentIdOverride &&
     classifySessionKeyShape(rawExplicitSessionKey) === "legacy_or_alias" &&
     !isUnscopedSessionKeySentinel(rawExplicitSessionKey),
   );
-  const explicitSessionKey = resolveExplicitAgentCommandSessionKey({
-    rawExplicitSessionKey,
-    agentIdOverride,
-    shouldScopeDefaultAgentKey,
-    cfg,
-  });
+  const explicitSessionKey = enterpriseRuntime
+    ? rawExplicitSessionKey
+    : resolveExplicitAgentCommandSessionKey({
+        rawExplicitSessionKey,
+        agentIdOverride,
+        shouldScopeDefaultAgentKey,
+        cfg,
+      });
   if (explicitSessionKey && classifySessionKeyShape(explicitSessionKey) === "malformed_agent") {
     throw new Error(
       `Invalid --session-key "${explicitSessionKey}". Agent-prefixed session keys must use agent:<agent-id>:<session-key>.`,
@@ -678,6 +686,7 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
     sessionId: opts.sessionId,
     sessionKey: explicitSessionKey,
     agentId: agentIdOverride,
+    sessionStoreNamespace: opts.sessionStoreNamespace ?? enterpriseRuntime?.sessionStoreNamespace,
     clone: false,
   });
 
@@ -690,6 +699,7 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
   });
   const sessionAgentId =
     agentIdOverride ??
+    enterpriseRuntime?.sessionStoreNamespace ??
     resolveSessionAgentId({
       sessionKey: sessionKey ?? explicitSessionKey,
       config: cfg,
@@ -701,10 +711,14 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
   });
   // Internal callers (for example subagent spawns) may pin workspace inheritance.
   const workspaceDirRaw =
-    normalizedSpawned.workspaceDir ?? resolveAgentWorkspaceDir(cfg, sessionAgentId);
+    enterpriseRuntime?.runContext.workspace.root ??
+    normalizedSpawned.workspaceDir ??
+    resolveAgentWorkspaceDir(cfg, sessionAgentId);
   const workspaceDir = resolveUserPath(workspaceDirRaw);
   const cwd =
-    normalizeOptionalString(opts.cwd) ?? normalizeOptionalString(sessionEntryRaw?.spawnedCwd);
+    enterpriseRuntime?.runContext.workspace.root ??
+    normalizeOptionalString(opts.cwd) ??
+    normalizeOptionalString(sessionEntryRaw?.spawnedCwd);
   const agentDir = resolveAgentDir(cfg, sessionAgentId);
   const pluginsEnabled = normalizePluginsConfig(cfg.plugins).enabled;
   const manifestMetadataSnapshot = pluginsEnabled
@@ -745,7 +759,7 @@ async function prepareAgentCommandExecution(opts: AgentCommandOpts, runtime: Run
   }
   await ensureAgentWorkspace({
     dir: workspaceDirRaw,
-    ensureBootstrapFiles: !agentCfg?.skipBootstrap,
+    ensureBootstrapFiles: enterpriseRuntime ? false : !agentCfg?.skipBootstrap,
     skipOptionalBootstrapFiles: agentCfg?.skipOptionalBootstrapFiles,
   });
   const runId = opts.runId?.trim() || sessionId;

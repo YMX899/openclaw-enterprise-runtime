@@ -98,6 +98,7 @@ export const CORE_GATEWAY_METHOD_SPECS: readonly CoreGatewayMethodSpec[] = [
   { name: "tasks.cancel", scope: "operator.write" },
   { name: "environments.list", scope: "operator.read" },
   { name: "environments.status", scope: "operator.read" },
+  { name: "enterprise.runtime.run", scope: "operator.write", startup: true },
   { name: "agents.list", scope: "operator.read" },
   { name: "agents.create", scope: "operator.admin" },
   { name: "agents.update", scope: "operator.admin" },

@@ -185,11 +185,13 @@ export function resolveStoredSessionKeyForSessionId(opts: {
   cfg: OpenClawConfig;
   sessionId: string;
   agentId?: string;
+  sessionStoreNamespace?: string;
 }): SessionKeyResolution {
   const sessionId = opts.sessionId.trim();
   const storeAgentId = opts.agentId?.trim() ? normalizeAgentId(opts.agentId) : undefined;
   const storePath = resolveStorePath(opts.cfg.session?.store, {
     agentId: storeAgentId,
+    sessionStoreNamespace: opts.sessionStoreNamespace,
   });
   const sessionStore = loadSessionStore(storePath);
   if (!sessionId) {
@@ -213,6 +215,7 @@ export function resolveSessionKeyForRequest(opts: {
   sessionId?: string;
   sessionKey?: string;
   agentId?: string;
+  sessionStoreNamespace?: string;
   clone?: boolean;
 }): SessionKeyResolution {
   const sessionCfg = opts.cfg.session;
@@ -229,13 +232,16 @@ export function resolveSessionKeyForRequest(opts: {
           agentId: requestedAgentId,
         })
       : undefined);
-  const storeAgentId = explicitSessionKey
-    ? isUnscopedSessionKeySentinel(explicitSessionKey)
-      ? (requestedAgentId ?? defaultAgentId)
-      : resolveAgentIdFromSessionKey(explicitSessionKey)
-    : (requestedAgentId ?? defaultAgentId);
+  const storeAgentId = opts.sessionStoreNamespace
+    ? opts.sessionStoreNamespace
+    : explicitSessionKey
+      ? isUnscopedSessionKeySentinel(explicitSessionKey)
+        ? (requestedAgentId ?? defaultAgentId)
+        : resolveAgentIdFromSessionKey(explicitSessionKey)
+      : (requestedAgentId ?? defaultAgentId);
   const storePath = resolveStorePath(sessionCfg?.store, {
     agentId: storeAgentId,
+    sessionStoreNamespace: opts.sessionStoreNamespace,
   });
   const loadOptions = opts.clone === false ? { clone: false as const } : undefined;
   const sessionStore = loadSessionStore(storePath, loadOptions);
@@ -307,6 +313,7 @@ export function resolveSession(opts: {
   sessionId?: string;
   sessionKey?: string;
   agentId?: string;
+  sessionStoreNamespace?: string;
   clone?: boolean;
 }): SessionResolution {
   const sessionCfg = opts.cfg.session;
@@ -316,6 +323,7 @@ export function resolveSession(opts: {
     sessionId: opts.sessionId,
     sessionKey: opts.sessionKey,
     agentId: opts.agentId,
+    sessionStoreNamespace: opts.sessionStoreNamespace,
     ...(opts.clone === false ? { clone: false } : {}),
   });
   const now = Date.now();

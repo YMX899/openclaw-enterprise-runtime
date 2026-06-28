@@ -20,12 +20,12 @@ import {
 } from "../../embedded-agent-helpers.js";
 import { FailoverError, resolveFailoverStatus } from "../../failover-error.js";
 import { shouldAllowCooldownProbeForReason } from "../../failover-policy.js";
+import { isNonSecretApiKeyMarker } from "../../model-auth-markers.js";
 import {
   getApiKeyForModel,
   MissingProviderAuthError,
   type ResolvedProviderAuth,
 } from "../../model-auth.js";
-import { isNonSecretApiKeyMarker } from "../../model-auth-markers.js";
 import {
   resolveProviderRequestConfig,
   sanitizeRuntimeProviderRequestOverrides,
@@ -392,11 +392,7 @@ export function createEmbeddedRunAuthController(params: {
     options: { allowCoolingFallback?: boolean } = {},
   ): ApiKeyInfo => {
     const primaryApiKey = apiKeyInfo.apiKey?.trim();
-    if (
-      !primaryApiKey ||
-      apiKeyInfo.mode !== "api-key" ||
-      isNonSecretApiKeyMarker(primaryApiKey)
-    ) {
+    if (!primaryApiKey || apiKeyInfo.mode !== "api-key" || isNonSecretApiKeyMarker(primaryApiKey)) {
       return apiKeyInfo;
     }
     const runtimeModel = params.getRuntimeModel();
@@ -513,7 +509,12 @@ export function createEmbeddedRunAuthController(params: {
   const rotateApiKeyForRateLimit = async (): Promise<boolean> => {
     const current = params.getApiKeyInfo();
     const currentApiKey = current?.apiKey?.trim();
-    if (!currentApiKey || current.mode !== "api-key" || isNonSecretApiKeyMarker(currentApiKey)) {
+    if (
+      !current ||
+      !currentApiKey ||
+      current.mode !== "api-key" ||
+      isNonSecretApiKeyMarker(currentApiKey)
+    ) {
       return false;
     }
     const currentCandidate = params.profileCandidates[params.getProfileIndex()];

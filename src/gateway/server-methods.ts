@@ -107,6 +107,10 @@ const loadEnvironmentsHandlers = lazyHandlerModule(
   () => import("./server-methods/environments.js"),
   (module) => module.environmentsHandlers,
 );
+const loadEnterpriseRuntimeHandlers = lazyHandlerModule(
+  () => import("./server-methods/enterprise-runtime.js"),
+  (module) => module.enterpriseRuntimeHandlers,
+);
 const loadExecApprovalsHandlers = lazyHandlerModule(
   () => import("./server-methods/exec-approvals.js"),
   (module) => module.execApprovalsHandlers,
@@ -337,6 +341,10 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...createLazyCoreHandlers({
     methods: ["environments.list", "environments.status"],
     loadHandlers: loadEnvironmentsHandlers,
+  }),
+  ...createLazyCoreHandlers({
+    methods: ["enterprise.runtime.run"],
+    loadHandlers: loadEnterpriseRuntimeHandlers,
   }),
   ...createLazyCoreHandlers({
     methods: [

@@ -9,6 +9,7 @@ import type { InboundEventKind } from "../channels/inbound-event/kind.js";
 import { resolveExecCommandHighlighting } from "../config/exec-command-highlighting.js";
 import type { ModelCompatConfig } from "../config/types.models.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import type { WorkspaceBoundary } from "../enterprise-runtime/types.js";
 import type { DiagnosticTraceContext } from "../infra/diagnostic-trace-context.js";
 import { resolveEventSessionRoutingPolicy } from "../infra/event-session-routing.js";
 import {
@@ -111,6 +112,15 @@ import {
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
 const MEMORY_FLUSH_ALLOWED_TOOL_NAMES = new Set(["read", "write"]);
+const ENTERPRISE_READ_ONLY_MUTATING_TOOLS = new Set([
+  "write",
+  "edit",
+  "apply_patch",
+  "exec",
+  "process",
+  "bash",
+  "shell.exec",
+]);
 
 type GuardContainerMount = {
   containerRoot: string;
@@ -520,6 +530,8 @@ export function createOpenClawCodingTools(options?: {
   onToolOutcome?: ToolOutcomeObserver;
   /** Runtime-only resolved skill paths that the read tool may load under workspaceOnly. */
   skillsSnapshot?: SkillSnapshot;
+  /** Enterprise runtime workspace boundary for per-run filesystem/tool isolation. */
+  enterpriseWorkspaceBoundary?: WorkspaceBoundary;
 }): AnyAgentTool[] {
   const execToolName = "exec";
   const sandbox = options?.sandbox?.enabled ? options.sandbox : undefined;
@@ -678,8 +690,9 @@ export function createOpenClawCodingTools(options?: {
   options?.recordToolPrepStage?.("tool-policy");
   const execConfig = resolveExecConfig({ cfg: options?.config, agentId });
   const fsConfig = resolveToolFsConfig({ cfg: options?.config, agentId });
+  const enterpriseBoundary = options?.enterpriseWorkspaceBoundary;
   const fsPolicy = createToolFsPolicy({
-    workspaceOnly: isMemoryFlushRun || fsConfig.workspaceOnly,
+    workspaceOnly: enterpriseBoundary !== undefined || isMemoryFlushRun || fsConfig.workspaceOnly,
   });
   const sandboxRoot = sandbox?.workspaceDir;
   const sandboxFsBridge = sandbox?.fsBridge;
@@ -697,7 +710,10 @@ export function createOpenClawCodingTools(options?: {
     includePluginTools: true,
   };
   const includeBaseCodingTools = includeCoreTools && toolConstructionPlan.includeBaseCodingTools;
-  const includeShellTools = includeCoreTools && toolConstructionPlan.includeShellTools;
+  const includeShellTools =
+    includeCoreTools &&
+    toolConstructionPlan.includeShellTools &&
+    (!enterpriseBoundary || sandbox !== undefined);
   const includeOpenClawTools = includeCoreTools && toolConstructionPlan.includeOpenClawTools;
   const includeChannelTools = toolConstructionPlan.includeChannelTools;
   const includePluginTools = toolConstructionPlan.includePluginTools;
@@ -1170,6 +1186,11 @@ export function createOpenClawCodingTools(options?: {
   // NOTE: Keep canonical (lowercase) tool names here.
   // shared model runtime's Anthropic OAuth transport remaps tool names to Claude Code-style names
   // on the wire and maps them back for tool dispatch.
+  if (enterpriseBoundary?.accessMode === "read") {
+    return withDeferredFollowupDescriptions.filter(
+      (tool) => !ENTERPRISE_READ_ONLY_MUTATING_TOOLS.has(normalizeToolName(tool.name)),
+    );
+  }
   return withDeferredFollowupDescriptions;
 }
 export { testing as __testing };

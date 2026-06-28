@@ -7,6 +7,7 @@ import type { ReplyOperation } from "../../../auto-reply/reply/reply-run-registr
 import type { ReasoningLevel, ThinkLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
 import type { InboundEventKind } from "../../../channels/inbound-event/kind.js";
 import type { OpenClawConfig } from "../../../config/types.openclaw.js";
+import type { WorkspaceBoundary } from "../../../enterprise-runtime/types.js";
 import type { ImageContent } from "../../../llm/types.js";
 import type { PromptImageOrderEntry } from "../../../media/prompt-image-order.js";
 import type { CommandQueueEnqueueFn } from "../../../process/command-queue.types.js";
@@ -146,6 +147,8 @@ export type RunEmbeddedAgentParams = {
   bootstrapContextRunKind?: "default" | "heartbeat" | "cron";
   /** Optional tool allow-list; when set, only these tools are sent to the model. */
   toolsAllow?: string[];
+  /** Enterprise runtime workspace boundary for per-run filesystem/tool isolation. */
+  enterpriseWorkspaceBoundary?: WorkspaceBoundary;
   /** Seen bootstrap truncation warning signatures for this session (once mode dedupe). */
   bootstrapPromptWarningSignaturesSeen?: string[];
   /** Last shown bootstrap truncation warning signature for this session. */
