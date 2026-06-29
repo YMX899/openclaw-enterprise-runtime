@@ -268,6 +268,7 @@ function buildSkillsSection(params: { skillsPrompt?: string; readToolName: strin
   return [
     "## Skills",
     `Scan <available_skills>. If one clearly applies, read its SKILL.md at exact <location> with \`${params.readToolName}\`, then follow it.`,
+    "Use the <location> value exactly as written. Do not invent alternate skill paths or filenames.",
     "If several apply, choose the most specific. If none clearly apply, read none.",
     "One skill up front max. Never guess/fabricate skill paths.",
     "External API writes: batch when safe, avoid tight loops, respect 429/Retry-After.",

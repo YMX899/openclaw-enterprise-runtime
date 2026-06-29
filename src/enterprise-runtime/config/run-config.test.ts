@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildEnterpriseRunOpenClawConfig } from "./run-config.js";
 import type { ResolvedRuntimeConfigSnapshot } from "./types.js";
@@ -24,6 +25,7 @@ function snapshot(): ResolvedRuntimeConfigSnapshot {
       maxTokensField: "max_completion_tokens",
       timeoutSeconds: 600,
       params: { temperature: 0.2 },
+      input: ["text", "image"],
       cost: { input: 1, output: 2 },
       authHeader: true,
     },
@@ -70,7 +72,7 @@ describe("buildEnterpriseRunOpenClawConfig", () => {
       contextTokens: 180_000,
       maxTokens: 8192,
       reasoning: true,
-      input: ["text"],
+      input: ["text", "image"],
       cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
       params: { temperature: 0.2 },
     });
@@ -105,5 +107,19 @@ describe("buildEnterpriseRunOpenClawConfig", () => {
     expect(cfg.models?.providers?.openai?.apiKey).toBeUndefined();
     expect(cfg.models?.providers?.openai?.auth).toBeUndefined();
     expect(cfg.models?.providers?.openai?.headers).toBeUndefined();
+  });
+
+  it("preserves multimodal input and injects per-run session store when stateDir is provided", () => {
+    const stateDir = path.join("tmp", "runtime-state");
+    const cfg = buildEnterpriseRunOpenClawConfig({
+      baseConfig: {},
+      snapshot: snapshot(),
+      stateDir,
+    });
+
+    expect(cfg.session?.store).toBe(
+      path.join(stateDir, "agents", "enterprise-runtime", "sessions", "sessions.json"),
+    );
+    expect(cfg.models?.providers?.openai?.models[0]?.input).toEqual(["text", "image"]);
   });
 });

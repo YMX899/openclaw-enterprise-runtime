@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { RuntimeRunSpec } from "../../packages/gateway-protocol/src/schema/enterprise-runtime.js";
+import type { EnterpriseRuntimeConfigFile, RuntimeConfig } from "./config/types.js";
 import {
   ENTERPRISE_RUNTIME_DEFAULT_LOGS_ENV,
   ENTERPRISE_RUNTIME_DEFAULT_TMP_ENV,
@@ -135,6 +136,65 @@ export async function resolveRuntimeDirs(params: {
     logsDir,
     tmpDir,
     runDir,
+  };
+}
+
+function findRuntimeSessionStore(params: {
+  configFile: EnterpriseRuntimeConfigFile;
+  runtimeConfig: RuntimeConfig;
+}) {
+  const id = params.runtimeConfig.sessionStoreId?.trim();
+  if (!id) {
+    return undefined;
+  }
+  const store = params.configFile.sessionStores?.find((entry) => entry.id === id);
+  if (!store) {
+    throw new EnterpriseRuntimeError("RUNTIME_CONFIG_REQUIRED", `session store not found: ${id}`);
+  }
+  if (store.type !== "file") {
+    throw new EnterpriseRuntimeError(
+      "RUNTIME_CONFIG_REQUIRED",
+      `session store '${id}' type ${store.type} is not supported by the current file backend`,
+    );
+  }
+  return store;
+}
+
+function findRuntimeArtifactStore(params: {
+  configFile: EnterpriseRuntimeConfigFile;
+  runtimeConfig: RuntimeConfig;
+}) {
+  const id = params.runtimeConfig.artifactStoreId?.trim();
+  if (!id) {
+    return undefined;
+  }
+  const store = params.configFile.artifactStores?.find((entry) => entry.id === id);
+  if (!store) {
+    throw new EnterpriseRuntimeError("RUNTIME_CONFIG_REQUIRED", `artifact store not found: ${id}`);
+  }
+  if (store.type !== "file") {
+    throw new EnterpriseRuntimeError(
+      "RUNTIME_CONFIG_REQUIRED",
+      `artifact store '${id}' type ${store.type} is not supported by the current file backend`,
+    );
+  }
+  return store;
+}
+
+export function resolveRuntimeStoreDirs(params: {
+  configFile: EnterpriseRuntimeConfigFile;
+  runtimeConfig: RuntimeConfig;
+}): {
+  stateDir?: string;
+  logsDir?: string;
+  tmpRoot?: string;
+} {
+  const sessionStore = findRuntimeSessionStore(params);
+  const artifactStore = findRuntimeArtifactStore(params);
+  return {
+    stateDir: params.runtimeConfig.stateDir ?? sessionStore?.rootDir,
+    logsDir: params.runtimeConfig.logsDir ?? artifactStore?.logsDir,
+    tmpRoot: params.runtimeConfig.tmpRoot ?? artifactStore?.tmpRoot,
   };
 }
 

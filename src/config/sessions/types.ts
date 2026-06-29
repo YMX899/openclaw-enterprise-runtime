@@ -704,7 +704,7 @@ export type SessionSystemPromptReport = {
   skills: {
     promptChars: number;
     hash?: string;
-    entries: Array<{ name: string; blockChars: number }>;
+    entries: Array<{ name: string; blockChars: number; location?: string }>;
   };
   tools: {
     listChars: number;

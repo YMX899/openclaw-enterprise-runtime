@@ -1703,6 +1703,8 @@ export async function runEmbeddedAgent(
             bootstrapContextRunKind: params.bootstrapContextRunKind,
             jobId: params.jobId,
             toolsAllow: params.toolsAllow,
+            toolsDeny: params.toolsDeny,
+            enterpriseWorkspaceBoundary: params.enterpriseWorkspaceBoundary,
             disableMessageTool: params.disableMessageTool,
             forceMessageTool: params.forceMessageTool,
             enableHeartbeatTool: params.enableHeartbeatTool,

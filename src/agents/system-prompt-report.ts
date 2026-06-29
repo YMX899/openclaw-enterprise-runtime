@@ -26,7 +26,9 @@ function extractBetween(input: string, startMarker: string, endMarker: string): 
   return end === -1 ? input.slice(start) : input.slice(start, end);
 }
 
-function parseSkillBlocks(skillsPrompt: string): Array<{ name: string; blockChars: number }> {
+function parseSkillBlocks(
+  skillsPrompt: string,
+): Array<{ name: string; blockChars: number; location?: string }> {
   const prompt = skillsPrompt.trim();
   if (!prompt) {
     return [];
@@ -37,7 +39,8 @@ function parseSkillBlocks(skillsPrompt: string): Array<{ name: string; blockChar
   return blocks
     .map((block) => {
       const name = block.match(/<name>\s*([^<]+?)\s*<\/name>/i)?.[1]?.trim() || "(unknown)";
-      return { name, blockChars: block.length };
+      const location = block.match(/<location>\s*([^<]+?)\s*<\/location>/i)?.[1]?.trim();
+      return { name, blockChars: block.length, ...(location ? { location } : {}) };
     })
     .filter((b) => b.blockChars > 0);
 }

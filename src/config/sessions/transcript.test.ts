@@ -282,6 +282,57 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     }
   });
 
+  it("falls back inside the explicit store directory instead of the global state dir", async () => {
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    const explicitRoot = fs.mkdtempSync(path.join(os.tmpdir(), "transcript-explicit-store-"));
+    const globalRoot = fs.mkdtempSync(path.join(os.tmpdir(), "transcript-global-store-"));
+    try {
+      process.env.OPENCLAW_STATE_DIR = globalRoot;
+      const explicitSessionsDir = path.join(
+        explicitRoot,
+        "agents",
+        "enterprise-runtime",
+        "sessions",
+      );
+      fs.mkdirSync(explicitSessionsDir, { recursive: true });
+      const storePath = path.join(explicitSessionsDir, "sessions.json");
+      fs.writeFileSync(
+        storePath,
+        JSON.stringify({
+          [sessionKey]: {
+            sessionId,
+            chatType: "direct",
+          },
+        }),
+        "utf-8",
+      );
+
+      const result = await appendAssistantMessageToSessionTranscript({
+        agentId: "enterprise-runtime",
+        sessionKey,
+        text: "Hello explicit store",
+        storePath,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.sessionFile).toBe(
+          resolveSessionTranscriptPathInDir(sessionId, explicitSessionsDir),
+        );
+        expect(result.sessionFile.startsWith(globalRoot)).toBe(false);
+        expect(fs.existsSync(result.sessionFile)).toBe(true);
+      }
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+      fs.rmSync(explicitRoot, { recursive: true, force: true });
+      fs.rmSync(globalRoot, { recursive: true, force: true });
+    }
+  });
+
   it("emits transcript update events for delivery mirrors", async () => {
     const store = {
       [sessionKey]: {

@@ -15,6 +15,7 @@ import {
   REQUIRED_PARAM_GROUPS,
   assertRequiredParams,
   getToolParamsRecord,
+  normalizePathParamAliases,
   stripMalformedXmlArgValueSuffix,
   stripMalformedXmlArgValueSuffixFromKeys,
   wrapToolParamValidation,
@@ -32,6 +33,7 @@ export {
   REQUIRED_PARAM_GROUPS,
   assertRequiredParams,
   getToolParamsRecord,
+  normalizePathParamAliases,
   wrapToolParamValidation,
 } from "./agent-tools.params.js";
 
@@ -637,15 +639,19 @@ export function wrapToolMemoryFlushAppendOnlyWrite(
     description: `${tool.description} During memory flush, this tool may only append to ${options.relativePath}.`,
     execute: async (toolCallId, args, signal, onUpdate) => {
       const record = getToolParamsRecord(args);
-      const normalizedRecord = record
-        ? stripMalformedXmlArgValueSuffixFromKeys(record, ["path"])
+      const strippedRecord = record
+        ? stripMalformedXmlArgValueSuffixFromKeys(record, ["path", "file_path", "filePath"])
+        : undefined;
+      const normalizedRecord = strippedRecord
+        ? normalizePathParamAliases(strippedRecord)
         : undefined;
       assertRequiredParams(normalizedRecord, REQUIRED_PARAM_GROUPS.write, tool.name);
       const filePath =
         typeof normalizedRecord?.path === "string" && normalizedRecord.path.trim()
           ? normalizedRecord.path
           : undefined;
-      const content = typeof record?.content === "string" ? record.content : undefined;
+      const content =
+        typeof normalizedRecord?.content === "string" ? normalizedRecord.content : undefined;
       if (!filePath || content === undefined) {
         return tool.execute(toolCallId, args, signal, onUpdate);
       }
@@ -744,7 +750,9 @@ export function wrapToolWorkspaceRootGuardWithOptions(
   },
 ): AnyAgentTool {
   const pathParamKeys =
-    options?.pathParamKeys && options.pathParamKeys.length > 0 ? options.pathParamKeys : ["path"];
+    options?.pathParamKeys && options.pathParamKeys.length > 0
+      ? options.pathParamKeys
+      : ["path", "file_path", "filePath"];
   return {
     ...tool,
     execute: async (toolCallId, args, signal, onUpdate) => {
@@ -800,7 +808,11 @@ export function wrapToolWorkspaceRootGuardWithOptions(
           normalizedRecord[key] = sandboxResult.resolved;
         }
       }
-      return tool.execute(toolCallId, normalizedRecord ?? args, signal, onUpdate);
+      const argsRecord = getToolParamsRecord(normalizedRecord ?? args);
+      const normalizedArgs = argsRecord
+        ? normalizePathParamAliases(argsRecord)
+        : (normalizedRecord ?? args);
+      return tool.execute(toolCallId, normalizedArgs, signal, onUpdate);
     },
   };
 }
@@ -858,8 +870,11 @@ export function createOpenClawReadTool(
     ...base,
     execute: async (toolCallId, params, signal) => {
       const record = getToolParamsRecord(params);
-      const normalizedRecord = record
-        ? stripMalformedXmlArgValueSuffixFromKeys(record, ["path"])
+      const strippedRecord = record
+        ? stripMalformedXmlArgValueSuffixFromKeys(record, ["path", "file_path", "filePath"])
+        : undefined;
+      const normalizedRecord = strippedRecord
+        ? normalizePathParamAliases(strippedRecord)
         : undefined;
       assertRequiredParams(normalizedRecord, REQUIRED_PARAM_GROUPS.read, base.name);
       const result = await executeReadWithAdaptivePaging({

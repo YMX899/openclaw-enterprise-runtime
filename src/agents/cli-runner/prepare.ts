@@ -165,6 +165,11 @@ export async function prepareCliRunContext(
       `CLI backend ${backendResolved.id} cannot enforce runtime toolsAllow; use an embedded runtime for restricted tool policy`,
     );
   }
+  if (params.toolsDeny !== undefined) {
+    throw new Error(
+      `CLI backend ${backendResolved.id} cannot enforce runtime toolsDeny; use an embedded runtime for restricted tool policy`,
+    );
+  }
   if (params.disableTools === true && backendResolved.nativeToolMode === "always-on") {
     throw new Error(
       `CLI backend ${backendResolved.id} cannot run with tools disabled because it exposes native tools`,

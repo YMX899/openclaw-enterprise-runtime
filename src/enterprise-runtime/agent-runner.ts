@@ -5,7 +5,30 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { defaultRuntime } from "../runtime.js";
 import { buildEnterpriseRunOpenClawConfig } from "./config/run-config.js";
 import { ENTERPRISE_RUNTIME_SESSION_NAMESPACE } from "./constants.js";
+import { buildEnterpriseRuntimeSessionResult } from "./session-store.js";
 import type { RuntimeRunContext } from "./types.js";
+
+function imageInputsFromContext(
+  ctx: RuntimeRunContext,
+): Pick<AgentCommandIngressOpts, "images" | "imageOrder"> {
+  const images = ctx.attachments.flatMap((attachment) =>
+    attachment.image ? [attachment.image] : [],
+  );
+  if (!images.length) {
+    return {};
+  }
+  const imageOrder = (ctx.input.attachments ?? []).flatMap((inputAttachment) => {
+    const resolved = ctx.attachments.find(
+      (attachment) =>
+        attachment.path === inputAttachment.path || attachment.name === inputAttachment.name,
+    );
+    return resolved?.image ? ["inline" as const] : [];
+  });
+  return {
+    images,
+    imageOrder: imageOrder.length ? imageOrder : images.map(() => "inline" as const),
+  };
+}
 
 function finalAnswerFromAgentResult(
   result: Awaited<ReturnType<typeof agentCommandFromIngress>>,
@@ -19,6 +42,16 @@ function finalAnswerFromAgentResult(
   return text || undefined;
 }
 
+function rawAgentSessionMeta(result: Awaited<ReturnType<typeof agentCommandFromIngress>>): {
+  sessionId?: unknown;
+  sessionFile?: unknown;
+} {
+  return {
+    sessionId: result?.meta?.agentMeta?.sessionId,
+    sessionFile: result?.meta?.agentMeta?.sessionFile,
+  };
+}
+
 export async function runEnterpriseAgent(
   ctx: RuntimeRunContext,
   baseConfig: OpenClawConfig,
@@ -29,11 +62,14 @@ export async function runEnterpriseAgent(
   const runConfig = buildEnterpriseRunOpenClawConfig({
     baseConfig,
     snapshot: ctx.configSnapshot,
+    stateDir: ctx.dirs.stateDir,
     lease: ctx.modelKeyLease,
   });
+  const imageInput = imageInputsFromContext(ctx);
   const agentOpts: AgentCommandIngressOpts = {
     message: ctx.input.message,
     transcriptMessage: ctx.input.message,
+    ...imageInput,
     sessionKey: ctx.session.sessionKey,
     sessionStoreNamespace: ENTERPRISE_RUNTIME_SESSION_NAMESPACE,
     workspaceDir: ctx.workspace.root,
@@ -49,6 +85,7 @@ export async function runEnterpriseAgent(
     promptMode: ctx.configSnapshot.prompt?.mode,
     extraSystemPrompt: ctx.configSnapshot.prompt?.extraSystemPrompt,
     toolsAllow: ctx.configSnapshot.tools.allow,
+    toolsDeny: ctx.configSnapshot.tools.deny,
     senderIsOwner: true,
     allowModelOverride: true,
     deliver: false,
@@ -75,6 +112,10 @@ export async function runEnterpriseAgent(
       openclawSessionKey: ctx.session.sessionKey,
       workspaceDir: ctx.workspace.root,
       resolvedConfigSnapshotId: ctx.configSnapshot.snapshotId,
+      session: buildEnterpriseRuntimeSessionResult({
+        ctx,
+        ...rawAgentSessionMeta(rawAgentResult),
+      }),
       finalAnswer,
       logs: {
         eventsPath: `${ctx.dirs.runDir}/events.jsonl`,
@@ -85,6 +126,8 @@ export async function runEnterpriseAgent(
         model: ctx.configSnapshot.model.model,
         authPoolId: ctx.configSnapshot.model.authPoolId,
         keyId: ctx.modelKeyLease?.keyId,
+        input: ctx.configSnapshot.model.input ?? ["text"],
+        attachmentCount: ctx.attachments.length,
       },
     },
   };

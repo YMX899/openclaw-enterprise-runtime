@@ -8,6 +8,7 @@ import type { RuntimeRunSpec } from "../../../packages/gateway-protocol/src/sche
 import { getRuntimeConfig } from "../../config/io.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { runEnterpriseAgent } from "../../enterprise-runtime/agent-runner.js";
+import { resolveRuntimeAttachments } from "../../enterprise-runtime/attachments.js";
 import { loadEnterpriseRuntimeConfigFile } from "../../enterprise-runtime/config/load-runtime-config.js";
 import {
   assertEnterpriseShellPolicy,
@@ -24,9 +25,9 @@ import { RuntimeEventLogger } from "../../enterprise-runtime/event-logger.js";
 import { acquireModelKeyLease } from "../../enterprise-runtime/model-broker/broker.js";
 import { classifyModelKeyLeaseError } from "../../enterprise-runtime/model-broker/error-classification.js";
 import {
-  assertRuntimeAttachmentsInsideWorkspace,
   resolveEnterpriseRuntimeConfigPath,
   resolveRuntimeDirs,
+  resolveRuntimeStoreDirs,
   resolveRuntimeWorkspace,
 } from "../../enterprise-runtime/paths.js";
 import { buildRuntimeRunResult, statusForError } from "../../enterprise-runtime/result.js";
@@ -34,9 +35,34 @@ import {
   buildEnterpriseSessionLockKey,
   runWithSessionLock,
 } from "../../enterprise-runtime/session-lock.js";
+import {
+  assertNoStalledRuntimeRun,
+  clearRuntimeRunStalled,
+  markRuntimeRunStalled,
+} from "../../enterprise-runtime/stalled-run-guard.js";
 import type { RuntimeRunContext } from "../../enterprise-runtime/types.js";
 import { runWithWorkspaceQueue } from "../../enterprise-runtime/workspace-queue.js";
 import type { GatewayRequestHandlers } from "./types.js";
+
+function assertRuntimeModelSupportsAttachments(ctx: RuntimeRunContext): void {
+  const hasImageAttachment = ctx.attachments.some((attachment) => attachment.image);
+  if (!hasImageAttachment) {
+    return;
+  }
+  if (ctx.configSnapshot.model.input?.includes("image")) {
+    return;
+  }
+  throw new EnterpriseRuntimeError(
+    "RUNTIME_MODEL_INPUT_UNSUPPORTED",
+    "current model profile does not support image input",
+    {
+      provider: ctx.configSnapshot.model.provider,
+      model: ctx.configSnapshot.model.model,
+      input: ctx.configSnapshot.model.input ?? ["text"],
+      attachmentCount: ctx.attachments.length,
+    },
+  );
+}
 
 function resolveMaxRunMs(fallbackSeconds?: number): number | undefined {
   const seconds = fallbackSeconds;
@@ -65,30 +91,71 @@ function createAbortSignal(maxRunMs: number | undefined): {
   };
 }
 
+function timeoutError(): EnterpriseRuntimeError {
+  return new EnterpriseRuntimeError("RUNTIME_TIMEOUT", "enterprise runtime run timed out");
+}
+
+async function runWithHardTimeout<T>(params: {
+  signal?: AbortSignal;
+  task: () => Promise<T>;
+  onDetachedTimeout?: () => void;
+  onDetachedTaskSettled?: () => void;
+}): Promise<T> {
+  const signal = params.signal;
+  if (!signal) {
+    return await params.task();
+  }
+  if (signal.aborted) {
+    throw signal.reason instanceof Error ? signal.reason : timeoutError();
+  }
+  return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let detached = false;
+    const finish = (fn: typeof resolve | typeof reject, value: T | unknown) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      fn(value as T);
+    };
+    const onAbort = () => {
+      detached = true;
+      params.onDetachedTimeout?.();
+      finish(reject, signal.reason instanceof Error ? signal.reason : timeoutError());
+    };
+    const finishTask = (fn: typeof resolve | typeof reject, value: T | unknown) => {
+      if (detached) {
+        params.onDetachedTaskSettled?.();
+      }
+      finish(fn, value);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    void params.task().then(
+      (value) => finishTask(resolve, value),
+      (error) => finishTask(reject, error),
+    );
+  });
+}
+
 async function buildRunContext(spec: RuntimeRunSpec): Promise<{
   ctx: RuntimeRunContext;
   baseConfig: OpenClawConfig;
 }> {
   const workspace = await resolveRuntimeWorkspace(spec);
-  await assertRuntimeAttachmentsInsideWorkspace(spec, workspace.root);
   const configPath = resolveEnterpriseRuntimeConfigPath(spec);
   const configFile = await loadEnterpriseRuntimeConfigFile(configPath);
   const { runtimeConfig, snapshot } = resolveRuntimeConfigSnapshot({ configFile, spec });
   const baseConfig = getRuntimeConfig({ pin: false });
+  const storeDirs = resolveRuntimeStoreDirs({ configFile, runtimeConfig });
   const dirs = await resolveRuntimeDirs({
     spec,
     workspaceRoot: workspace.root,
-    configStateDir: runtimeConfig.stateDir,
-    configLogsDir: runtimeConfig.logsDir,
-    configTmpRoot: runtimeConfig.tmpRoot,
+    configStateDir: storeDirs.stateDir,
+    configLogsDir: storeDirs.logsDir,
+    configTmpRoot: storeDirs.tmpRoot,
   });
   await saveResolvedRuntimeConfigSnapshot({ stateDir: dirs.stateDir, snapshot });
-
-  const sandboxed = false;
-  assertEnterpriseShellPolicy({ toolsAllow: snapshot.tools.allow, sandboxed });
-  if (spec.workspace.accessMode === "read") {
-    assertReadModeTools(snapshot.tools.allow);
-  }
 
   return {
     ctx: {
@@ -108,6 +175,7 @@ async function buildRunContext(spec: RuntimeRunSpec): Promise<{
         sessionKey: spec.productSession.openclawSessionKey,
       },
       input: spec.input,
+      attachments: [],
       configSnapshot: snapshot,
       credentialPools: configFile.credentialPools,
       dirs,
@@ -147,23 +215,39 @@ export const enterpriseRuntimeHandlers: GatewayRequestHandlers = {
       const built = await buildRunContext(params);
       ctx = built.ctx;
       baseConfig = built.baseConfig;
+      const lockKey = buildEnterpriseSessionLockKey(ctx.session.namespace, ctx.session.sessionKey);
+      const stalledEntries = [
+        { scope: "workspace" as const, key: ctx.workspace.queueKey },
+        { scope: "session" as const, key: lockKey },
+      ];
+      assertNoStalledRuntimeRun(stalledEntries);
       logger = new RuntimeEventLogger(ctx);
       await logger.event({ eventType: "run.accepted" });
       await logger.event({ eventType: "config.snapshot.created" });
       await logger.event({ eventType: "workspace.boundary.created" });
+      ctx.attachments = await resolveRuntimeAttachments({
+        spec: params,
+        workspaceRoot: ctx.workspace.root,
+      });
+      await logger.event({
+        eventType: "attachments.resolved",
+        attachmentCount: ctx.attachments.length,
+      });
+      assertRuntimeModelSupportsAttachments(ctx);
+      const sandboxed = false;
+      assertEnterpriseShellPolicy({ toolsAllow: ctx.configSnapshot.tools.allow, sandboxed });
+      if (ctx.workspace.accessMode === "read") {
+        assertReadModeTools(ctx.configSnapshot.tools.allow);
+      }
 
-      const queued = await runWithWorkspaceQueue(ctx.workspace.queueKey, async (queue) => {
+      const completed = await runWithWorkspaceQueue(ctx.workspace.queueKey, async (queue) => {
         await logger?.event({ eventType: "run.queued", queue });
-        const lockKey = buildEnterpriseSessionLockKey(
-          ctx!.session.namespace,
-          ctx!.session.sessionKey,
-        );
         return await runWithSessionLock(lockKey, async () => {
+          await logger?.event({ eventType: "session.lock.acquired" });
           const abort = createAbortSignal(
             resolveMaxRunMs(ctx!.configSnapshot.limits?.maxRunSeconds),
           );
           ctx!.abortSignal = abort.signal;
-          await logger?.event({ eventType: "session.lock.acquired" });
           await logger?.event({ eventType: "run.started" });
           try {
             const lease = await acquireModelKeyLease({
@@ -182,23 +266,58 @@ export const enterpriseRuntimeHandlers: GatewayRequestHandlers = {
                 keyId: lease.keyId,
               });
             }
+            let leaseReleaseDeferredToDetachedTask = false;
             try {
-              const agent = await runEnterpriseAgent(ctx!, baseConfig!);
-              return buildRuntimeRunResult({
+              const agent = await runWithHardTimeout({
+                signal: ctx!.abortSignal,
+                task: () => runEnterpriseAgent(ctx!, baseConfig!),
+                onDetachedTimeout: () => {
+                  leaseReleaseDeferredToDetachedTask = true;
+                  markRuntimeRunStalled({ entries: stalledEntries, runId: ctx!.runId });
+                },
+                onDetachedTaskSettled: () => {
+                  clearRuntimeRunStalled({ entries: stalledEntries, runId: ctx!.runId });
+                  lease?.release("overloaded");
+                  ctx!.modelKeyLease = undefined;
+                },
+              });
+              const fallbackResult = buildRuntimeRunResult({
                 ctx: ctx!,
                 status: "succeeded",
                 finalAnswer: agent.result.finalAnswer,
                 queue,
                 keyId: lease?.keyId,
               });
+              return {
+                ...fallbackResult,
+                ...agent.result,
+                queue,
+                session: {
+                  ...fallbackResult.session,
+                  ...agent.result.session,
+                },
+                logs: {
+                  ...fallbackResult.logs,
+                  ...agent.result.logs,
+                },
+                usage: {
+                  ...fallbackResult.usage,
+                  ...agent.result.usage,
+                  ...(lease?.keyId && !agent.result.usage?.keyId ? { keyId: lease.keyId } : {}),
+                },
+              };
             } catch (error) {
-              lease?.release(
-                ctx!.abortSignal?.aborted ? "overloaded" : classifyModelKeyLeaseError(error),
-              );
+              if (!leaseReleaseDeferredToDetachedTask) {
+                lease?.release(
+                  ctx!.abortSignal?.aborted ? "overloaded" : classifyModelKeyLeaseError(error),
+                );
+              }
               throw error;
             } finally {
-              lease?.release();
-              ctx!.modelKeyLease = undefined;
+              if (!leaseReleaseDeferredToDetachedTask) {
+                lease?.release();
+                ctx!.modelKeyLease = undefined;
+              }
             }
           } finally {
             activeRunAborted = ctx!.abortSignal?.aborted === true;
@@ -208,9 +327,12 @@ export const enterpriseRuntimeHandlers: GatewayRequestHandlers = {
         });
       });
 
-      await logger.event({ eventType: "run.finished", status: queued.result.status });
-      await logger.result(queued.result);
-      respond(true, queued.result, undefined);
+      await logger.event({
+        eventType: "run.finished",
+        status: completed.result.status,
+      });
+      await logger.result(completed.result);
+      respond(true, completed.result, undefined);
     } catch (error) {
       if (logger) {
         await logger.error(error);

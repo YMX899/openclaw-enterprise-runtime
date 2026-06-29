@@ -156,6 +156,41 @@ function getCompactReadClassification(
   return undefined;
 }
 
+function resolveSkillDirectoryReadPath(absolutePath: string, cwd: string): string | undefined {
+  const relativePath = relative(resolvePath(cwd), resolvePath(absolutePath));
+  if (
+    !relativePath ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${sep}`) ||
+    isAbsolute(relativePath)
+  ) {
+    return undefined;
+  }
+
+  const parts = relativePath.split(sep).filter(Boolean);
+  if (parts.length < 2 || parts[0] !== "skills" || parts.at(-1) === "SKILL.md") {
+    return undefined;
+  }
+  return resolvePath(absolutePath, "SKILL.md");
+}
+
+async function resolveReadFilePath(params: {
+  absolutePath: string;
+  cwd: string;
+  operations: ReadOperations;
+}): Promise<string> {
+  const skillFilePath = resolveSkillDirectoryReadPath(params.absolutePath, params.cwd);
+  if (!skillFilePath) {
+    return params.absolutePath;
+  }
+  try {
+    await params.operations.access(skillFilePath);
+    return skillFilePath;
+  } catch {
+    return params.absolutePath;
+  }
+}
+
 function formatCompactReadCall(
   classification: CompactReadClassification,
   args: ReadRenderArgs | undefined,
@@ -264,15 +299,20 @@ export function createReadToolDefinition(
             if (aborted) {
               return;
             }
+            const readPath = await resolveReadFilePath({
+              absolutePath,
+              cwd,
+              operations: ops,
+            });
             const mimeType = ops.detectImageMimeType
-              ? await ops.detectImageMimeType(absolutePath)
+              ? await ops.detectImageMimeType(readPath)
               : undefined;
             let content: (TextContent | ImageContent)[];
             let details: ReadToolDetails | undefined;
             const nonVisionImageNote = getNonVisionImageNote(ctx?.model);
             if (mimeType) {
               // Read image as binary.
-              const buffer = await ops.readFile(absolutePath);
+              const buffer = await ops.readFile(readPath);
               const base64 = buffer.toString("base64");
               if (autoResizeImages) {
                 // Resize image if needed before sending it back to the model.
@@ -309,7 +349,7 @@ export function createReadToolDefinition(
               }
             } else {
               // Read text content.
-              const buffer = await ops.readFile(absolutePath);
+              const buffer = await ops.readFile(readPath);
               const textContent = buffer.toString("utf-8");
               const allLines = textContent.split("\n");
               const totalFileLines = allLines.length;

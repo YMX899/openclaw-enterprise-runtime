@@ -86,6 +86,8 @@ export type RunCliAgentParams = {
   senderIsOwner?: boolean;
   /** Runtime tool allow-list. CLI harnesses fail closed when this is set. */
   toolsAllow?: string[];
+  /** Runtime tool deny-list. CLI harnesses fail closed when this is set. */
+  toolsDeny?: string[];
   disableTools?: boolean;
   abortSignal?: AbortSignal;
   onExecutionStarted?: () => void;

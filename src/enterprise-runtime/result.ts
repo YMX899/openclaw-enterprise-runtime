@@ -3,6 +3,7 @@ import type {
   RuntimeQueueState,
 } from "../../packages/gateway-protocol/src/schema/enterprise-runtime.js";
 import { EnterpriseRuntimeError, toRuntimeError } from "./errors.js";
+import { buildEnterpriseRuntimeSessionResult } from "./session-store.js";
 import type { RuntimeRunContext } from "./types.js";
 
 export function buildRuntimeRunResult(params: {
@@ -21,6 +22,7 @@ export function buildRuntimeRunResult(params: {
     openclawSessionKey: params.ctx.session.sessionKey,
     workspaceDir: params.ctx.workspace.root,
     resolvedConfigSnapshotId: params.ctx.configSnapshot.snapshotId,
+    session: buildEnterpriseRuntimeSessionResult({ ctx: params.ctx }),
     logs: {
       eventsPath: `${params.ctx.dirs.runDir}/events.jsonl`,
       accessDenyPath: `${params.ctx.dirs.runDir}/access-deny.jsonl`,
@@ -33,6 +35,8 @@ export function buildRuntimeRunResult(params: {
         ? { authPoolId: params.ctx.configSnapshot.model.authPoolId }
         : {}),
       ...(params.keyId ? { keyId: params.keyId } : {}),
+      input: params.ctx.configSnapshot.model.input ?? ["text"],
+      attachmentCount: params.ctx.attachments.length,
     },
     ...(params.finalAnswer !== undefined ? { finalAnswer: params.finalAnswer } : {}),
     ...(params.queue ? { queue: params.queue } : {}),

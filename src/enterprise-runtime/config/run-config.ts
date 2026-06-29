@@ -5,6 +5,7 @@ import type {
 } from "../../config/types.models.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import type { ModelKeyLease } from "../model-broker/types.js";
+import { resolveEnterpriseRuntimeSessionStorePath } from "../session-store.js";
 import type { ResolvedRuntimeConfigSnapshot } from "./types.js";
 
 const DEFAULT_BASE_URL: Record<string, string> = {
@@ -89,9 +90,10 @@ function providerBaseConfigWithoutAuth(config: ModelProviderConfig | undefined) 
 export function buildEnterpriseRunOpenClawConfig(params: {
   baseConfig: OpenClawConfig;
   snapshot: ResolvedRuntimeConfigSnapshot;
+  stateDir?: string;
   lease?: ModelKeyLease;
 }): OpenClawConfig {
-  const { baseConfig, snapshot, lease } = params;
+  const { baseConfig, snapshot, stateDir, lease } = params;
   const provider = snapshot.model.provider;
   const model = snapshot.model.model;
   const api = normalizeApi(snapshot.model.api);
@@ -140,6 +142,14 @@ export function buildEnterpriseRunOpenClawConfig(params: {
   const primary = modelRef(provider, model);
   return {
     ...baseConfig,
+    ...(stateDir
+      ? {
+          session: {
+            ...baseConfig.session,
+            store: resolveEnterpriseRuntimeSessionStorePath(stateDir),
+          },
+        }
+      : {}),
     models: {
       ...baseConfig.models,
       providers: {

@@ -35,7 +35,7 @@ async function loadModule() {
 let wrapToolWorkspaceRootGuardWithOptions: typeof import("./agent-tools.read.js").wrapToolWorkspaceRootGuardWithOptions;
 
 describe("wrapToolWorkspaceRootGuardWithOptions", () => {
-  const root = "/tmp/root";
+  const root = path.resolve("/tmp/root");
   const assertSandboxPathImpl: AssertSandboxPath = async ({ filePath }) => ({
     resolved:
       filePath.startsWith("file://") || path.isAbsolute(filePath)
@@ -80,6 +80,25 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
     expect(execute).toHaveBeenCalledWith(
       "tc-suffix",
       { path: "docs/readme.md" },
+      undefined,
+      undefined,
+    );
+  });
+
+  it("guards default file_path aliases and normalizes them for execution", async () => {
+    const { execute, tool } = createToolHarness();
+    const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root);
+
+    await wrapped.execute("tc-file-path-alias", { file_path: "docs/readme.md" });
+
+    expect(mocks.assertSandboxPath).toHaveBeenCalledWith({
+      filePath: "docs/readme.md",
+      cwd: root,
+      root,
+    });
+    expect(execute).toHaveBeenCalledWith(
+      "tc-file-path-alias",
+      { file_path: "docs/readme.md", path: "docs/readme.md" },
       undefined,
       undefined,
     );
@@ -211,7 +230,7 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
 
   it("maps additional container mounts to their own guarded host roots", async () => {
     const { tool } = createToolHarness();
-    const agentRoot = "/tmp/agent-root";
+    const agentRoot = path.resolve("/tmp/agent-root");
     const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
       additionalContainerMounts: [{ containerRoot: "/agent", hostRoot: agentRoot }],
       containerWorkdir: "/workspace",
@@ -228,7 +247,7 @@ describe("wrapToolWorkspaceRootGuardWithOptions", () => {
 
   it("maps file URLs under additional container mounts", async () => {
     const { tool } = createToolHarness();
-    const agentRoot = "/tmp/agent-root";
+    const agentRoot = path.resolve("/tmp/agent-root");
     const wrapped = wrapToolWorkspaceRootGuardWithOptions(tool, root, {
       additionalContainerMounts: [{ containerRoot: "/agent", hostRoot: agentRoot }],
       containerWorkdir: "/workspace",

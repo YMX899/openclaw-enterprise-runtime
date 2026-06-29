@@ -596,6 +596,7 @@ export function runAgentAttempt(params: {
         agentAccountId: params.runContext.accountId,
         senderIsOwner: params.opts.senderIsOwner,
         toolsAllow: params.opts.toolsAllow,
+        toolsDeny: params.opts.toolsDeny,
         cleanupBundleMcpOnRunEnd: params.opts.cleanupBundleMcpOnRunEnd,
         cleanupCliLiveSessionOnRunEnd: params.opts.cleanupCliLiveSessionOnRunEnd,
         ...(mutableCliSessionStore
@@ -692,6 +693,7 @@ export function runAgentAttempt(params: {
     bootstrapContextMode: params.opts.bootstrapContextMode,
     bootstrapContextRunKind: params.opts.bootstrapContextRunKind,
     toolsAllow: params.opts.toolsAllow,
+    toolsDeny: params.opts.toolsDeny,
     enterpriseWorkspaceBoundary: params.opts.enterpriseRuntime?.runContext.boundary,
     internalEvents: params.opts.internalEvents,
     inputProvenance: params.opts.inputProvenance,

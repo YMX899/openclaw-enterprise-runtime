@@ -11,7 +11,8 @@ export type RequiredParamGroup = {
 
 const RETRY_GUIDANCE_SUFFIX = " Supply correct parameters before retrying.";
 const XML_ARG_VALUE_SUFFIX_RE = /<\/arg_value>>+$/;
-const XML_ARG_VALUE_PATH_PARAM_KEYS = new Set(["path"]);
+const PATH_PARAM_ALIASES = ["path", "file_path", "filePath"] as const;
+const XML_ARG_VALUE_PATH_PARAM_KEYS: ReadonlySet<string> = new Set(PATH_PARAM_ALIASES);
 
 function parameterValidationError(message: string): Error {
   return new Error(`${message}.${RETRY_GUIDANCE_SUFFIX}`);
@@ -85,16 +86,33 @@ function hasValidEditReplacements(record: Record<string, unknown>): boolean {
 }
 
 export const REQUIRED_PARAM_GROUPS = {
-  read: [{ keys: ["path"], label: "path" }],
+  read: [{ keys: PATH_PARAM_ALIASES, label: "path" }],
   write: [
-    { keys: ["path"], label: "path" },
+    { keys: PATH_PARAM_ALIASES, label: "path" },
     { keys: ["content"], label: "content" },
   ],
   edit: [
-    { keys: ["path"], label: "path" },
+    { keys: PATH_PARAM_ALIASES, label: "path" },
     { keys: ["edits"], label: "edits", validator: hasValidEditReplacements },
   ],
 } as const;
+
+export function normalizePathParamAliases<T extends Record<string, unknown>>(record: T): T {
+  const primary = record.path;
+  if (typeof primary === "string" && primary.trim()) {
+    return record;
+  }
+
+  for (const key of PATH_PARAM_ALIASES) {
+    const value = record[key];
+    if (typeof value !== "string" || !value.trim()) {
+      continue;
+    }
+    return { ...record, path: value };
+  }
+
+  return record;
+}
 
 /** Return a record view of model-supplied tool params when possible. */
 export function getToolParamsRecord(params: unknown): Record<string, unknown> | undefined {
@@ -191,10 +209,14 @@ export function wrapToolParamValidation(
     execute: async (toolCallId, params, signal, onUpdate) => {
       const record = getToolParamsRecord(params);
       const pathKeys = resolveMalformedXmlArgValuePathKeys(requiredParamGroups);
-      const normalizedParams =
+      const strippedParams =
         record && pathKeys.length > 0
           ? stripMalformedXmlArgValueSuffixFromKeys(record, pathKeys)
           : params;
+      const strippedRecord = getToolParamsRecord(strippedParams);
+      const normalizedParams = strippedRecord
+        ? normalizePathParamAliases(strippedRecord)
+        : strippedParams;
       if (requiredParamGroups?.length) {
         assertRequiredParams(getToolParamsRecord(normalizedParams), requiredParamGroups, tool.name);
       }

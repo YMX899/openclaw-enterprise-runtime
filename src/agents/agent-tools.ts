@@ -491,6 +491,8 @@ export function createOpenClawCodingTools(options?: {
   allowGatewaySubagentBinding?: boolean;
   /** Runtime-scoped explicit allowlist used to materialize matching plugin tools. */
   runtimeToolAllowlist?: string[];
+  /** Runtime-scoped explicit denylist. Deny entries take precedence over allow entries. */
+  runtimeToolDenylist?: string[];
   /** If true, the model has native vision capability */
   modelHasVision?: boolean;
   /** Require explicit message targets (no implicit last-route sends). */
@@ -1132,6 +1134,11 @@ export function createOpenClawCodingTools(options?: {
         unavailableCoreToolReason,
       },
       { policy: inheritedToolPolicy, label: "inherited tools", unavailableCoreToolReason },
+      {
+        policy: options?.runtimeToolDenylist ? { deny: options.runtimeToolDenylist } : undefined,
+        label: "runtime tools.deny",
+        unavailableCoreToolReason,
+      },
     ],
     auditLogLevel: options?.toolPolicyAuditLogLevel,
   });

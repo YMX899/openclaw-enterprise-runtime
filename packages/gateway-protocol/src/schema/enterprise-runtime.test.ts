@@ -40,6 +40,12 @@ function validResult() {
     workspaceDir: "/workspaces/user-1/project",
     resolvedConfigSnapshotId: "snapshot-1",
     finalAnswer: "Done.",
+    session: {
+      namespace: "enterprise-runtime",
+      storePath: "/runtime/state/agents/enterprise-runtime/sessions/sessions.json",
+      sessionId: "session-1",
+      filePath: "/runtime/state/agents/enterprise-runtime/sessions/session-1.jsonl",
+    },
     logs: {
       eventsPath: "/runtime/logs/runs/run-1/events.jsonl",
     },
@@ -48,6 +54,8 @@ function validResult() {
       model: "gpt-5",
       authPoolId: "openai-prod",
       keyId: "openai-prod-001",
+      input: ["text", "image"],
+      attachmentCount: 0,
     },
   };
 }

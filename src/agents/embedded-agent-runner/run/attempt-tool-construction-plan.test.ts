@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyEmbeddedAttemptToolsPolicy,
   applyEmbeddedAttemptToolsAllow,
   mergeForcedEmbeddedAttemptToolsAllow,
   resolveEmbeddedAttemptToolConstructionPlan,
@@ -167,6 +168,53 @@ describe("applyEmbeddedAttemptToolsAllow", () => {
 
     expect(applyEmbeddedAttemptToolsAllow(tools, []).map((tool) => tool.name)).toStrictEqual([]);
     expect(shouldBuildCoreCodingToolsForAllowlist([])).toBe(false);
+  });
+});
+
+describe("applyEmbeddedAttemptToolsPolicy", () => {
+  it("applies runtime deny after allow and lets deny win", () => {
+    const tools = [{ name: "read" }, { name: "write" }, { name: "message" }];
+
+    expect(
+      applyEmbeddedAttemptToolsPolicy(tools, {
+        allow: ["*"],
+        deny: ["write"],
+      }).map((tool) => tool.name),
+    ).toEqual(["read", "message"]);
+  });
+
+  it("allows runtime deny to remove every allowed tool after allowlist resolution", () => {
+    const tools = [{ name: "read" }, { name: "write" }, { name: "message" }];
+    const allowFiltered = applyEmbeddedAttemptToolsAllow(tools, ["read", "write"]);
+
+    expect(allowFiltered.map((tool) => tool.name)).toEqual(["read", "write"]);
+    expect(
+      applyEmbeddedAttemptToolsPolicy(allowFiltered, {
+        allow: ["read", "write"],
+        deny: ["read", "write"],
+      }).map((tool) => tool.name),
+    ).toEqual([]);
+  });
+
+  it("expands plugin group deny entries", () => {
+    const tools = [{ name: "memory_search" }, { name: "memory_get" }, { name: "browser" }];
+    const toolMeta = (tool: { name: string }) => {
+      if (tool.name.startsWith("memory_")) {
+        return { pluginId: "active-memory" };
+      }
+      if (tool.name === "browser") {
+        return { pluginId: "browser" };
+      }
+      return undefined;
+    };
+
+    expect(
+      applyEmbeddedAttemptToolsPolicy(tools, {
+        allow: ["group:plugins"],
+        deny: ["active-memory"],
+        toolMeta,
+      }).map((tool) => tool.name),
+    ).toEqual(["browser"]);
   });
 });
 

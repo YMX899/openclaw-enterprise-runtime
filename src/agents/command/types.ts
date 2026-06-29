@@ -92,6 +92,8 @@ export type AgentCommandOpts = {
   allowModelOverride?: boolean;
   /** Optional runtime tool allow-list; when set, only these tools are exposed for this run. */
   toolsAllow?: string[];
+  /** Optional runtime tool deny-list; deny entries take precedence over allow entries. */
+  toolsDeny?: string[];
   /** Explicit session-store namespace for runtimes that do not use agent-id state partitioning. */
   sessionStoreNamespace?: string;
   /** Enterprise runtime context for single-run workspace/session/config isolation. */

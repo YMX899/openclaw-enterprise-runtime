@@ -1806,6 +1806,7 @@
                 "group": "Technical reference",
                 "pages": [
                   "agent-runtime-architecture",
+                  "enterprise-runtime",
                   "reference/wizard",
                   "reference/token-use",
                   "reference/secretref-credential-surface",

@@ -231,6 +231,92 @@ describe("createOpenClawCodingTools", () => {
     expect(names.has("bash")).toBe(false);
   });
 
+  it("blocks enterprise absolute reads outside the workspace", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-enterprise-read-boundary-"));
+    try {
+      const workspaceDir = path.join(tempRoot, "workspace");
+      const outsideFile = path.join(tempRoot, "outside-secret.txt");
+      await fs.mkdir(workspaceDir, { recursive: true });
+      await fs.writeFile(outsideFile, "outside secret", "utf8");
+      const tools = createOpenClawCodingTools({
+        workspaceDir,
+        cwd: workspaceDir,
+        enterpriseWorkspaceBoundary: {
+          root: workspaceDir,
+          accessMode: "write",
+        },
+      });
+      const readExecute = requireToolExecute(requireTool(tools, "read"));
+
+      await expect(readExecute("tool-read-outside", { path: outsideFile })).rejects.toThrow();
+      await expect(
+        readExecute("tool-read-outside-file-path", { file_path: outsideFile }),
+      ).rejects.toThrow();
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks enterprise absolute writes outside the workspace", async () => {
+    const tempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "openclaw-enterprise-write-boundary-"),
+    );
+    try {
+      const workspaceDir = path.join(tempRoot, "workspace");
+      const outsideFile = path.join(tempRoot, "outside-created.txt");
+      await fs.mkdir(workspaceDir, { recursive: true });
+      const tools = createOpenClawCodingTools({
+        workspaceDir,
+        cwd: workspaceDir,
+        enterpriseWorkspaceBoundary: {
+          root: workspaceDir,
+          accessMode: "write",
+        },
+      });
+      const writeExecute = requireToolExecute(requireTool(tools, "write"));
+
+      await expect(
+        writeExecute("tool-write-outside", {
+          path: outsideFile,
+          content: "outside content",
+        }),
+      ).rejects.toThrow();
+      await expect(
+        writeExecute("tool-write-outside-file-path", {
+          file_path: outsideFile,
+          content: "outside content",
+        }),
+      ).rejects.toThrow();
+      await expect(fs.stat(outsideFile)).rejects.toThrow();
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("lets enterprise runtime toolsDeny remove write even when workspace access is write", async () => {
+    const workspaceDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "openclaw-enterprise-deny-write-"),
+    );
+    try {
+      const tools = createOpenClawCodingTools({
+        workspaceDir,
+        cwd: workspaceDir,
+        enterpriseWorkspaceBoundary: {
+          root: workspaceDir,
+          accessMode: "write",
+        },
+        runtimeToolDenylist: ["write"],
+      });
+      const names = new Set(tools.map((tool) => normalizeToolName(tool.name)));
+
+      expect(names.has("read")).toBe(true);
+      expect(names.has("write")).toBe(false);
+      expect(names.has("edit")).toBe(true);
+    } finally {
+      await fs.rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
   it("passes explicit hook channel ids to wrapped tool hooks", async () => {
     const beforeToolCall = vi.fn();
     initializeGlobalHookRunner(
@@ -695,6 +781,19 @@ describe("createOpenClawCodingTools", () => {
 
     expect(createOpenClawToolsMock).toHaveBeenCalledTimes(1);
     expectListIncludes(latestCreateOpenClawToolsOptions().pluginToolDenylist, ["pdf"]);
+  });
+
+  it("keeps runtime tool denylist out of plugin discovery planning", () => {
+    const createOpenClawToolsMock = vi.mocked(createOpenClawTools);
+    createOpenClawToolsMock.mockClear();
+
+    const tools = createOpenClawCodingTools({
+      runtimeToolDenylist: ["write"],
+    });
+
+    expect(toolNameList(tools)).not.toContain("write");
+    expect(createOpenClawToolsMock).toHaveBeenCalledTimes(1);
+    expect(latestCreateOpenClawToolsOptions().pluginToolDenylist ?? []).not.toContain("write");
   });
 
   it("passes inherited allowlist entries to OpenClaw plugin discovery", async () => {
@@ -1417,7 +1516,7 @@ describe("createOpenClawCodingTools", () => {
     }
   });
 
-  it("rejects legacy alias parameters", async () => {
+  it("accepts model path alias parameters", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-legacy-alias-"));
     try {
       const tools = createOpenClawCodingTools({ workspaceDir: tmpDir });
@@ -1430,19 +1529,23 @@ describe("createOpenClawCodingTools", () => {
         }),
       ).rejects.toThrow(/Missing required parameter: path/);
 
-      await expect(
-        editTool?.execute("tool-legacy-edit", {
-          filePath: "legacy.txt",
-          old_text: "old",
-          newString: "new",
-        }),
-      ).rejects.toThrow(/Missing required parameters: path, edits/);
+      await writeTool?.execute("tool-alias-write", {
+        file_path: "alias.txt",
+        content: "hello old value",
+      });
+      await editTool?.execute("tool-alias-edit", {
+        filePath: "alias.txt",
+        edits: [{ oldText: "old", newText: "new" }],
+      });
+      const result = await readTool?.execute("tool-alias-read", {
+        file_path: "alias.txt",
+      });
 
-      await expect(
-        readTool?.execute("tool-legacy-read", {
-          file_path: "legacy.txt",
-        }),
-      ).rejects.toThrow(/Missing required parameter: path/);
+      const textBlocks = result?.content?.filter((block) => block.type === "text") as
+        | Array<{ text?: string }>
+        | undefined;
+      const combinedText = textBlocks?.map((block) => block.text ?? "").join("\n");
+      expect(combinedText).toContain("hello new value");
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

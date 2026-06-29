@@ -12,6 +12,8 @@ export type RuntimeConfig = {
   stateDir?: string;
   logsDir?: string;
   tmpRoot?: string;
+  sessionStoreId?: string;
+  artifactStoreId?: string;
   model: RuntimeModelOverride & {
     modelProfileId: string;
   };
@@ -115,10 +117,60 @@ export type ProviderCredentialPool = {
   };
 };
 
+export type RuntimeSessionStoreConfig =
+  | {
+      id: string;
+      type: "file";
+      rootDir: string;
+      namespace?: string;
+      maxSessionBytes?: number;
+      retentionDays?: number;
+    }
+  | {
+      id: string;
+      type: "database";
+      namespace?: string;
+      connectionRef: string;
+      tablePrefix?: string;
+      maxSessionBytes?: number;
+      retentionDays?: number;
+    }
+  | {
+      id: string;
+      type: "db-object";
+      namespace?: string;
+      connectionRef: string;
+      objectBucketRef: string;
+      objectPrefix?: string;
+      chunkBytes?: number;
+      maxSessionBytes?: number;
+      retentionDays?: number;
+    };
+
+export type RuntimeArtifactStoreConfig =
+  | {
+      id: string;
+      type: "file";
+      logsDir: string;
+      tmpRoot: string;
+      snapshotDir?: string;
+      retentionDays?: number;
+    }
+  | {
+      id: string;
+      type: "object";
+      bucketRef: string;
+      prefix?: string;
+      localCacheDir: string;
+      retentionDays?: number;
+    };
+
 export type EnterpriseRuntimeConfigFile = {
   runtimeConfigs: RuntimeConfig[];
   modelProfiles: ModelProfile[];
   credentialPools?: ProviderCredentialPool[];
+  sessionStores?: RuntimeSessionStoreConfig[];
+  artifactStores?: RuntimeArtifactStoreConfig[];
 };
 
 export type ResolvedRuntimeConfigSnapshot = {

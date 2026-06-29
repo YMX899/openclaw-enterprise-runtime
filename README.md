@@ -39,6 +39,7 @@
 - 把 OpenClaw 的 agent / subagent 默认并发提升到 1000。
 - 增加大模型 API key 请求池，遇到 rate limit 自动切换可用 key。
 - 提供可重复的压力测试脚本，确认 runtime 能同时触发 1000 个 agent 模型请求。
+- 提供 `enterprise.runtime.run`，让上游产品服务显式传入用户 workspace、OpenClaw session key、runtime config、附件和运行目录。
 
 项目目标很明确：让开发者能在 OpenClaw 的执行能力上，搭一个真正面向大众用户的 agent 系统。
 
@@ -128,6 +129,17 @@ API key pool mock:
 ```
 
 这说明 OpenClaw runtime 已经可以同时把 1000 个 agent 推到模型请求层。真实 provider 是否全部成功，取决于上游账号、模型、RPM/TPM、并发额度和 key 池配置。
+
+`enterprise.runtime.run` 当前已经支持真实 workspace 直跑、OpenClaw 原生 session 续写、file session/artifact store、workspace queue、session lock、附件校验、模型 input 能力检查、API key pool、hard timeout、stalled-run guard 和 detached key lease 延迟释放。详细契约见 [Enterprise runtime](docs/enterprise-runtime.md)。
+
+2026-06-29 真实服务器上线前测试证明主链路可跑通，但还不是最终生产放行版本。上线前 P0：
+
+```text
+RuntimeConfig.limits.maxToolCalls 已定义，但 live agent loop 尚未强制执行。
+resolveRuntimeDirs 在拒绝 workspace 内 state/log/tmp 前会先创建目录，需要改成先校验后 mkdir。
+```
+
+图片链路验收拆成两部分：runtime 负责附件在 workspace 内、MIME/魔数/大小/数量校验、传给模型和返回 usage；模型把图片中的文字读对属于模型能力验收。MiMo v2.5 在真实 smoke 中看到图片，但曾把 `HUO7403` 读成 `HU07403`。
 
 ## 设计理念 ✨
 

@@ -107,20 +107,32 @@ describe("assertRequiredParams", () => {
     ).toThrow(/\(received: path\)/);
   });
 
-  it("does not normalize legacy aliases during validation", async () => {
+  it("normalizes model path aliases during validation", async () => {
+    const execute = vi.fn(async (_id, args) => args);
     const tool = wrapToolParamValidation(
       {
         name: "write",
         label: "write",
         description: "write a file",
         parameters: {},
-        execute: vi.fn(),
+        execute,
       },
       REQUIRED_PARAM_GROUPS.write,
     );
-    await expect(
-      tool.execute("id", { file_path: "test.txt" }, new AbortController().signal, vi.fn()),
-    ).rejects.toThrow(/\(received: file_path\)/);
+
+    await tool.execute(
+      "id",
+      { file_path: "test.txt", content: "ok" },
+      new AbortController().signal,
+      vi.fn(),
+    );
+
+    expect(execute).toHaveBeenCalledWith(
+      "id",
+      { file_path: "test.txt", content: "ok", path: "test.txt" },
+      expect.any(AbortSignal),
+      expect.any(Function),
+    );
   });
 
   it("enforces canonical path/content at runtime", async () => {

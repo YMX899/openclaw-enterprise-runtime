@@ -147,6 +147,8 @@ export type RunEmbeddedAgentParams = {
   bootstrapContextRunKind?: "default" | "heartbeat" | "cron";
   /** Optional tool allow-list; when set, only these tools are sent to the model. */
   toolsAllow?: string[];
+  /** Optional tool deny-list; deny entries take precedence over allow entries. */
+  toolsDeny?: string[];
   /** Enterprise runtime workspace boundary for per-run filesystem/tool isolation. */
   enterpriseWorkspaceBoundary?: WorkspaceBoundary;
   /** Seen bootstrap truncation warning signatures for this session (once mode dedupe). */

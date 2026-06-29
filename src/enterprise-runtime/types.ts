@@ -1,4 +1,5 @@
 import type { RuntimeRunSpec } from "../../packages/gateway-protocol/src/schema/enterprise-runtime.js";
+import type { ResolvedRuntimeAttachment } from "./attachments.js";
 import type { ProviderCredentialPool, ResolvedRuntimeConfigSnapshot } from "./config/types.js";
 import type { ENTERPRISE_RUNTIME_SESSION_NAMESPACE } from "./constants.js";
 import type { ModelKeyLease } from "./model-broker/types.js";
@@ -36,6 +37,7 @@ export type RuntimeRunContext = {
     sessionId?: string;
   };
   input: RuntimeRunSpec["input"];
+  attachments: ResolvedRuntimeAttachment[];
   configSnapshot: ResolvedRuntimeConfigSnapshot;
   credentialPools?: ProviderCredentialPool[];
   modelKeyLease?: ModelKeyLease;

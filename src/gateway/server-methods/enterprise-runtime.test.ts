@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeRunSpec } from "../../../packages/gateway-protocol/src/schema/enterprise-runtime.js";
 import { ENTERPRISE_RUNTIME_METHOD } from "../../enterprise-runtime/constants.js";
 import { testing as brokerTesting } from "../../enterprise-runtime/model-broker/broker.js";
+import {
+  getStalledRuntimeRunCountForTest,
+  resetStalledRuntimeRunsForTest,
+} from "../../enterprise-runtime/stalled-run-guard.js";
 
 const mocks = vi.hoisted(() => ({
   runEnterpriseAgent: vi.fn(),
@@ -25,7 +29,12 @@ let tempRoot: string;
 
 async function writeRuntimeConfig(
   configPath: string,
-  params?: { allowOverride?: boolean; maxRunSeconds?: number },
+  params?: {
+    allowOverride?: boolean;
+    maxRunSeconds?: number;
+    modelInput?: Array<"text" | "image">;
+    useStores?: boolean;
+  },
 ) {
   await fs.writeFile(
     configPath,
@@ -35,9 +44,16 @@ async function writeRuntimeConfig(
           {
             id: "coding-default",
             version: "v1",
-            stateDir: path.join(tempRoot, "state"),
-            logsDir: path.join(tempRoot, "logs"),
-            tmpRoot: path.join(tempRoot, "tmp"),
+            ...(params?.useStores
+              ? {
+                  sessionStoreId: "session-file",
+                  artifactStoreId: "artifact-file",
+                }
+              : {
+                  stateDir: path.join(tempRoot, "state"),
+                  logsDir: path.join(tempRoot, "logs"),
+                  tmpRoot: path.join(tempRoot, "tmp"),
+                }),
             model: {
               modelProfileId: "openai-gpt5",
               thinking: "medium",
@@ -58,12 +74,32 @@ async function writeRuntimeConfig(
               : undefined,
           },
         ],
+        ...(params?.useStores
+          ? {
+              sessionStores: [
+                {
+                  id: "session-file",
+                  type: "file",
+                  rootDir: path.join(tempRoot, "state-from-store"),
+                },
+              ],
+              artifactStores: [
+                {
+                  id: "artifact-file",
+                  type: "file",
+                  logsDir: path.join(tempRoot, "logs-from-store"),
+                  tmpRoot: path.join(tempRoot, "tmp-from-store"),
+                },
+              ],
+            }
+          : {}),
         modelProfiles: [
           {
             id: "openai-gpt5",
             provider: "openai",
             model: "gpt-5",
             api: "openai",
+            input: params?.modelInput ?? ["text", "image"],
             authPoolId: "openai-prod",
           },
         ],
@@ -166,6 +202,7 @@ describe("enterprise.runtime.run handler", () => {
     mocks.runEnterpriseAgent.mockReset();
     brokerTesting.states.clear();
     brokerTesting.roundRobin.clear();
+    resetStalledRuntimeRunsForTest();
     await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
@@ -186,11 +223,24 @@ describe("enterprise.runtime.run handler", () => {
         openclawSessionKey:
           "runtime:tenant:tenant-1:user:user-1:workspace:workspace-1:thread:thread-1",
         workspaceDir: await fs.realpath(workspaceDir),
+        session: expect.objectContaining({
+          namespace: "enterprise-runtime",
+          storePath: path.join(
+            tempRoot,
+            "state",
+            "agents",
+            "enterprise-runtime",
+            "sessions",
+            "sessions.json",
+          ),
+        }),
         usage: expect.objectContaining({
           provider: "openai",
           model: "gpt-5",
           authPoolId: "openai-prod",
           keyId: "openai-prod-001",
+          input: ["text", "image"],
+          attachmentCount: 0,
         }),
       }),
       undefined,
@@ -218,6 +268,119 @@ describe("enterprise.runtime.run handler", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("resolves runtime directories from configured file session and artifact stores", async () => {
+    const workspaceDir = path.join(tempRoot, "workspace");
+    const configPath = path.join(tempRoot, "runtime.json");
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await writeRuntimeConfig(configPath, { useStores: true });
+
+    const respond = await invokeEnterpriseRuntime(runtimeSpec(workspaceDir, configPath));
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        status: "succeeded",
+        session: expect.objectContaining({
+          storePath: path.join(
+            tempRoot,
+            "state-from-store",
+            "agents",
+            "enterprise-runtime",
+            "sessions",
+            "sessions.json",
+          ),
+        }),
+      }),
+      undefined,
+    );
+    const result = respond.mock.calls[0]?.[1] as { logs: { eventsPath: string } };
+    expect(path.normalize(result.logs.eventsPath)).toBe(
+      path.join(tempRoot, "logs-from-store", "runs", "run-1", "events.jsonl"),
+    );
+    await expect(
+      fs.access(
+        path.join(
+          tempRoot,
+          "state-from-store",
+          "enterprise-runtime",
+          "config-snapshots",
+          "run-1.json",
+        ),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      fs.access(path.join(tempRoot, "logs-from-store", "runs", "run-1", "result.json")),
+    ).resolves.toBeUndefined();
+  });
+
+  it("preserves the concrete OpenClaw session file path returned by the agent run", async () => {
+    const workspaceDir = path.join(tempRoot, "workspace");
+    const configPath = path.join(tempRoot, "runtime.json");
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await writeRuntimeConfig(configPath);
+    const sessionFile = path.join(
+      tempRoot,
+      "state",
+      "agents",
+      "enterprise-runtime",
+      "sessions",
+      "session-1.jsonl",
+    );
+    mocks.runEnterpriseAgent.mockImplementation(async (ctx) => ({
+      result: {
+        runId: ctx.runId,
+        status: "succeeded",
+        threadId: ctx.threadId,
+        openclawSessionKey: ctx.session.sessionKey,
+        workspaceDir: ctx.workspace.root,
+        resolvedConfigSnapshotId: ctx.configSnapshot.snapshotId,
+        finalAnswer: "Done with session.",
+        session: {
+          namespace: "enterprise-runtime",
+          storePath: path.join(
+            tempRoot,
+            "state",
+            "agents",
+            "enterprise-runtime",
+            "sessions",
+            "sessions.json",
+          ),
+          sessionId: "session-1",
+          filePath: sessionFile,
+        },
+        logs: {
+          eventsPath: path.join(tempRoot, "logs", "runs", "run-1", "events.jsonl"),
+          accessDenyPath: path.join(tempRoot, "logs", "runs", "run-1", "access-deny.jsonl"),
+        },
+        usage: {
+          provider: "openai",
+          model: "gpt-5",
+          authPoolId: "openai-prod",
+          input: ["text", "image"],
+          attachmentCount: 0,
+        },
+      },
+      rawAgentResult: {
+        payloads: [{ text: "Done with session." }],
+      },
+    }));
+
+    const respond = await invokeEnterpriseRuntime(runtimeSpec(workspaceDir, configPath));
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        status: "succeeded",
+        finalAnswer: "Done with session.",
+        session: expect.objectContaining({
+          sessionId: "session-1",
+          filePath: sessionFile,
+        }),
+      }),
+      undefined,
+    );
+  });
+
   it("rejects forbidden model overrides before running the agent", async () => {
     const workspaceDir = path.join(tempRoot, "workspace");
     const configPath = path.join(tempRoot, "runtime.json");
@@ -236,6 +399,43 @@ describe("enterprise.runtime.run handler", () => {
       expect.objectContaining({
         message: expect.stringContaining("model override 'model' is not allowed"),
       }),
+    );
+  });
+
+  it("rejects image attachments when the resolved model profile is text-only", async () => {
+    const workspaceDir = path.join(tempRoot, "workspace");
+    const configPath = path.join(tempRoot, "runtime.json");
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await writeRuntimeConfig(configPath, { modelInput: ["text"] });
+    const imagePath = path.join(workspaceDir, "tiny.png");
+    await fs.writeFile(
+      imagePath,
+      Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    );
+
+    const respond = await invokeEnterpriseRuntime({
+      ...runtimeSpec(workspaceDir, configPath),
+      input: {
+        message: "Describe this image.",
+        attachments: [{ name: "tiny", path: imagePath, kind: "image/png" }],
+      },
+    });
+
+    expect(mocks.runEnterpriseAgent).not.toHaveBeenCalled();
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        status: "failed",
+        error: expect.objectContaining({ code: "RUNTIME_MODEL_INPUT_UNSUPPORTED" }),
+        usage: expect.objectContaining({
+          input: ["text"],
+          attachmentCount: 1,
+        }),
+      }),
+      undefined,
     );
   });
 
@@ -265,6 +465,154 @@ describe("enterprise.runtime.run handler", () => {
     );
   });
 
+  it("returns timeout even if the agent loop does not settle after abort", async () => {
+    const workspaceDir = path.join(tempRoot, "workspace");
+    const configPath = path.join(tempRoot, "runtime.json");
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await writeRuntimeConfig(configPath, { maxRunSeconds: 0.02 });
+    let observedAbort = false;
+    mocks.runEnterpriseAgent.mockImplementation(async (ctx) => {
+      ctx.abortSignal?.addEventListener(
+        "abort",
+        () => {
+          observedAbort = true;
+        },
+        { once: true },
+      );
+      return await new Promise(() => undefined);
+    });
+
+    const respond = await invokeEnterpriseRuntime(runtimeSpec(workspaceDir, configPath));
+
+    expect(observedAbort).toBe(true);
+    expect(mocks.runEnterpriseAgent).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        status: "timeout",
+        error: expect.objectContaining({ code: "RUNTIME_TIMEOUT" }),
+      }),
+      undefined,
+    );
+    expect(getStalledRuntimeRunCountForTest()).toBe(2);
+  });
+
+  it("fails closed for the same workspace while a timed-out agent loop is still settling", async () => {
+    const workspaceDir = path.join(tempRoot, "workspace");
+    const configPath = path.join(tempRoot, "runtime.json");
+    await fs.mkdir(workspaceDir, { recursive: true });
+    await writeRuntimeConfig(configPath, { maxRunSeconds: 0.02 });
+    let releaseAgent!: () => void;
+    const releaseAgentPromise = new Promise<void>((resolve) => {
+      releaseAgent = resolve;
+    });
+    mocks.runEnterpriseAgent.mockImplementation(async (ctx) => {
+      if (ctx.runId === "run-1") {
+        await releaseAgentPromise;
+      }
+      return {
+        result: { finalAnswer: `done ${ctx.runId}` },
+        rawAgentResult: { payloads: [{ text: `done ${ctx.runId}` }] },
+      };
+    });
+
+    const firstRespond = await invokeEnterpriseRuntime(runtimeSpec(workspaceDir, configPath));
+
+    expect(firstRespond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        runId: "run-1",
+        status: "timeout",
+      }),
+      undefined,
+    );
+    expect(getStalledRuntimeRunCountForTest()).toBe(2);
+
+    const secondRespond = await invokeEnterpriseRuntime({
+      ...runtimeSpec(workspaceDir, configPath),
+      runId: "run-2",
+    });
+
+    expect(mocks.runEnterpriseAgent).toHaveBeenCalledTimes(1);
+    expect(secondRespond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        runId: "run-2",
+        status: "failed",
+        error: expect.objectContaining({ code: "RUNTIME_RUN_STALLED" }),
+      }),
+      undefined,
+    );
+
+    releaseAgent();
+    await vi.waitFor(() => expect(getStalledRuntimeRunCountForTest()).toBe(0));
+  });
+
+  it("keeps the model key lease until a timed-out detached agent loop settles", async () => {
+    const firstWorkspaceDir = path.join(tempRoot, "workspace-1");
+    const secondWorkspaceDir = path.join(tempRoot, "workspace-2");
+    const configPath = path.join(tempRoot, "runtime.json");
+    await fs.mkdir(firstWorkspaceDir, { recursive: true });
+    await fs.mkdir(secondWorkspaceDir, { recursive: true });
+    await writeRuntimeConfig(configPath, { maxRunSeconds: 0.02 });
+    let releaseAgent!: () => void;
+    const releaseAgentPromise = new Promise<void>((resolve) => {
+      releaseAgent = resolve;
+    });
+    mocks.runEnterpriseAgent.mockImplementation(async (ctx) => {
+      if (ctx.runId === "run-1") {
+        await releaseAgentPromise;
+      }
+      return {
+        result: { finalAnswer: `done ${ctx.runId}` },
+        rawAgentResult: { payloads: [{ text: `done ${ctx.runId}` }] },
+      };
+    });
+
+    const firstRespond = await invokeEnterpriseRuntime(runtimeSpec(firstWorkspaceDir, configPath));
+
+    expect(firstRespond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        runId: "run-1",
+        status: "timeout",
+      }),
+      undefined,
+    );
+    expect(brokerTesting.stateFor("openai-prod", "openai-prod-001").inFlight).toBe(1);
+
+    const secondRespond = await invokeEnterpriseRuntime({
+      ...runtimeSpec(secondWorkspaceDir, configPath),
+      runId: "run-2",
+      workspaceId: "workspace-2",
+      workspace: {
+        realPath: secondWorkspaceDir,
+        accessMode: "write",
+      },
+      productSession: {
+        threadId: "thread-2",
+        openclawSessionKey:
+          "runtime:tenant:tenant-1:user:user-1:workspace:workspace-2:thread:thread-2",
+      },
+    });
+
+    expect(secondRespond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        runId: "run-2",
+        status: "failed",
+        error: expect.objectContaining({ code: "MODEL_KEY_POOL_BUSY" }),
+      }),
+      undefined,
+    );
+    expect(mocks.runEnterpriseAgent).toHaveBeenCalledTimes(1);
+
+    releaseAgent();
+    await vi.waitFor(() => {
+      expect(brokerTesting.stateFor("openai-prod", "openai-prod-001").inFlight).toBe(0);
+    });
+  });
+
   it("does not spend maxRunSeconds while a run is waiting in the workspace queue", async () => {
     const workspaceDir = path.join(tempRoot, "workspace");
     const firstConfigPath = path.join(tempRoot, "runtime-first.json");
@@ -290,6 +638,7 @@ describe("enterprise.runtime.run handler", () => {
           rawAgentResult: { payloads: [] },
         };
       }
+      secondStartedBeforeFirstReleased = !firstReleased;
       secondActiveAt = Date.now();
       return await new Promise((_, reject) => {
         ctx.abortSignal?.addEventListener("abort", () => reject(ctx.abortSignal?.reason), {
@@ -305,12 +654,16 @@ describe("enterprise.runtime.run handler", () => {
       runId: "run-2",
     });
     let secondSettled = false;
+    let secondStartedBeforeFirstReleased = false;
+    let firstReleased = false;
     void second.then(() => {
       secondSettled = true;
     });
 
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(secondSettled).toBe(false);
+    expect(secondActiveAt).toBe(0);
+    firstReleased = true;
     releaseFirst();
 
     const firstRespond = await first;
@@ -322,9 +675,8 @@ describe("enterprise.runtime.run handler", () => {
     await vi.waitFor(() => expect(mocks.runEnterpriseAgent).toHaveBeenCalledTimes(2));
 
     const secondRespond = await second;
-    const activeElapsedMs = Date.now() - secondActiveAt;
 
-    expect(activeElapsedMs).toBeGreaterThanOrEqual(80);
+    expect(secondStartedBeforeFirstReleased).toBe(false);
     expect(secondRespond).toHaveBeenCalledWith(
       true,
       expect.objectContaining({ runId: "run-2", status: "timeout" }),

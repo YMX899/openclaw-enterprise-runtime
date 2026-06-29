@@ -122,6 +122,28 @@ export function applyEmbeddedAttemptToolsAllow<T extends { name: string }>(
   return tools.filter((tool) => isToolAllowedByPolicyName(tool.name, policy));
 }
 
+export function applyEmbeddedAttemptToolsPolicy<T extends { name: string }>(
+  tools: T[],
+  params?: {
+    allow?: string[];
+    deny?: string[];
+    toolMeta?: (tool: T) => { pluginId: string } | undefined;
+  },
+): T[] {
+  const allowFiltered = applyEmbeddedAttemptToolsAllow(tools, params?.allow, {
+    toolMeta: params?.toolMeta,
+  });
+  const deny = params?.deny;
+  if (!deny || deny.length === 0) {
+    return allowFiltered;
+  }
+  const pluginGroups = params?.toolMeta
+    ? buildPluginToolGroups({ tools: allowFiltered, toolMeta: params.toolMeta })
+    : undefined;
+  const policy = pluginGroups ? expandPolicyWithPluginGroups({ deny }, pluginGroups) : { deny };
+  return allowFiltered.filter((tool) => isToolAllowedByPolicyName(tool.name, policy));
+}
+
 /**
  * Adds the message tool to a narrowed allowlist when the caller must support
  * forced source-reply delivery. Wildcard and undefined allowlists already cover

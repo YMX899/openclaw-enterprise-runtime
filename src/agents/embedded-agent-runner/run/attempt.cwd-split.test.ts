@@ -81,4 +81,29 @@ describe("runEmbeddedAttempt cwd/workspace split", () => {
     ).rejects.toThrow("cwd override is not supported");
     expect(hoisted.createOpenClawCodingToolsMock).not.toHaveBeenCalled();
   });
+
+  it("passes enterprise workspace boundary into coding tool construction", async () => {
+    const boundaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-enterprise-boundary-"));
+    tempPaths.push(boundaryRoot);
+    const boundary = {
+      root: boundaryRoot,
+      accessMode: "write" as const,
+      toolsAllow: ["read", "write"],
+    };
+
+    await createContextEngineAttemptRunner({
+      contextEngine: createContextEngineBootstrapAndAssemble(),
+      sessionKey: "runtime:tenant:t:user:u:workspace:w:thread:th",
+      tempPaths,
+      attemptOverrides: {
+        disableTools: false,
+        enterpriseWorkspaceBoundary: boundary,
+      },
+    });
+
+    const toolsCall = hoisted.createOpenClawCodingToolsMock.mock.calls[0]?.[0] as
+      | { enterpriseWorkspaceBoundary?: typeof boundary }
+      | undefined;
+    expect(toolsCall?.enterpriseWorkspaceBoundary).toEqual(boundary);
+  });
 });

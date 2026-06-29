@@ -11,7 +11,7 @@ import {
   resolveDefaultSessionStorePath,
   resolveSessionFilePath,
   resolveSessionFilePathOptions,
-  resolveSessionTranscriptPath,
+  resolveSessionTranscriptPathInDir,
 } from "./paths.js";
 import { resolveAndPersistSessionFile } from "./session-file.js";
 import { loadSessionStore, resolveSessionStoreEntry } from "./store.js";
@@ -121,9 +121,9 @@ export async function resolveSessionTranscriptFile(params: {
   if (params.sessionStore && params.storePath) {
     const threadIdFromSessionKey = parseSessionThreadInfo(params.sessionKey).threadId;
     const fallbackSessionFile = !sessionEntry?.sessionFile
-      ? resolveSessionTranscriptPath(
+      ? resolveSessionTranscriptPathInDir(
           params.sessionId,
-          params.agentId,
+          sessionPathOpts?.sessionsDir ?? path.dirname(params.storePath),
           params.threadId ?? threadIdFromSessionKey,
         )
       : undefined;

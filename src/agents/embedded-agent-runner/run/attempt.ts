@@ -296,6 +296,7 @@ import { abortable as abortableWithSignal } from "./abortable.js";
 import { createEmbeddedAgentSessionWithResourceLoader } from "./attempt-session.js";
 import {
   applyEmbeddedAttemptToolsAllow,
+  applyEmbeddedAttemptToolsPolicy,
   mergeForcedEmbeddedAttemptToolsAllow,
   resolveEmbeddedAttemptToolConstructionPlan,
   shouldCreateBundleLspRuntimeForAttempt,
@@ -715,6 +716,7 @@ function collectAttemptExplicitToolAllowlistSources(params: {
   senderE164?: string | null;
   sandboxToolPolicy?: { allow?: string[]; deny?: string[] };
   toolsAllow?: string[];
+  toolsDeny?: string[];
 }) {
   const { agentId, globalPolicy, globalProviderPolicy, agentPolicy, agentProviderPolicy } =
     resolveEffectiveToolPolicy({
@@ -891,10 +893,12 @@ export async function runEmbeddedAttempt(
     config: params.config,
     agentId: params.agentId,
   });
-  const effectiveFsWorkspaceOnly = resolveAttemptFsWorkspaceOnly({
-    config: params.config,
-    sessionAgentId,
-  });
+  const effectiveFsWorkspaceOnly =
+    params.enterpriseWorkspaceBoundary !== undefined ||
+    resolveAttemptFsWorkspaceOnly({
+      config: params.config,
+      sessionAgentId,
+    });
   prepStages.mark("workspace-sandbox");
 
   let restoreSkillEnv: (() => void) | undefined;
@@ -1165,6 +1169,7 @@ export async function runEmbeddedAttempt(
         ? createToolSearchCatalogRef()
         : undefined;
     const toolSearchTargetTranscriptProjections: ToolSearchTargetTranscriptProjection[] = [];
+    let toolsBeforeRuntimeDenyForEmptyAllowlistCheck: string[] = [];
     const toolsRaw = !shouldConstructTools
       ? []
       : (() => {
@@ -1264,7 +1269,19 @@ export async function runEmbeddedAttempt(
             },
           });
           corePluginToolStages.mark("attempt:create-openclaw-coding-tools");
-          const filteredTools = applyEmbeddedAttemptToolsAllow(allTools, effectiveToolsAllow, {
+          const toolsBeforeRuntimeDeny = applyEmbeddedAttemptToolsAllow(
+            allTools,
+            effectiveToolsAllow,
+            {
+              toolMeta: (tool) => getPluginToolMeta(tool),
+            },
+          );
+          toolsBeforeRuntimeDenyForEmptyAllowlistCheck = toolsBeforeRuntimeDeny.map(
+            (tool) => tool.name,
+          );
+          const filteredTools = applyEmbeddedAttemptToolsPolicy(toolsBeforeRuntimeDeny, {
+            allow: effectiveToolsAllow,
+            deny: params.toolsDeny,
             toolMeta: (tool) => getPluginToolMeta(tool),
           });
           corePluginToolStages.mark("attempt:tools-allow");
@@ -1666,11 +1683,17 @@ export async function runEmbeddedAttempt(
         : undefined,
       explicitAllowlistSources: explicitToolAllowlistSources,
     });
+    const callableToolNamesForEmptyAllowlistCheck =
+      params.toolsDeny && params.toolsDeny.length > 0
+        ? toolSearchRunPlan.emptyAllowlistCallableNames.length > 0
+          ? toolSearchRunPlan.emptyAllowlistCallableNames
+          : toolsBeforeRuntimeDenyForEmptyAllowlistCheck
+        : toolSearchRunPlan.emptyAllowlistCallableNames;
     const allowedToolNames = toolSearchRunPlan.visibleAllowedToolNames;
     const replayAllowedToolNames = toolSearchRunPlan.replayAllowedToolNames;
     const emptyExplicitToolAllowlistError = buildEmptyExplicitToolAllowlistError({
       sources: explicitToolAllowlistSources,
-      callableToolNames: toolSearchRunPlan.emptyAllowlistCallableNames,
+      callableToolNames: callableToolNamesForEmptyAllowlistCheck,
       toolsEnabled,
       disableTools: params.disableTools,
     });

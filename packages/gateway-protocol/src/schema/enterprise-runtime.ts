@@ -119,6 +119,16 @@ export const RuntimeQueueStateSchema = Type.Object(
   { additionalProperties: false },
 );
 
+const RuntimeSessionResultSchema = Type.Object(
+  {
+    namespace: NonEmptyString,
+    storePath: NonEmptyString,
+    sessionId: Type.Optional(NonEmptyString),
+    filePath: Type.Optional(NonEmptyString),
+  },
+  { additionalProperties: false },
+);
+
 export const RuntimeRunResultSchema = Type.Object(
   {
     runId: NonEmptyString,
@@ -132,6 +142,7 @@ export const RuntimeRunResultSchema = Type.Object(
     openclawSessionKey: NonEmptyString,
     workspaceDir: NonEmptyString,
     resolvedConfigSnapshotId: NonEmptyString,
+    session: RuntimeSessionResultSchema,
     finalAnswer: Type.Optional(Type.String()),
     queue: Type.Optional(RuntimeQueueStateSchema),
     logs: Type.Object(
@@ -152,6 +163,17 @@ export const RuntimeRunResultSchema = Type.Object(
           inputTokens: Type.Optional(Type.Integer({ minimum: 0 })),
           outputTokens: Type.Optional(Type.Integer({ minimum: 0 })),
           estimatedCostUsd: Type.Optional(Type.Number({ minimum: 0 })),
+          input: Type.Optional(
+            Type.Array(
+              Type.Union([
+                Type.Literal("text"),
+                Type.Literal("image"),
+                Type.Literal("video"),
+                Type.Literal("audio"),
+              ]),
+            ),
+          ),
+          attachmentCount: Type.Optional(Type.Integer({ minimum: 0 })),
         },
         { additionalProperties: false },
       ),

@@ -184,6 +184,26 @@ describe("buildSystemPromptReport", () => {
     expect(sameLengthChangedPrompt.systemPrompt.hash).not.toBe(report.systemPrompt.hash);
   });
 
+  it("includes skill locations in report entries", () => {
+    const file = makeBootstrapFile({ path: "/tmp/workspace/AGENTS.md" });
+    const report = buildSystemPromptReport({
+      source: "run",
+      generatedAt: 0,
+      bootstrapMaxChars: 20_000,
+      systemPrompt: "system",
+      bootstrapFiles: [file],
+      injectedFiles: [],
+      skillsPrompt:
+        "<available_skills>\n  <skill>\n    <name>docs</name>\n    <location>skills/docs/SKILL.md</location>\n  </skill>\n</available_skills>",
+      tools: [],
+    });
+
+    expect(report.skills.entries[0]).toMatchObject({
+      name: "docs",
+      location: "skills/docs/SKILL.md",
+    });
+  });
+
   it("keeps reporting when a tool schema cannot be stringified", () => {
     const file = makeBootstrapFile({ path: "/tmp/workspace/AGENTS.md" });
     const circularSchema: Record<string, unknown> = {
