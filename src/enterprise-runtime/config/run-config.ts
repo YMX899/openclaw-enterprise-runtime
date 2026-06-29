@@ -178,6 +178,14 @@ export function buildEnterpriseRunOpenClawConfig(params: {
             ...(snapshot.model.params ? { params: snapshot.model.params } : {}),
           },
         },
+        subagents: {
+          ...baseConfig.agents?.defaults?.subagents,
+          delegationMode: "suggest",
+          allowAgents: [],
+          maxSpawnDepth: 0,
+          maxChildrenPerAgent: 0,
+          requireAgentId: true,
+        },
       },
     },
     plugins: {

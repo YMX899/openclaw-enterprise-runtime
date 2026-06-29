@@ -84,6 +84,13 @@ describe("buildEnterpriseRunOpenClawConfig", () => {
     expect(cfg.agents?.defaults?.skipBootstrap).toBe(true);
     expect(cfg.agents?.defaults?.reasoningDefault).toBe("stream");
     expect(cfg.agents?.defaults?.compaction).toEqual({ enabled: true, reserveTokens: 4096 });
+    expect(cfg.agents?.defaults?.subagents).toMatchObject({
+      delegationMode: "suggest",
+      allowAgents: [],
+      maxSpawnDepth: 0,
+      maxChildrenPerAgent: 0,
+      requireAgentId: true,
+    });
   });
 
   it("does not inject a key when no lease is present", () => {

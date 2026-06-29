@@ -139,6 +139,33 @@ shell/process without sandbox -> fail closed
 
 The queue, session lock, stalled-run guard, and key lease are in-process mechanisms. Multi-instance deployment must replace them with Redis, database, or another distributed coordination layer.
 
+## Subagent policy
+
+The enterprise runtime service runs only the main OpenClaw agent loop for each `enterprise.runtime.run` request. It does not expose child-agent/subagent orchestration to the model.
+
+Service-level tool policy removes these tools from every run, even if the runtime config or request tries to allow them:
+
+```text
+sessions_spawn
+sessions_yield
+sessions_list
+sessions_history
+sessions_send
+subagents
+agents_list
+```
+
+The per-run OpenClaw config also sets the default subagent policy to fail closed:
+
+```text
+agents.defaults.subagents.allowAgents = []
+agents.defaults.subagents.maxSpawnDepth = 0
+agents.defaults.subagents.maxChildrenPerAgent = 0
+agents.defaults.subagents.requireAgentId = true
+```
+
+This keeps one product request mapped to one active main agent execution. Cross-workspace concurrency still works through independent top-level runs; same-workspace runs remain serialized by the workspace queue.
+
 ## Timeout and stalled runs
 
 `limits.maxRunSeconds` starts after a run becomes active. The handler wraps `runEnterpriseAgent` with hard timeout behavior. If the abort signal fires and the agent loop does not settle, the API still returns `status = "timeout"`.

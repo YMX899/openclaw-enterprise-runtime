@@ -400,6 +400,7 @@ OpenClaw remains the execution engine. This fork adds the pieces needed to make 
 - Main model calls can use a shared API key pool.
 - Rate-limited keys are cooled down and skipped.
 - Stress tests verify 1000 concurrent agent runs at the gateway/model boundary.
+- `enterprise.runtime.run` disables child-agent/subagent and cross-session orchestration tools at the service boundary.
 - The architecture is designed around meta workspaces and temporary runtime workspaces.
 
 ## The mental model

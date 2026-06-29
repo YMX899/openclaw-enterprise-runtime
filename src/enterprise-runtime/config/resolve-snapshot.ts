@@ -1,5 +1,6 @@
 import type { RuntimeRunSpec } from "../../../packages/gateway-protocol/src/schema/enterprise-runtime.js";
 import { EnterpriseRuntimeError } from "../errors.js";
+import { applyEnterpriseRuntimeSubagentToolPolicy } from "../subagent-policy.js";
 import { objectHash } from "./hash.js";
 import { assertRuntimeOverridesAllowed, stripReadModeMutatingTools } from "./override-policy.js";
 import type {
@@ -108,6 +109,11 @@ export function resolveRuntimeConfigSnapshot(params: {
   const pool = findPool(configFile, model.authPoolId);
   const toolsAllow = unique([...(runtimeConfig.tools?.allow ?? []), ...(spec.tools?.allow ?? [])]);
   const toolsDeny = unique([...(runtimeConfig.tools?.deny ?? []), ...(spec.tools?.deny ?? [])]);
+  const tools = applyEnterpriseRuntimeSubagentToolPolicy({
+    allow:
+      spec.workspace.accessMode === "read" ? stripReadModeMutatingTools(toolsAllow) : toolsAllow,
+    deny: toolsDeny,
+  });
   const snapshot: ResolvedRuntimeConfigSnapshot = {
     snapshotId: `${spec.runId}-${objectHash({ runId: spec.runId, runtimeConfig, profile, spec }).slice(0, 12)}`,
     runId: spec.runId,
@@ -115,11 +121,7 @@ export function resolveRuntimeConfigSnapshot(params: {
     runtimeConfigId: runtimeConfig.id,
     runtimeConfigVersion: runtimeConfig.version,
     model,
-    tools: {
-      allow:
-        spec.workspace.accessMode === "read" ? stripReadModeMutatingTools(toolsAllow) : toolsAllow,
-      deny: toolsDeny,
-    },
+    tools,
     plugins: {
       enabled: unique([
         ...(runtimeConfig.plugins?.enabled ?? []),

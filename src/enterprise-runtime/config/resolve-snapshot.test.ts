@@ -153,4 +153,66 @@ describe("resolveRuntimeConfigSnapshot", () => {
       /credential pool not found: missing-pool/,
     );
   });
+
+  it("hard-disables subagent orchestration tools in enterprise runtime snapshots", () => {
+    const configFile: EnterpriseRuntimeConfigFile = {
+      runtimeConfigs: [
+        {
+          id: "coding-default",
+          model: { modelProfileId: "profile-1" },
+          tools: {
+            allow: [
+              "read",
+              "sessions_spawn",
+              "sessions_list",
+              "sessions_history",
+              "sessions_send",
+              "subagents",
+              "agents_list",
+              "sessions_yield",
+            ],
+            deny: ["write"],
+          },
+        },
+      ],
+      modelProfiles: [
+        {
+          id: "profile-1",
+          provider: "openai",
+          model: "gpt-5",
+          authPoolId: "pool-1",
+        },
+      ],
+      credentialPools: [
+        {
+          id: "pool-1",
+          provider: "openai",
+          keys: [{ keyId: "key-1", secretRef: "env:OPENAI_API_KEY" }],
+        },
+      ],
+    };
+
+    const { snapshot } = resolveRuntimeConfigSnapshot({
+      configFile,
+      spec: {
+        ...spec(),
+        tools: {
+          allow: ["sessions_spawn", "sessions_list", "read"],
+          deny: ["subagents"],
+        },
+      },
+    });
+
+    expect(snapshot.tools.allow).toEqual(["read"]);
+    expect(snapshot.tools.deny).toEqual([
+      "write",
+      "subagents",
+      "sessions_spawn",
+      "sessions_yield",
+      "sessions_list",
+      "sessions_history",
+      "sessions_send",
+      "agents_list",
+    ]);
+  });
 });

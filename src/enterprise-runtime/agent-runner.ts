@@ -6,6 +6,7 @@ import { defaultRuntime } from "../runtime.js";
 import { buildEnterpriseRunOpenClawConfig } from "./config/run-config.js";
 import { ENTERPRISE_RUNTIME_SESSION_NAMESPACE } from "./constants.js";
 import { buildEnterpriseRuntimeSessionResult } from "./session-store.js";
+import { applyEnterpriseRuntimeSubagentToolPolicy } from "./subagent-policy.js";
 import type { RuntimeRunContext } from "./types.js";
 
 function imageInputsFromContext(
@@ -66,6 +67,7 @@ export async function runEnterpriseAgent(
     lease: ctx.modelKeyLease,
   });
   const imageInput = imageInputsFromContext(ctx);
+  const tools = applyEnterpriseRuntimeSubagentToolPolicy(ctx.configSnapshot.tools);
   const agentOpts: AgentCommandIngressOpts = {
     message: ctx.input.message,
     transcriptMessage: ctx.input.message,
@@ -84,8 +86,8 @@ export async function runEnterpriseAgent(
         : undefined,
     promptMode: ctx.configSnapshot.prompt?.mode,
     extraSystemPrompt: ctx.configSnapshot.prompt?.extraSystemPrompt,
-    toolsAllow: ctx.configSnapshot.tools.allow,
-    toolsDeny: ctx.configSnapshot.tools.deny,
+    toolsAllow: tools.allow,
+    toolsDeny: tools.deny,
     senderIsOwner: true,
     allowModelOverride: true,
     deliver: false,

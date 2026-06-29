@@ -440,7 +440,7 @@ function buildWebchatCanvasSection(params: {
   ];
 }
 
-function buildExecutionBiasSection(params: { isMinimal: boolean }) {
+function buildExecutionBiasSection(params: { isMinimal: boolean; hasSessionsSpawn: boolean }) {
   if (params.isMinimal) {
     return [];
   }
@@ -452,7 +452,9 @@ function buildExecutionBiasSection(params: { isMinimal: boolean }) {
     "- Weak/empty tool result: vary query, path, command, or source before concluding.",
     "- Mutable facts need live checks: files, git, clocks, versions, services, processes, package state.",
     "- Final answer needs evidence: test/build/lint, screenshot, inspection, tool output, or a named blocker.",
-    "- Longer work: brief progress update, then keep going; use background work or sub-agents when they fit.",
+    params.hasSessionsSpawn
+      ? "- Longer work: brief progress update, then keep going; use background work or sub-agents when they fit."
+      : "- Longer work: brief progress update, then keep going with the available tools.",
     "",
   ];
 }
@@ -1018,6 +1020,10 @@ export function buildAgentSystemPrompt(params: {
       ...(renderOpenClawToolWorkflowHints
         ? [
             `For long waits, avoid rapid poll loops: use ${execToolName} with enough yieldMs or ${processToolName}(action=poll, timeout=<ms>).`,
+          ]
+        : []),
+      ...(renderOpenClawToolWorkflowHints && hasSessionsSpawn
+        ? [
             "Larger work: use `sessions_spawn`; completion is push-based.",
             '`sessions_spawn`: omit `context` unless transcript needed; then set `context:"fork"`.',
           ]
@@ -1040,7 +1046,7 @@ export function buildAgentSystemPrompt(params: {
               : []),
           ]
         : []),
-      ...(renderOpenClawToolWorkflowHints
+      ...(renderOpenClawToolWorkflowHints && (availableTools.has("subagents") || hasSessionsSpawn)
         ? [
             availableTools.has("sessions_yield")
               ? "Do not poll `subagents list` / `sessions_list` in a loop; use `sessions_yield` when waiting for spawned sub-agent completion events, and check status only on-demand (for intervention, debugging, or when explicitly asked)."
@@ -1081,6 +1087,7 @@ export function buildAgentSystemPrompt(params: {
         override: providerSectionOverrides.execution_bias,
         fallback: buildExecutionBiasSection({
           isMinimal,
+          hasSessionsSpawn,
         }),
       }),
       ...buildOverridablePromptSection({
